@@ -10,7 +10,7 @@ import (
 	"os/signal"
 	"time"
 
-	"github.com/blood-vessel/vitals/assert"
+	"github.com/blood-vessel/basex/assert"
 	"github.com/charmbracelet/log"
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
