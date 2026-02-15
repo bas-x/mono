@@ -1,0 +1,161 @@
+:root {
+  color-scheme: light;
+
+  /* Typography */
+  --font-family-base: 'Segoe UI', 'SF Pro Text', -apple-system, BlinkMacSystemFont, sans-serif;
+  --line-height-base: 1.5;
+  --font-weight-base: 400;
+
+  /* Brand / semantic colors */
+  --color-primary: #1e3a8a;
+  --color-primary-strong: #0f172a;
+  --color-secondary: #334155;
+  --color-accent: #2563eb;
+
+  /* Surface + text */
+  --color-bg: #f3f6fa;
+  --color-surface: #ffffff;
+  --color-text: #0f172a;
+  --color-text-muted: #334155;
+  --color-border: #d6dbe3;
+  --color-header-text: #ffffff;
+
+  /* Effects */
+  --header-gradient: linear-gradient(120deg, var(--color-primary-strong), var(--color-primary));
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+
+    --color-primary: #60a5fa;
+    --color-primary-strong: #1e3a8a;
+    --color-secondary: #cbd5e1;
+    --color-accent: #93c5fd;
+
+    --color-bg: #0b1220;
+    --color-surface: #111827;
+    --color-text: #e2e8f0;
+    --color-text-muted: #cbd5e1;
+    --color-border: #253041;
+    --color-header-text: #f8fafc;
+
+    --header-gradient: linear-gradient(120deg, #111827, #1e3a8a);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: var(--font-family-base);
+  line-height: var(--line-height-base);
+  font-weight: var(--font-weight-base);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+  gap: 1rem;
+}
+
+.app-header {
+  background: var(--header-gradient);
+  color: var(--color-header-text);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: clamp(1.25rem, 2.2vw, 1.75rem);
+  letter-spacing: 0.03em;
+}
+
+.app-main {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: 1fr;
+  flex: 1;
+}
+
+.panel {
+  border-radius: 0.75rem;
+  padding: 1rem;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  min-height: 220px;
+}
+
+.panel h2 {
+  margin: 0;
+  font-size: 1rem;
+  color: var(--color-text-muted);
+}
+
+.panel-rpc {
+  min-height: auto;
+}
+
+.rpc-meta p,
+.rpc-actions p {
+  margin: 0.4rem 0;
+  font-size: 0.92rem;
+  color: var(--color-text-muted);
+}
+
+.rpc-actions {
+  margin-top: 0.75rem;
+}
+
+.rpc-actions button {
+  border: 1px solid var(--color-border);
+  background: var(--color-primary);
+  color: var(--color-header-text);
+  border-radius: 0.5rem;
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+}
+
+.rpc-actions button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.rpc-status {
+  font-weight: 600;
+}
+
+.rpc-status-success {
+  color: #15803d;
+}
+
+.rpc-status-error {
+  color: #b91c1c;
+}
+
+@media (min-width: 900px) {
+  .app-main {
+    grid-template-columns: 2fr 1fr;
+  }
+
+  .panel-map,
+  .panel-timeline {
+    min-height: 560px;
+  }
+
+  .panel-rpc {
+    grid-column: 1 / -1;
+  }
+}
