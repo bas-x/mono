@@ -31,8 +31,26 @@ pnpm --dir frontend dev
 
 Create `frontend/.env` or `frontend/.env.local` for local values.
 
-Example placeholder:
+Supported variables:
+
+- `VITE_API_BASE_URL` - backend base URL (default: `http://localhost:8080`)
+- `VITE_RPC_PROTOCOL` - RPC protocol: `connect` or `grpc-web` (default: `connect`)
+- `VITE_USE_MOCK_RPC` - `true` or `false` (default: `true`)
+
+Mock mode (default, no backend required):
 
 ```env
 VITE_API_BASE_URL=http://localhost:8080
+VITE_RPC_PROTOCOL=connect
+VITE_USE_MOCK_RPC=true
 ```
+
+Point to a real backend:
+
+```env
+VITE_API_BASE_URL=http://localhost:8080
+VITE_RPC_PROTOCOL=connect
+VITE_USE_MOCK_RPC=false
+```
+
+Note: real mode currently has a placeholder Health client until generated service definitions are added under `src/gen`.
