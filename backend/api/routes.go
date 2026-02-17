@@ -3,7 +3,7 @@ package api
 import (
 	"net/http"
 
-	"github.com/blood-vessel/basex/assert"
+	"github.com/bas-x/basex/assert"
 	"github.com/charmbracelet/log"
 	"github.com/spf13/viper"
 

@@ -7,7 +7,7 @@ import (
 	"net"
 	"os"
 
-	"github.com/blood-vessel/basex/api"
+	"github.com/bas-x/basex/api"
 	"github.com/charmbracelet/log"
 	"github.com/joho/godotenv"
 	"github.com/spf13/viper"
