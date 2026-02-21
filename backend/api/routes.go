@@ -16,10 +16,10 @@ func registerRoutes(
 	config *viper.Viper,
 	deps *ServerDependencies,
 ) {
-	assert.AssertNotNil(e)
-	assert.AssertNotNil(logger)
-	assert.AssertNotNil(deps)
-	assert.AssertNotNil(config)
+	assert.NotNil(e, "echo")
+	assert.NotNil(logger, "logger")
+	assert.NotNil(deps, "deps")
+	assert.NotNil(config, "config")
 
 	e.GET("", func(c echo.Context) error {
 		logger.Debug("basex")

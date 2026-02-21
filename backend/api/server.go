@@ -26,10 +26,10 @@ type RunOptions struct {
 }
 
 func Run(ctx context.Context, opts *RunOptions) error {
-	assert.AssertNotNil(opts)
-	assert.AssertNotNil(opts.Config)
-	assert.AssertNotNil(opts.Listener)
-	assert.AssertNotNil(opts.Writer)
+	assert.NotNil(opts, "run options")
+	assert.NotNil(opts.Config, "run config")
+	assert.NotNil(opts.Listener, "run listener")
+	assert.NotNil(opts.Writer, "run writer")
 
 	ctx, cancel := signal.NotifyContext(ctx, os.Interrupt)
 	defer cancel()
@@ -41,14 +41,14 @@ func Run(ctx context.Context, opts *RunOptions) error {
 	}
 
 	deps := initDeps(opts.Config)
-	assert.AssertNotNil(deps)
+	assert.NotNil(deps, "server dependencies")
 
 	server := newServer(
 		logger,
 		opts.Config,
 		deps,
 	)
-	assert.AssertNotNil(server)
+	assert.NotNil(server, "http server")
 
 	go func() {
 		log.Info("serving")
@@ -75,15 +75,15 @@ type ServerDependencies struct {
 }
 
 func initDeps(config *viper.Viper) *ServerDependencies {
-	assert.AssertNotNil(config)
+	assert.NotNil(config, "config")
 
 	return &ServerDependencies{}
 }
 
 func newServer(logger *log.Logger, config *viper.Viper, deps *ServerDependencies) *http.Server {
-	assert.AssertNotNil(logger)
-	assert.AssertNotNil(config)
-	assert.AssertNotNil(deps)
+	assert.NotNil(logger, "logger")
+	assert.NotNil(config, "config")
+	assert.NotNil(deps, "server dependencies")
 
 	e := echo.New()
 	e.IPExtractor = echo.ExtractIPDirect()
@@ -111,7 +111,7 @@ func newServer(logger *log.Logger, config *viper.Viper, deps *ServerDependencies
 
 	registerRoutes(e, logger, config, deps)
 
-	assert.AssertNotNil(server)
+	assert.NotNil(server, "http server")
 	return server
 }
 
