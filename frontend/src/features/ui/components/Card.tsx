@@ -6,10 +6,20 @@ type CardProps = PropsWithChildren<{
   ariaLabel?: string;
 }>;
 
-export function Card({ title, className = '', ariaLabel, children }: CardProps) {
+function mergeClassNames(...parts: Array<string | undefined>) {
+  return parts.filter(Boolean).join(' ');
+}
+
+export function Card({ title, className, ariaLabel, children }: CardProps) {
   return (
-    <section className={`panel ${className}`.trim()} aria-label={ariaLabel}>
-      <h2>{title}</h2>
+    <section
+      className={mergeClassNames(
+        'min-h-55 rounded-xl border border-border bg-surface p-4 dark:border-border dark:bg-surface',
+        className,
+      )}
+      aria-label={ariaLabel}
+    >
+      <h2 className="m-0 text-base font-semibold text-text-muted dark:text-text-muted">{title}</h2>
       {children}
     </section>
   );

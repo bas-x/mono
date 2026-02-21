@@ -1,5 +1,5 @@
 import { Card } from '../../ui';
 
 export function MapPanel() {
-  return <Card className="panel-map" ariaLabel="Map section" title="Map" />;
+  return <Card className="min-[900px]:min-h-140" ariaLabel="Map section" title="Map" />;
 }

@@ -1,7 +1,5 @@
 import { Card } from '../../ui';
 
 export function TimelinePanel() {
-  return (
-    <Card className="panel-timeline" ariaLabel="Timeline section" title="Timeline" />
-  );
+  return <Card className="min-[900px]:min-h-140" ariaLabel="Timeline section" title="Timeline" />;
 }
