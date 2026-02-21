@@ -2,10 +2,7 @@ module github.com/bas-x/basex
 
 go 1.25.0
 
-require (
-	github.com/bas-x/vitals v0.0.0-20250830120441-2db3682a92ca
-	github.com/joho/godotenv v1.5.1
-)
+require github.com/joho/godotenv v1.5.1
 
 require (
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect

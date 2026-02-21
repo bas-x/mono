@@ -25,6 +25,9 @@ func registerRoutes(
 		logger.Debug("basex")
 		return c.String(http.StatusOK, "basex")
 	})
+
+	e.GET("/health", GetHealth(logger))
+	e.GET("/ping", GetPing(logger))
 }
 
 func bindAndValidate[T any](c echo.Context) (*T, error) {

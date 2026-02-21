@@ -1,9 +1,11 @@
 # For details on buf.yaml configuration, visit https://buf.build/docs/configuration/v2/buf-yaml
 version: v2
-name: buf.build/bloodvessel/basex
+name: buf.build/bas-x/frontend-api
 lint:
   use:
     - STANDARD
+  except:
+    - PACKAGE_VERSION_SUFFIX
 breaking:
   use:
     - FILE
