@@ -1,1 +1,1 @@
-export { TimelinePanel } from './components/TimelinePanel';
+export { TimelinePanel } from '@/features/timeline/components/TimelinePanel';

@@ -7,7 +7,7 @@ import {
   type SimulationEventEnvelope,
 } from '@/lib/api';
 
-import { Card } from '../../ui';
+import { Card } from '@/features/ui';
 
 type PingState =
   | { status: 'idle'; message: string }

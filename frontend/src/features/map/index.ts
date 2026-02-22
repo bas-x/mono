@@ -1,1 +1,1 @@
-export { MapPanel } from './components/MapPanel';
+export { MapPanel } from '@/features/map/components/MapPanel';

@@ -1,8 +1,8 @@
-export { createApiClients } from './clients';
-export { parseApiConfigFromEnv, SIMULATION_WS_PATH } from './config';
-export { queryKeys } from './query-keys';
-export { useApi } from './useApi';
-export { useSimulationStream } from './useSimulationStream';
+export { createApiClients } from '@/lib/api/clients';
+export { parseApiConfigFromEnv, SIMULATION_WS_PATH } from '@/lib/api/config';
+export { queryKeys } from '@/lib/api/query-keys';
+export { useApi } from '@/lib/api/useApi';
+export { useSimulationStream } from '@/lib/api/useSimulationStream';
 export type {
   ApiConfig,
   ApiClients,
@@ -12,4 +12,4 @@ export type {
   SimulationEventEnvelope,
   SimulationEventType,
   SimulationStreamClient,
-} from './types';
+} from '@/lib/api/types';

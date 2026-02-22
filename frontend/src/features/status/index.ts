@@ -1,1 +1,1 @@
-export { ApiStatusPanel } from './components/ApiStatusPanel';
+export { ApiStatusPanel } from '@/features/status/components/ApiStatusPanel';

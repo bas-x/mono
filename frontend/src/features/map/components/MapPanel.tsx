@@ -1,4 +1,4 @@
-import { Card } from '../../ui';
+import { Card } from '@/features/ui';
 
 export function MapPanel() {
   return (

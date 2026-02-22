@@ -1,2 +1,2 @@
-export { Card } from './components/Card';
-export { Navbar } from './components/Navbar';
+export { Card } from '@/features/ui/components/Card';
+export { Navbar } from '@/features/ui/components/Navbar';
