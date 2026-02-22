@@ -40,7 +40,7 @@ This glossary is the source of truth for terms used in code, docs, and UI.
 
 - **Backend (`/backend`)**: Deterministic event-driven simulation engine and planning logic.
 - **Simulation model**: State transitions are represented as immutable events; state is reconstructed/advanced from events.
-- **RPC**: ConnectRPC between frontend and backend; supports request/response and streaming updates.
+- **Interface layer**: Transport-neutral API abstraction. Frontend uses HTTP endpoints for request/response and WebSocket streams for realtime updates.
 - **Frontend (`/frontend`)**: UI rendering layer for map, timeline, branch controls, and plan comparison.
 - **Replay + branching**: Timeline checkpoints allow branch creation and side-by-side run comparison.
 
@@ -69,7 +69,7 @@ Target demo sequence:
 - Never introduce non-deterministic behavior into simulation.
 - Keep domain language aligned with this glossary.
 - Frontend must not reimplement simulation logic.
-- Keep RPC integration behind the `src/lib/rpc/*` abstraction.
+- Keep API/realtime integration behind the `src/lib/api/*` abstraction.
 - New features must function in replay mode.
 
 ## AI Update Rule
@@ -79,5 +79,5 @@ When implementing or modifying a feature:
 - Update relevant `docs/context/*` files.
 - If introducing new domain terms, update the glossary.
 - If modifying simulation behavior, document determinism impact.
-- If adding RPC endpoints, document in `api.md`.
+- If adding or changing HTTP/WebSocket endpoints, document in `api.md`.
 - If affecting demo flow, update demo documentation.

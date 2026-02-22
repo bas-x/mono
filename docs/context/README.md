@@ -6,7 +6,7 @@ Each feature has a dedicated context folder:
 
 Expected files:
 - `context.md` (mandatory)
-- `api.md` (required if RPC is involved)
+- `api.md` (required if API or realtime transport is involved)
 - `ui.md` (required if frontend-heavy)
 - `simulation.md` (required if backend simulation logic changes)
 - `demo.md` (required if demo flow/steps/metrics change)
