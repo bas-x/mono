@@ -14,7 +14,7 @@ export function Card({ title, className, ariaLabel, children }: CardProps) {
   return (
     <section
       className={mergeClassNames(
-        'min-h-55 rounded-xl border border-border bg-surface p-4 dark:border-border dark:bg-surface',
+        'min-h-55 bg-surface p-4 dark:border-border dark:bg-surface',
         className,
       )}
       aria-label={ariaLabel}
