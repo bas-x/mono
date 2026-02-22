@@ -42,7 +42,7 @@ export function BaseXOps() {
   }, [simulationStream]);
 
   async function handlePing() {
-    setPingState({ status: 'loading', message: 'Pinging backend...' });
+    setPingState({ status: 'loading', message: 'Pinging backend…' });
     try {
       const response = await clients.health.ping();
       setPingState({
@@ -64,11 +64,17 @@ export function BaseXOps() {
 
   return (
     <div className="flex min-h-screen flex-col gap-4 p-4">
+      <a
+        href="#main-content"
+        className="sr-only rounded-md bg-surface px-3 py-2 text-text focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+      >
+        Skip to main content
+      </a>
       <Navbar title="bas X" />
-      <main className="grid flex-1 grid-cols-1 gap-4 min-[900px]:grid-cols-[2fr_1fr]">
+      <main id="main-content" className="grid flex-1 grid-cols-1 gap-4 min-[900px]:grid-cols-[2fr_1fr]">
         <MapPanel />
         <TimelinePanel />
-        <Card className="min-h-auto min-[900px]:col-span-2" ariaLabel="API status section" title="API status">
+        <Card className="min-h-auto min-[900px]:col-span-2" ariaLabel="API status section" title="API Status">
           <div className="space-y-1 text-sm text-text-muted">
             <p>
               <strong>Mode:</strong> {config.useMock ? 'Mock' : 'Real'}
@@ -98,11 +104,13 @@ export function BaseXOps() {
               type="button"
               onClick={handlePing}
               disabled={pingState.status === 'loading'}
-              className="cursor-pointer rounded-md border border-border bg-primary px-3 py-1.5 font-medium text-header-text disabled:cursor-not-allowed disabled:opacity-60"
+              className="cursor-pointer rounded-md border border-border bg-primary px-3 py-1.5 font-medium text-header-text transition-colors hover:bg-primary-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {pingState.status === 'loading' ? 'Pinging...' : 'Ping backend'}
+              {pingState.status === 'loading' ? 'Pinging…' : 'Ping backend'}
             </button>
-            <p className={`font-semibold ${pingStatusClassName}`}>{pingState.message}</p>
+            <p aria-live="polite" className={`font-semibold ${pingStatusClassName}`}>
+              {pingState.message}
+            </p>
             {pingState.status === 'success' ? <p className="text-text-muted">Time: {pingState.payload.time}</p> : null}
           </div>
         </Card>
