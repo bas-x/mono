@@ -2,11 +2,16 @@ package simulation
 
 import (
 	"math/rand/v2"
+	"strings"
 	"testing"
 	"testing/synctest"
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/bas-x/basex/assets"
+	"github.com/bas-x/basex/geometry"
+	"github.com/bas-x/basex/prng"
 )
 
 func TestRandSourceCopy(t *testing.T) {
@@ -99,4 +104,89 @@ func TestSimulation_RunnerPauseAndBranch(t *testing.T) {
 			require.False(t, cloneRunner.active.Load())
 		})
 	})
+}
+
+func TestSimulationInitAirbases(t *testing.T) {
+	ts := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
+	sim := NewSimulator([32]byte{9, 9, 9}, ts)
+	options := &SimulationOptions{
+		Airbases: AirbasesOptions{
+			IncludeRegions:    []string{"Blekinge"},
+			MinPerRegion:      2,
+			MaxPerRegion:      3,
+			MaxTotal:          5,
+			RegionProbability: prng.New(1, 1),
+		},
+	}
+
+	require.NoError(t, sim.Init(options))
+	bases := sim.Airbases()
+	require.NotEmpty(t, bases)
+	require.LessOrEqual(t, len(bases), 5)
+
+	region := findRegionByName(t, "Blekinge")
+	for _, base := range bases {
+		require.Equal(t, "Blekinge", base.Region)
+		require.Truef(t, pointInsideRegion(base.Location, region), "base %+v not inside region", base)
+	}
+}
+
+func TestSimulationInitDeterministic(t *testing.T) {
+	seed := [32]byte{1, 2, 3}
+	opts := &SimulationOptions{
+		Airbases: AirbasesOptions{
+			IncludeRegions:    []string{"Blekinge", "Gotland"},
+			MinPerRegion:      1,
+			MaxPerRegion:      2,
+			MaxTotal:          6,
+			RegionProbability: prng.New(1, 1),
+		},
+	}
+
+	ts1 := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
+	sim1 := NewSimulator(seed, ts1)
+	require.NoError(t, sim1.Init(opts))
+
+	ts2 := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
+	sim2 := NewSimulator(seed, ts2)
+	require.NoError(t, sim2.Init(opts))
+
+	require.Equal(t, sim1.Airbases(), sim2.Airbases())
+}
+
+func TestSimulationInitRespectsMaxTotal(t *testing.T) {
+	ts := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
+	sim := NewSimulator([32]byte{5, 5, 5}, ts)
+	opts := &SimulationOptions{
+		Airbases: AirbasesOptions{
+			IncludeRegions:    []string{"Blekinge", "Gotland", "Halland"},
+			MinPerRegion:      1,
+			MaxPerRegion:      5,
+			MaxTotal:          3,
+			RegionProbability: prng.New(1, 1),
+		},
+	}
+	require.NoError(t, sim.Init(opts))
+	require.LessOrEqual(t, len(sim.Airbases()), 3)
+}
+
+func pointInsideRegion(point geometry.Point, region assets.Region) bool {
+	for _, area := range region.Areas {
+		poly := toGeometryPolygon(area)
+		if pointInPolygonGeometry(point, poly) {
+			return true
+		}
+	}
+	return false
+}
+
+func findRegionByName(t *testing.T, name string) assets.Region {
+	t.Helper()
+	for _, region := range assets.Regions {
+		if strings.EqualFold(region.Name, name) {
+			return region
+		}
+	}
+	t.Fatalf("region %s not found", name)
+	return assets.Region{}
 }
