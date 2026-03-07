@@ -100,7 +100,7 @@ func fillPolygon(img *image.RGBA, points []image.Point, col color.Color) {
 
 	for y := minY; y <= maxY; y++ {
 		var intersections []int
-		for i := 0; i < len(points); i++ {
+		for i := range points {
 			j := (i + 1) % len(points)
 			p1 := points[i]
 			p2 := points[j]

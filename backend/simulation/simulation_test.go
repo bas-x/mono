@@ -110,7 +110,7 @@ func TestSimulationInitAirbases(t *testing.T) {
 	ts := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
 	sim := NewSimulator([32]byte{9, 9, 9}, ts)
 	options := &SimulationOptions{
-		Airbases: AirbasesOptions{
+		Airbases: ConstellationOptions{
 			IncludeRegions:    []string{"Blekinge"},
 			MinPerRegion:      2,
 			MaxPerRegion:      3,
@@ -134,7 +134,7 @@ func TestSimulationInitAirbases(t *testing.T) {
 func TestSimulationInitDeterministic(t *testing.T) {
 	seed := [32]byte{1, 2, 3}
 	opts := &SimulationOptions{
-		Airbases: AirbasesOptions{
+		Airbases: ConstellationOptions{
 			IncludeRegions:    []string{"Blekinge", "Gotland"},
 			MinPerRegion:      1,
 			MaxPerRegion:      2,
@@ -158,7 +158,7 @@ func TestSimulationInitRespectsMaxTotal(t *testing.T) {
 	ts := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
 	sim := NewSimulator([32]byte{5, 5, 5}, ts)
 	opts := &SimulationOptions{
-		Airbases: AirbasesOptions{
+		Airbases: ConstellationOptions{
 			IncludeRegions:    []string{"Blekinge", "Gotland", "Halland"},
 			MinPerRegion:      1,
 			MaxPerRegion:      5,
@@ -173,7 +173,7 @@ func TestSimulationInitRespectsMaxTotal(t *testing.T) {
 func pointInsideRegion(point geometry.Point, region assets.Region) bool {
 	for _, area := range region.Areas {
 		poly := toGeometryPolygon(area)
-		if pointInPolygonGeometry(point, poly) {
+		if geometry.PointInPolygon(point, poly) {
 			return true
 		}
 	}

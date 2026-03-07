@@ -10,7 +10,7 @@ func TestRandomPointInTriangle(t *testing.T) {
 	triangle := []Point{{0, 0}, {1, 0}, {0, 1}}
 	seed := [32]byte{1, 2, 3}
 	rng := rand.New(rand.NewChaCha8(seed))
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		p, err := RandomPointInPolygon(rng, triangle)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -50,7 +50,7 @@ func TestRandomPointInConcavePolygon(t *testing.T) {
 	}
 	seed := [32]byte{9, 9, 9}
 	rng := rand.New(rand.NewChaCha8(seed))
-	for i := 0; i < 200; i++ {
+	for range 200 {
 		p, err := RandomPointInPolygon(rng, poly)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -70,6 +70,29 @@ func TestRandomPointInvalid(t *testing.T) {
 	if _, err := RandomPointInPolygon(rng, []Point{{0, 0}, {1, 1}}); err == nil {
 		t.Fatalf("expected error for degenerate polygon")
 	}
+}
+
+func TestSampleFromPolygon(t *testing.T) {
+	poly := []Point{{0, 0}, {2, 0}, {2, 1}, {0, 1}}
+	seed := [32]byte{4, 5, 6}
+	rng := rand.New(rand.NewChaCha8(seed))
+	for range 100 {
+		pt, _ := SampleFromPolygon(rng, poly, 16)
+		if !PointInPolygon(pt, poly) {
+			t.Fatalf("sampled point %+v outside polygon", pt)
+		}
+	}
+}
+
+func TestSampleFromPolygonInvalid(t *testing.T) {
+	seed := [32]byte{7, 8, 9}
+	rng := rand.New(rand.NewChaCha8(seed))
+	defer func() {
+		if r := recover(); r == nil {
+			t.Fatalf("expected panic for invalid polygon")
+		}
+	}()
+	SampleFromPolygon(rng, []Point{{0, 0}, {1, 1}}, 8)
 }
 
 func pointInPolygon(p Point, vertices []Point) bool {
