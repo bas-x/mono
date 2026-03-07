@@ -14,8 +14,30 @@ export interface HealthServiceClient {
   ping(signal?: AbortSignal): Promise<HealthPingResult>;
 }
 
+export type ApiAirbasePoint = {
+  x: number;
+  y: number;
+};
+
+export type ApiAirbase = {
+  id: string;
+  area: ApiAirbasePoint[];
+  infoUrl?: string;
+};
+
+export type ApiAirbaseDetails = {
+  id: string;
+  [key: string]: unknown;
+};
+
+export interface MapServiceClient {
+  getAirbases(signal?: AbortSignal): Promise<ApiAirbase[]>;
+  getAirbaseDetails(idOrUrl: string, signal?: AbortSignal): Promise<ApiAirbaseDetails>;
+}
+
 export type ApiClients = {
   health: HealthServiceClient;
+  map: MapServiceClient;
 };
 
 export type ConnectionState =

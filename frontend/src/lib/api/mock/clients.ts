@@ -1,3 +1,4 @@
+import { getMockAirbaseDetails, getMockAirbases } from '@/lib/api/mock/map';
 import type { ApiClients } from '@/lib/api/types';
 
 const MOCK_PING_TIME = '2026-01-01T00:00:00.000Z';
@@ -11,6 +12,14 @@ export function createMockApiClients(): ApiClients {
           message: 'Mock API health check OK',
           time: MOCK_PING_TIME,
         };
+      },
+    },
+    map: {
+      async getAirbases() {
+        return getMockAirbases();
+      },
+      async getAirbaseDetails(idOrUrl: string) {
+        return getMockAirbaseDetails(idOrUrl);
       },
     },
   };
