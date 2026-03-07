@@ -29,7 +29,10 @@
 - V1 defaults to mock-first data source to support local demo reliability.
 - Hover details are debounced and cached (TTL) with in-flight deduplication to limit redundant requests.
 - Selection behavior is callback-first; map feature does not own decision panel state in V1.
-- `MapPanel` owns a compact right-side selected-airbase detail panel and controls selection state passed to `ConstellationMap`.
+- `MapPanel` is the full-screen workspace shell for the map view and controls selection state passed to `ConstellationMap`.
+- The right sidebar includes mode toggles (`Live`, `Simulate`) and mode-specific action buttons.
+- Mode switching is presentation-only in V1, but it must visibly change map theme colors so operators can distinguish contexts at a glance.
+- Selected-airbase details remain in the same sidebar and are secondary to mode controls.
 
 ## Accessibility Rules
 - Each airbase polygon must be keyboard reachable (`tabIndex=0`) and actionable (`Enter`/`Space`).

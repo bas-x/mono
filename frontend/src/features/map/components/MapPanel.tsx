@@ -1,15 +1,45 @@
+import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import type { AirbaseDetails } from '@/features/map/types';
-import { Card } from '@/features/ui';
 import { ConstellationMap } from '@/features/map/components/ConstellationMap';
+import {
+  MapSidebar,
+  type SelectedAirbaseDetailsState,
+  type ViewMode,
+} from '@/features/map/components/MapSidebar';
+import type { AirbaseDetails } from '@/features/map/types';
 import { useApi } from '@/lib/api';
 
-type SelectedAirbaseDetailsState =
-  | { status: 'idle' }
-  | { status: 'loading'; airbaseId: string }
-  | { status: 'success'; details: AirbaseDetails }
-  | { status: 'error'; airbaseId: string; message: string };
+type ThemeStyle = CSSProperties & {
+  '--color-map-surface': string;
+  '--color-map-boundary': string;
+  '--color-airbase-default-fill': string;
+  '--color-airbase-default-stroke': string;
+  '--color-airbase-hover': string;
+  '--color-airbase-selected-border': string;
+  '--color-airbase-selected-fill': string;
+};
+
+const MODE_THEME_STYLES: Record<ViewMode, ThemeStyle> = {
+  live: {
+    '--color-map-surface': 'oklch(77% 0.112 186)',
+    '--color-map-boundary': 'oklch(36% 0.064 221)',
+    '--color-airbase-default-fill': 'oklch(31% 0.118 256)',
+    '--color-airbase-default-stroke': 'oklch(16% 0.031 258)',
+    '--color-airbase-hover': 'oklch(89% 0.11 181)',
+    '--color-airbase-selected-border': 'oklch(49% 0.157 34)',
+    '--color-airbase-selected-fill': 'oklch(71% 0.173 63)',
+  },
+  simulate: {
+    '--color-map-surface': 'oklch(73% 0.157 42)',
+    '--color-map-boundary': 'oklch(35% 0.082 22)',
+    '--color-airbase-default-fill': 'oklch(39% 0.138 336)',
+    '--color-airbase-default-stroke': 'oklch(21% 0.045 334)',
+    '--color-airbase-hover': 'oklch(84% 0.136 32)',
+    '--color-airbase-selected-border': 'oklch(37% 0.143 257)',
+    '--color-airbase-selected-fill': 'oklch(66% 0.169 275)',
+  },
+};
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -19,43 +49,9 @@ function toErrorMessage(error: unknown): string {
   return 'Unable to load selected airbase details.';
 }
 
-function renderDetailsContent(selectedAirbaseId: string | null, state: SelectedAirbaseDetailsState) {
-  if (!selectedAirbaseId || state.status === 'idle') {
-    return <p className="m-0 text-xs text-text-muted">Select an airbase on the map to inspect details.</p>;
-  }
-
-  if (state.status === 'loading') {
-    return <p className="m-0 text-xs text-text-muted">Loading details for {state.airbaseId}…</p>;
-  }
-
-  if (state.status === 'error') {
-    return (
-      <p className="m-0 text-xs text-red-700 dark:text-red-400">
-        {state.airbaseId}: {state.message}
-      </p>
-    );
-  }
-
-  const entries = Object.entries(state.details).filter(([key]) => key !== 'id');
-
-  if (entries.length === 0) {
-    return <p className="m-0 text-xs text-text-muted">No additional details available.</p>;
-  }
-
-  return (
-    <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-xs">
-      {entries.map(([key, value]) => (
-        <div key={key} className="contents">
-          <dt className="font-semibold text-text">{key}</dt>
-          <dd className="m-0 truncate text-text-muted">{String(value)}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
 export function MapPanel() {
   const { clients } = useApi();
+  const [viewMode, setViewMode] = useState<ViewMode>('live');
   const [selectedAirbaseId, setSelectedAirbaseId] = useState<string | null>(null);
   const [selectedAirbaseDetailsState, setSelectedAirbaseDetailsState] =
     useState<SelectedAirbaseDetailsState>({ status: 'idle' });
@@ -75,6 +71,10 @@ export function MapPanel() {
       cancelActiveRequest();
     };
   }, [cancelActiveRequest]);
+
+  const handleModeChange = useCallback((nextMode: ViewMode) => {
+    setViewMode((currentMode) => (currentMode === nextMode ? currentMode : nextMode));
+  }, []);
 
   const handleSelectAirbase = useCallback(
     (airbaseId: string | null) => {
@@ -125,36 +125,27 @@ export function MapPanel() {
   );
 
   return (
-    <Card className="col-span-2" ariaLabel="Map section" title="Map">
-      <div className="mt-3 grid items-start gap-3 min-[1100px]:grid-cols-[minmax(0,1fr)_15rem]">
+    <section
+      className="grid h-full min-h-0 min-w-0 overflow-hidden bg-zinc-950 min-[1040px]:grid-cols-[minmax(0,1fr)_10rem]"
+      aria-label="Constellation map workspace"
+      style={MODE_THEME_STYLES[viewMode]}
+    >
+      <div className="relative min-h-[55vh] min-w-0 bg-zinc-950 min-[1040px]:min-h-0">
         <ConstellationMap
-          className="h-[58vh] min-h-[18rem] min-[900px]:h-[calc(100vh-10rem)]"
+          className="h-full min-h-full rounded-none border-0"
+          mode={viewMode === 'live' ? 'live' : 'static'}
           selectedAirbaseId={selectedAirbaseId}
           onSelectAirbase={handleSelectAirbase}
         />
-
-        <aside
-          className="h-fit max-h-[calc(100vh-10rem)] overflow-auto rounded-lg border border-border bg-bg p-3"
-          aria-label="Selected airbase details"
-          aria-live="polite"
-        >
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <h3 className="m-0 text-sm font-semibold text-text">Airbase Details</h3>
-            <button
-              type="button"
-              onClick={() => handleSelectAirbase(null)}
-              disabled={!selectedAirbaseId}
-              className="cursor-pointer rounded border border-border bg-surface px-2 py-1 text-[11px] text-text-muted transition-colors hover:text-text focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Clear
-            </button>
-          </div>
-          <p className="m-0 mb-2 text-[11px] text-text-muted">
-            Selected: <strong>{selectedAirbaseId ?? 'none'}</strong>
-          </p>
-          {renderDetailsContent(selectedAirbaseId, selectedAirbaseDetailsState)}
-        </aside>
       </div>
-    </Card>
+
+      <MapSidebar
+        viewMode={viewMode}
+        selectedAirbaseId={selectedAirbaseId}
+        selectedAirbaseDetailsState={selectedAirbaseDetailsState}
+        onModeChange={handleModeChange}
+        onClearSelection={() => handleSelectAirbase(null)}
+      />
+    </section>
   );
 }
