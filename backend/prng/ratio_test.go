@@ -48,7 +48,7 @@ func TestChance(t *testing.T) {
 
 	const trials = 10000
 	var hits int
-	for i := 0; i < trials; i++ {
+	for range trials {
 		if Chance(rng, r) {
 			hits++
 		}
@@ -61,7 +61,7 @@ func TestChance(t *testing.T) {
 	// Determinism: rerun with the same seed and ensure identical hit count.
 	rng2 := rand.New(rand.NewChaCha8(seed))
 	var hits2 int
-	for i := 0; i < trials; i++ {
+	for range trials {
 		if Chance(rng2, r) {
 			hits2++
 		}

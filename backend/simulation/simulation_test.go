@@ -15,6 +15,7 @@ import (
 )
 
 func TestRandSourceCopy(t *testing.T) {
+	t.Parallel()
 	src := rand.NewChaCha8([32]byte{1, 2, 3})
 
 	_ = src.Uint64()
@@ -32,6 +33,7 @@ func TestRandSourceCopy(t *testing.T) {
 }
 
 func TestSimulation_SimpleRun(t *testing.T) {
+	t.Parallel()
 	ts := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
 	sim := NewSimulator([32]byte{1, 2, 3}, ts)
 	runner := NewBasicRunner(BasicRunnerConfig{})
@@ -45,34 +47,39 @@ func TestSimulation_SimpleRun(t *testing.T) {
 }
 
 func TestSimulation_IdenticalStepTagsAfterClone(t *testing.T) {
+	t.Parallel()
 	t.Run("branch before start", func(t *testing.T) {
+		t.Parallel()
 		ts := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
 		sim := NewSimulator([32]byte{1, 2, 3}, ts)
 		clone := sim.Clone()
 
-		sim.step()
-		clone.step()
+		sim.Step()
+		clone.Step()
 
 		require.Equal(t, sim.stepTag, clone.stepTag)
 	})
 
 	t.Run("branch after start", func(t *testing.T) {
+		t.Parallel()
 		ts := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
 		sim := NewSimulator([32]byte{1, 2, 3}, ts)
-		sim.step()
+		sim.Step()
 
 		clone := sim.Clone()
 		require.Equal(t, sim.stepTag, clone.stepTag)
 
-		sim.step()
-		clone.step()
+		sim.Step()
+		clone.Step()
 
 		require.Equal(t, sim.stepTag, clone.stepTag)
 	})
 }
 
 func TestSimulation_RunnerPauseAndBranch(t *testing.T) {
+	t.Parallel()
 	t.Run("branch while paused", func(t *testing.T) {
+		t.Parallel()
 		synctest.Test(t, func(t *testing.T) {
 			ts := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
 			runnerConfig := ControlledRunnerConfig{
@@ -107,10 +114,11 @@ func TestSimulation_RunnerPauseAndBranch(t *testing.T) {
 }
 
 func TestSimulationInitAirbases(t *testing.T) {
+	t.Parallel()
 	ts := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
 	sim := NewSimulator([32]byte{9, 9, 9}, ts)
 	options := &SimulationOptions{
-		Airbases: AirbasesOptions{
+		Airbases: ConstellationOptions{
 			IncludeRegions:    []string{"Blekinge"},
 			MinPerRegion:      2,
 			MaxPerRegion:      3,
@@ -131,10 +139,168 @@ func TestSimulationInitAirbases(t *testing.T) {
 	}
 }
 
+func TestSimulationInitFleet(t *testing.T) {
+	t.Parallel()
+	ts := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
+	sim := NewSimulator([32]byte{7, 7, 7}, ts)
+	opts := &SimulationOptions{
+		Fleet: FleetOptions{
+			AircraftMin:    3,
+			AircraftMax:    3,
+			NeedsMin:       1,
+			NeedsMax:       2,
+			NeedsPool:      []NeedType{NeedFuel, NeedMunitions, NeedRepairs},
+			SeverityMin:    30,
+			SeverityMax:    90,
+			BlockingChance: prng.New(1, 2),
+		},
+	}
+
+	require.NoError(t, sim.Init(opts))
+	aircrafts := sim.Aircrafts()
+	require.Len(t, aircrafts, 3)
+
+	seen := make(map[TailNumber]struct{}, len(aircrafts))
+	for _, aircraft := range aircrafts {
+		aircraft.AssertInvariants()
+		require.LessOrEqual(t, len(aircraft.Needs), 2)
+		require.GreaterOrEqual(t, len(aircraft.Needs), 1)
+		require.NotContains(t, seen, aircraft.TailNumber)
+		seen[aircraft.TailNumber] = struct{}{}
+	}
+}
+
+func TestAircraftStateTransitions(t *testing.T) {
+	t.Parallel()
+	ts := New(time.Second, WithEpoch(time.Unix(0, 1)))
+	sim := NewSimulator([32]byte{1}, ts)
+
+	sim.constellation.airbases = []Airbase{
+		{ID: BaseID{0, 0, 0, 0, 0, 0, 0, 1}},
+		{ID: BaseID{0, 0, 0, 0, 0, 0, 0, 2}},
+	}
+	sim.dispatcher = NewDispatcher(sim.constellation, &RoundRobinAssigner{})
+
+	tail := TailNumber{0, 0, 0, 0, 0, 0, 0, 9}
+	sim.fleet = &Fleet{aircrafts: []Aircraft{NewAircraft(tail, &OutboundState{}, nil)}}
+
+	sim.AssertInvariants()
+
+	resolution := sim.ts.Resolution
+	stepsFor := func(d time.Duration) int {
+		return int(d/resolution) + 1
+	}
+
+	current := func() (Aircraft, string) {
+		a := sim.Aircrafts()
+		require.NotEmpty(t, a)
+		return a[0], a[0].State.Name()
+	}
+
+	advance := func(steps int) {
+		for i := 0; i < steps; i++ {
+			sim.Step()
+		}
+	}
+
+	_, name := current()
+	require.Equal(t, "Outbound", name)
+	advance(stepsFor(outboundDuration))
+	_, name = current()
+	require.Equal(t, "Engaged", name)
+	advance(stepsFor(engagedDuration))
+	ac, name := current()
+	require.Equal(t, "Inbound", name)
+	advance(stepsFor(inboundDecisionDelay))
+	ac, name = current()
+	require.Equal(t, "Committed", name)
+	require.True(t, ac.HasAssignment)
+	require.Equal(t, BaseID{0, 0, 0, 0, 0, 0, 0, 1}, ac.AssignedBase)
+	advance(stepsFor(commitApproachDuration))
+	_, name = current()
+	require.Equal(t, "Servicing", name)
+	advance(stepsFor(servicingDuration))
+	_, name = current()
+	require.Equal(t, "Ready", name)
+
+	_, assigned := sim.Dispatcher().AssignmentFor(tail)
+	require.False(t, assigned)
+}
+
+func TestSimulationLandingOverrideFlow(t *testing.T) {
+	t.Parallel()
+	ts := New(time.Second, WithEpoch(time.Unix(0, 1)))
+	sim := NewSimulator([32]byte{2}, ts)
+
+	baseA := BaseID{0, 0, 0, 0, 0, 0, 0, 1}
+	baseB := BaseID{0, 0, 0, 0, 0, 0, 0, 2}
+	sim.constellation.airbases = []Airbase{{ID: baseA}, {ID: baseB}}
+	sim.dispatcher = NewDispatcher(sim.constellation, &RoundRobinAssigner{})
+
+	tailA := TailNumber{0, 0, 0, 0, 0, 0, 0, 3}
+	tailB := TailNumber{0, 0, 0, 0, 0, 0, 0, 4}
+	sim.fleet = &Fleet{aircrafts: []Aircraft{
+		NewAircraft(tailA, &OutboundState{}, nil),
+		NewAircraft(tailB, &OutboundState{}, nil),
+	}}
+
+	sim.AssertInvariants()
+
+	resolution := sim.ts.Resolution
+	stepsFor := func(d time.Duration) int { return int(d/resolution) + 1 }
+
+	advance := func(steps int) {
+		for i := 0; i < steps; i++ {
+			sim.Step()
+		}
+	}
+
+	advance(stepsFor(outboundDuration))
+	advance(stepsFor(engagedDuration))
+
+	_, ok := sim.Dispatcher().AssignmentFor(tailA)
+	require.False(t, ok)
+	_, ok = sim.Dispatcher().AssignmentFor(tailB)
+	require.False(t, ok)
+
+	advance(1)
+	_, ok = sim.Dispatcher().AssignmentFor(tailA)
+	require.True(t, ok)
+	_, ok = sim.Dispatcher().AssignmentFor(tailB)
+	require.True(t, ok)
+
+	override, err := sim.OverrideLandingAssignment(tailA, baseB)
+	require.NoError(t, err)
+	require.Equal(t, baseB, override.Base)
+	require.Equal(t, AssignmentSourceHuman, override.Source)
+
+	advance(stepsFor(inboundDecisionDelay))
+
+	acs := sim.Aircrafts()
+	require.Len(t, acs, 2)
+	require.Equal(t, baseB, acs[0].AssignedBase)
+	require.True(t, acs[0].HasAssignment)
+	require.True(t, acs[1].HasAssignment)
+	require.NotEqual(t, BaseID{}, acs[1].AssignedBase)
+
+	advance(stepsFor(commitApproachDuration))
+	advance(stepsFor(servicingDuration))
+
+	acs = sim.Aircrafts()
+	require.Equal(t, "Ready", acs[0].State.Name())
+	require.Equal(t, "Ready", acs[1].State.Name())
+
+	_, ok = sim.Dispatcher().AssignmentFor(tailA)
+	require.False(t, ok)
+	_, ok = sim.Dispatcher().AssignmentFor(tailB)
+	require.False(t, ok)
+}
+
 func TestSimulationInitDeterministic(t *testing.T) {
+	t.Parallel()
 	seed := [32]byte{1, 2, 3}
 	opts := &SimulationOptions{
-		Airbases: AirbasesOptions{
+		Airbases: ConstellationOptions{
 			IncludeRegions:    []string{"Blekinge", "Gotland"},
 			MinPerRegion:      1,
 			MaxPerRegion:      2,
@@ -155,10 +321,11 @@ func TestSimulationInitDeterministic(t *testing.T) {
 }
 
 func TestSimulationInitRespectsMaxTotal(t *testing.T) {
+	t.Parallel()
 	ts := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
 	sim := NewSimulator([32]byte{5, 5, 5}, ts)
 	opts := &SimulationOptions{
-		Airbases: AirbasesOptions{
+		Airbases: ConstellationOptions{
 			IncludeRegions:    []string{"Blekinge", "Gotland", "Halland"},
 			MinPerRegion:      1,
 			MaxPerRegion:      5,
@@ -173,7 +340,7 @@ func TestSimulationInitRespectsMaxTotal(t *testing.T) {
 func pointInsideRegion(point geometry.Point, region assets.Region) bool {
 	for _, area := range region.Areas {
 		poly := toGeometryPolygon(area)
-		if pointInPolygonGeometry(point, poly) {
+		if geometry.PointInPolygon(point, poly) {
 			return true
 		}
 	}

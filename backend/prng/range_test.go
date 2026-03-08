@@ -20,7 +20,7 @@ func TestRangeInclusiveBounds(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		for i := 0; i < 1000; i++ {
+		for range 1000 {
 			v := RangeInclusive[uint64](rng, tc.min, tc.max)
 			if v < tc.min || v > tc.max {
 				t.Fatalf("value %d outside range [%d,%d]", v, tc.min, tc.max)

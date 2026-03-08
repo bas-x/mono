@@ -5,27 +5,70 @@ import "github.com/bas-x/basex/assert"
 type TailNumber [8]byte
 
 type Aircraft struct {
-	TailNumber TailNumber
-	State      AircraftState
+	TailNumber    TailNumber
+	Needs         []Need
+	State         AircraftState
+	AssignedBase  BaseID
+	HasAssignment bool
 }
 
-func NewAircraft(tn TailNumber, state AircraftState) Aircraft {
+func NewAircraft(
+	tn TailNumber,
+	state AircraftState,
+	needs []Need,
+) Aircraft {
 	assert.NotNil(state, "state")
-	return Aircraft{
-		TailNumber: tn,
-		State:      state,
+	if needs == nil {
+		needs = make([]Need, 0)
 	}
+	clonedNeeds := make([]Need, len(needs))
+	for i, need := range needs {
+		clonedNeeds[i] = need.Clone()
+	}
+	aircraft := Aircraft{
+		TailNumber: tn,
+		State:      state.Clone(),
+		Needs:      clonedNeeds,
+	}
+	aircraft.AssertInvariants()
+	return aircraft
 }
 
-func (a *Aircraft) Step() {
-	nextState := a.State.Step(a)
+func (a *Aircraft) Step(ctx FlightContext) {
+	a.AssertInvariants()
+	nextState := a.State.Step(a, ctx)
 	assert.NotNil(nextState, "next state")
 	a.State = nextState
 }
 
 func (a *Aircraft) Clone() *Aircraft {
-	return &Aircraft{
-		TailNumber: a.TailNumber,
-		State:      a.State.Clone(),
+	clonedNeeds := make([]Need, len(a.Needs))
+	for i, need := range a.Needs {
+		clonedNeeds[i] = need.Clone()
 	}
+	return &Aircraft{
+		TailNumber:    a.TailNumber,
+		State:         a.State.Clone(),
+		Needs:         clonedNeeds,
+		AssignedBase:  a.AssignedBase,
+		HasAssignment: a.HasAssignment,
+	}
+}
+
+func (a *Aircraft) AssertInvariants() {
+	assert.NotNil(a, "aircraft")
+	assert.NotNil(a.State, "aircraft state")
+	var seen uint64
+	for _, need := range a.Needs {
+		need.AssertInvariants()
+
+		idx, ok := NeedTypeIndex(need.Type)
+		assert.True(ok, "aircraft need type registered", need.Type)
+
+		mask := uint64(1) << idx
+		assert.True(seen&mask == 0, "aircraft needs unique", need.Type)
+
+		seen |= mask
+	}
+	assert.NotNil(a.State, "aircraft state")
 }

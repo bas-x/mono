@@ -1,6 +1,10 @@
 package simulation
 
-import "github.com/bas-x/basex/geometry"
+import (
+	"maps"
+
+	"github.com/bas-x/basex/geometry"
+)
 
 type BaseID [8]byte
 
@@ -17,9 +21,7 @@ func (a Airbase) Clone() Airbase {
 	var meta map[string]any
 	if a.Metadata != nil {
 		meta = make(map[string]any, len(a.Metadata))
-		for k, v := range a.Metadata {
-			meta[k] = v
-		}
+		maps.Copy(meta, a.Metadata)
 	}
 	return Airbase{
 		ID:       a.ID,

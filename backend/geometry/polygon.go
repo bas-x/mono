@@ -4,6 +4,8 @@ import (
 	"errors"
 	"math"
 	"math/rand/v2"
+
+	"github.com/bas-x/basex/assert"
 )
 
 // ErrInvalidPolygon indicates that the provided polygon cannot be triangulated (e.g. less than
@@ -184,4 +186,91 @@ func samplePointInTriangle(rng *rand.Rand, a, b, c Point) Point {
 	g := s * (1 - v)
 	h := s * v
 	return a.Scale(f).Add(b.Scale(g)).Add(c.Scale(h))
+}
+
+// SampleFromPolygons returns a uniformly random point sampled from the provided collection of
+// polygons. Areas must contain the precalculated area for each corresponding polygon. Any fatal
+// error results in a panic to aid deterministic debugging.
+func SampleFromPolygons(rng *rand.Rand, polygons [][]Point, maxAttempts uint) (Point, bool) {
+	assert.True(len(polygons) > 0, "sample from polygons requires input", "no polygons provided")
+
+	polygonIdx := rng.IntN(len(polygons))
+	assert.True(len(polygons[polygonIdx]) >= 3, "polygon must consist of at least 3 points")
+
+	return SampleFromPolygon(rng, polygons[polygonIdx], maxAttempts)
+}
+
+// SampleFromPolygon returns a uniformly random point sampled from a single polygon. Any fatal error
+// results in a panic to aid deterministic debugging.
+func SampleFromPolygon(rng *rand.Rand, polygon []Point, maxAttempts uint) (Point, bool) {
+	assert.True(len(polygon) >= 3, "sample from polygon vertices", "invalid polygon")
+	area := PolygonArea(polygon)
+	assert.True(area > 0, "sample from polygon area", "non-positive area")
+
+	pt, err := RandomPointInPolygon(rng, polygon)
+	if err == nil {
+		return pt, true
+	}
+	if errors.Is(err, ErrInvalidPolygon) {
+		if fallback, fbErr := fallbackPointInPolygon(rng, polygon, maxAttempts); fbErr == nil {
+			return fallback, true
+		}
+	}
+	assert.Fail("sample from polygon", err)
+	return Point{}, false
+}
+
+func fallbackPointInPolygon(rng *rand.Rand, poly []Point, maxAttempts uint) (Point, error) {
+	if len(poly) < 3 {
+		return Point{}, ErrInvalidPolygon
+	}
+	minX, maxX := poly[0].X, poly[0].X
+	minY, maxY := poly[0].Y, poly[0].Y
+	for _, pt := range poly[1:] {
+		if pt.X < minX {
+			minX = pt.X
+		}
+		if pt.X > maxX {
+			maxX = pt.X
+		}
+		if pt.Y < minY {
+			minY = pt.Y
+		}
+		if pt.Y > maxY {
+			maxY = pt.Y
+		}
+	}
+
+	if minX == maxX || minY == maxY {
+		return Point{}, ErrInvalidPolygon
+	}
+
+	limit := maxAttempts
+	if limit == 0 {
+		limit = 64
+	}
+	for attempt := uint(0); attempt < limit; attempt++ {
+		x := rng.Float64()*(maxX-minX) + minX
+		y := rng.Float64()*(maxY-minY) + minY
+		candidate := Point{X: x, Y: y}
+		if PointInPolygon(candidate, poly) {
+			return candidate, nil
+		}
+	}
+	return Point{}, errors.New("geometry: fallback sampling exceeded attempts")
+}
+
+// PointInPolygon reports whether p lies inside the simple polygon poly. Points on the edge are
+// treated as inside, allowing a small tolerance for floating point error.
+func PointInPolygon(p Point, poly []Point) bool {
+	inside := false
+	for i := range poly {
+		j := (i + 1) % len(poly)
+		xi, yi := poly[i].X, poly[i].Y
+		xj, yj := poly[j].X, poly[j].Y
+		if ((yi > p.Y) != (yj > p.Y)) && (p.X < (xj-xi)*(p.Y-yi)/(yj-yi+1e-12)+xi) {
+			inside = !inside
+		}
+	}
+	return inside
 }
