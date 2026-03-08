@@ -26,7 +26,7 @@
 
 - Base map is rendered as static SVG asset (`sweden.svg`) with airbase polygons overlaid in map-space coordinates.
 - Overlay uses frontend map contract data (`/map`) projected into SVG space with an optional linear transform.
-- Mock airbase positions are derived from `sweden.svg` geographic bounds (`mapsvg:geoViewBox`) so demo bases stay aligned with the source map asset.
+- Mock airbase positions use curated SVG-space anchors aligned to `sweden.svg`; they are not derived from a linear geo projection.
 - Airbase interactions include hover inspection, click selection, and keyboard activation.
 - Map region fill/stroke and airbase interaction colors are driven by theme variables in `frontend/src/styles/app.css`.
 - Airbases are rendered as triangle markers positioned at base centroids, with deterministic small/medium/large capacity sizing for consistent demos.

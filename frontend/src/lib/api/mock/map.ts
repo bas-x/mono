@@ -1,51 +1,25 @@
 import type { ApiAirbase, ApiAirbaseDetails } from '@/lib/api/types';
 
-const SWEDEN_SVG_GEO_BOUNDS = {
-  west: 11.105169,
-  north: 69.061149,
-  east: 24.170696,
-  south: 55.338154,
-} as const;
-
-const SWEDEN_SVG_SIZE = {
-  width: 345.62482,
-  height: 792.52374,
-} as const;
-
-function toSvgPointFromGeo(longitude: number, latitude: number) {
-  const x =
-    ((longitude - SWEDEN_SVG_GEO_BOUNDS.west) /
-      (SWEDEN_SVG_GEO_BOUNDS.east - SWEDEN_SVG_GEO_BOUNDS.west)) *
-    SWEDEN_SVG_SIZE.width;
-  const y =
-    ((SWEDEN_SVG_GEO_BOUNDS.north - latitude) /
-      (SWEDEN_SVG_GEO_BOUNDS.north - SWEDEN_SVG_GEO_BOUNDS.south)) *
-    SWEDEN_SVG_SIZE.height;
-
-  return { x, y };
-}
-
-function createAirbaseAreaFromGeo(longitude: number, latitude: number, width = 12, height = 12) {
-  const center = toSvgPointFromGeo(longitude, latitude);
+function createAirbaseAreaFromSvgCenter(centerX: number, centerY: number, width = 12, height = 12) {
   const halfWidth = width / 2;
   const halfHeight = height / 2;
 
   return [
     {
-      x: Math.round((center.x - halfWidth) * 100) / 100,
-      y: Math.round((center.y - halfHeight) * 100) / 100,
+      x: Math.round((centerX - halfWidth) * 100) / 100,
+      y: Math.round((centerY - halfHeight) * 100) / 100,
     },
     {
-      x: Math.round((center.x + halfWidth) * 100) / 100,
-      y: Math.round((center.y - halfHeight + 2) * 100) / 100,
+      x: Math.round((centerX + halfWidth) * 100) / 100,
+      y: Math.round((centerY - halfHeight + 2) * 100) / 100,
     },
     {
-      x: Math.round((center.x + halfWidth - 2) * 100) / 100,
-      y: Math.round((center.y + halfHeight) * 100) / 100,
+      x: Math.round((centerX + halfWidth - 2) * 100) / 100,
+      y: Math.round((centerY + halfHeight) * 100) / 100,
     },
     {
-      x: Math.round((center.x - halfWidth - 2) * 100) / 100,
-      y: Math.round((center.y + halfHeight - 2) * 100) / 100,
+      x: Math.round((centerX - halfWidth - 2) * 100) / 100,
+      y: Math.round((centerY + halfHeight - 2) * 100) / 100,
     },
   ];
 }
@@ -54,22 +28,22 @@ export const MOCK_AIRBASES: ApiAirbase[] = [
   {
     id: 'lulea',
     infoUrl: '/map/airbase/lulea',
-    area: createAirbaseAreaFromGeo(22.1217, 65.5438),
+    area: createAirbaseAreaFromSvgCenter(287, 178),
   },
   {
     id: 'arlanda',
     infoUrl: '/map/airbase/arlanda',
-    area: createAirbaseAreaFromGeo(17.9238, 59.6498),
+    area: createAirbaseAreaFromSvgCenter(183, 568),
   },
   {
     id: 'visby',
     infoUrl: '/map/airbase/visby',
-    area: createAirbaseAreaFromGeo(18.3462, 57.6628),
+    area: createAirbaseAreaFromSvgCenter(194, 682),
   },
   {
     id: 'goteborg',
     infoUrl: '/map/airbase/goteborg',
-    area: createAirbaseAreaFromGeo(12.2923, 57.6688),
+    area: createAirbaseAreaFromSvgCenter(32, 656),
   },
 ];
 
