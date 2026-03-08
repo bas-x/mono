@@ -20,11 +20,11 @@ export function Navbar() {
             aria-label="Simulation"
             title="Simulation"
             aria-current="page"
-            className="shell-button-active group flex h-12 w-12 items-center justify-center rounded-md border transition-all duration-200 hover:bg-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
+            className="shell-nav-item-active group flex h-12 w-12 items-center justify-center rounded-md border transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-bg"
           >
             <SiOpenlayers
               aria-hidden="true"
-              className="h-5 w-5 transition-transform duration-200 group-hover:scale-105"
+              className="shell-nav-icon h-5 w-5 transition-[color,transform] duration-200 group-hover:scale-105"
             />
             <span className="sr-only">Simulation</span>
           </a>

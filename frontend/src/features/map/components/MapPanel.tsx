@@ -213,11 +213,11 @@ export function MapPanel() {
 
   return (
     <section
-      className="grid h-full min-h-0 min-w-0 overflow-hidden bg-zinc-950 min-[1040px]:grid-cols-[minmax(0,1fr)_10rem]"
+      className="grid h-full min-h-0 min-w-0 overflow-hidden bg-bg min-[1040px]:grid-cols-[minmax(0,1fr)_10rem]"
       aria-label="Constellation map workspace"
       style={MODE_THEME_STYLES[viewMode]}
     >
-      <div className="relative min-h-[55vh] min-w-0 bg-zinc-950 min-[1040px]:min-h-0">
+      <div className="relative min-h-[55vh] min-w-0 bg-bg min-[1040px]:min-h-0">
         <ConstellationMap
           className="h-full min-h-full rounded-none border-0"
           dataSource={dataSource}
