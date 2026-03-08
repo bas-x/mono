@@ -7,12 +7,20 @@ export type PolygonBounds = {
   maxY: number;
 };
 
+export type RenderContainerSize = {
+  width: number;
+  height: number;
+};
+
+export type RenderedViewBoxMetrics = {
+  renderedWidth: number;
+  renderedHeight: number;
+  offsetX: number;
+  offsetY: number;
+};
+
 export function hasValidPolygon(points: AirbasePoint[]): boolean {
   return points.length >= 3;
-}
-
-export function polygonToPointsAttribute(points: AirbasePoint[]): string {
-  return points.map((point) => `${point.x},${point.y}`).join(' ');
 }
 
 export function calculatePolygonBounds(points: AirbasePoint[]): PolygonBounds {
@@ -90,17 +98,67 @@ export function pointToViewBoxPercent(point: AirbasePoint, viewBox: MapViewBox) 
   };
 }
 
+export function pointToRenderedPercent(
+  point: AirbasePoint,
+  viewBox: MapViewBox,
+  containerSize: RenderContainerSize,
+): { x: number; y: number } | null {
+  const renderedMetrics = getRenderedViewBoxMetrics(viewBox, containerSize);
+  if (!renderedMetrics) {
+    return null;
+  }
+  const { renderedWidth, renderedHeight, offsetX, offsetY } = renderedMetrics;
+
+  const xRatio = (point.x - viewBox.minX) / viewBox.width;
+  const yRatio = (point.y - viewBox.minY) / viewBox.height;
+  const xPixel = offsetX + xRatio * renderedWidth;
+  const yPixel = offsetY + yRatio * renderedHeight;
+
+  return {
+    x: (xPixel / containerSize.width) * 100,
+    y: (yPixel / containerSize.height) * 100,
+  };
+}
+
+export function getRenderedViewBoxMetrics(
+  viewBox: MapViewBox,
+  containerSize: RenderContainerSize,
+): RenderedViewBoxMetrics | null {
+  if (containerSize.width <= 0 || containerSize.height <= 0) {
+    return null;
+  }
+
+  const viewBoxAspectRatio = viewBox.width / viewBox.height;
+  const containerAspectRatio = containerSize.width / containerSize.height;
+
+  let renderedWidth = containerSize.width;
+  let renderedHeight = containerSize.height;
+  let offsetX = 0;
+  let offsetY = 0;
+
+  if (containerAspectRatio > viewBoxAspectRatio) {
+    renderedWidth = containerSize.height * viewBoxAspectRatio;
+    offsetX = (containerSize.width - renderedWidth) / 2;
+  } else if (containerAspectRatio < viewBoxAspectRatio) {
+    renderedHeight = containerSize.width / viewBoxAspectRatio;
+    offsetY = (containerSize.height - renderedHeight) / 2;
+  }
+
+  return {
+    renderedWidth,
+    renderedHeight,
+    offsetX,
+    offsetY,
+  };
+}
+
 export function createFocusedViewBox(bounds: PolygonBounds, sourceViewBox: MapViewBox): MapViewBox {
   const aspectRatio = sourceViewBox.width / sourceViewBox.height;
   const boundsWidth = Math.max(bounds.maxX - bounds.minX, 1);
   const boundsHeight = Math.max(bounds.maxY - bounds.minY, 1);
   const targetWidth = Math.min(
     sourceViewBox.width,
-    Math.max(
-      boundsWidth * 7,
-      boundsHeight * aspectRatio * 7,
-      sourceViewBox.width * 0.24,
-    ),
+    Math.max(boundsWidth * 7, boundsHeight * aspectRatio * 7, sourceViewBox.width * 0.24),
   );
   const targetHeight = targetWidth / aspectRatio;
   const centerX = (bounds.minX + bounds.maxX) / 2;

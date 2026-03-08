@@ -1,9 +1,13 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 import swedenMapRaw from '@/assets/sweden.svg?raw';
 import { useApi } from '@/lib/api';
 
-import { AirbaseOverlayLayer, type RenderableAirbase } from '@/features/map/components/AirbaseOverlayLayer';
+import {
+  AirbaseOverlayLayer,
+  type AirbaseCapacity,
+  type RenderableAirbase,
+} from '@/features/map/components/AirbaseOverlayLayer';
 import { AirbaseTooltip } from '@/features/map/components/AirbaseTooltip';
 import { useAirbaseDetails } from '@/features/map/hooks/useAirbaseDetails';
 import { useAirbases } from '@/features/map/hooks/useAirbases';
@@ -11,8 +15,8 @@ import {
   calculatePolygonBounds,
   calculatePolygonCentroid,
   hasValidPolygon,
+  pointToRenderedPercent,
   pointToViewBoxPercent,
-  polygonToPointsAttribute,
   toAriaLabel,
 } from '@/features/map/lib/geometry';
 import { applyTransformToPolygon, resolveCoordinateTransform } from '@/features/map/lib/transform';
@@ -29,11 +33,6 @@ function mergeClassNames(...parts: Array<string | undefined>) {
   return parts.filter(Boolean).join(' ');
 }
 
-type ElementSize = {
-  width: number;
-  height: number;
-};
-
 function extractSvgInnerMarkup(svgRaw: string): string {
   const withoutMetadata = svgRaw
     .replace(/<\?xml[\s\S]*?\?>/gi, '')
@@ -43,43 +42,6 @@ function extractSvgInnerMarkup(svgRaw: string): string {
 }
 
 const SWEDEN_SVG_INNER_MARKUP = extractSvgInnerMarkup(swedenMapRaw);
-
-function toTooltipPercentPosition(
-  point: { x: number; y: number },
-  containerSize: ElementSize,
-  viewBox: MapViewBox,
-): { x: number; y: number } | null {
-  if (containerSize.width <= 0 || containerSize.height <= 0) {
-    return null;
-  }
-
-  const viewBoxAspectRatio = viewBox.width / viewBox.height;
-  const containerAspectRatio = containerSize.width / containerSize.height;
-
-  let renderedWidth = containerSize.width;
-  let renderedHeight = containerSize.height;
-  let offsetX = 0;
-  let offsetY = 0;
-
-  if (containerAspectRatio > viewBoxAspectRatio) {
-    renderedWidth = containerSize.height * viewBoxAspectRatio;
-    offsetX = (containerSize.width - renderedWidth) / 2;
-  } else if (containerAspectRatio < viewBoxAspectRatio) {
-    renderedHeight = containerSize.width / viewBoxAspectRatio;
-    offsetY = (containerSize.height - renderedHeight) / 2;
-  }
-
-  const xRatio = (point.x - viewBox.minX) / viewBox.width;
-  const yRatio = (point.y - viewBox.minY) / viewBox.height;
-
-  const xPixel = offsetX + xRatio * renderedWidth;
-  const yPixel = offsetY + yRatio * renderedHeight;
-
-  return {
-    x: (xPixel / containerSize.width) * 100,
-    y: (yPixel / containerSize.height) * 100,
-  };
-}
 
 type ConstellationMapProps = {
   mode?: MapMode;
@@ -97,7 +59,39 @@ type ConstellationMapProps = {
   viewBox?: MapViewBox;
 };
 
-function asRenderableAirbase(airbase: Airbase, transform: MapCoordinateTransform): RenderableAirbase | null {
+const AIRBASE_CAPACITY_SEQUENCE = ['small', 'medium', 'large'] as const;
+
+function hashAirbaseId(id: string): number {
+  let hash = 0;
+
+  for (let index = 0; index < id.length; index += 1) {
+    hash = (hash * 31 + id.charCodeAt(index)) >>> 0;
+  }
+
+  return hash;
+}
+
+function resolveAirbaseCapacity(id: string): AirbaseCapacity {
+  return (
+    AIRBASE_CAPACITY_SEQUENCE[hashAirbaseId(id) % AIRBASE_CAPACITY_SEQUENCE.length] ?? 'medium'
+  );
+}
+
+function resolveMarkerSizePx(capacity: AirbaseCapacity): number {
+  switch (capacity) {
+    case 'small':
+      return 16;
+    case 'large':
+      return 32;
+    default:
+      return 24;
+  }
+}
+
+function asRenderableAirbase(
+  airbase: Airbase,
+  transform: MapCoordinateTransform,
+): RenderableAirbase | null {
   const transformedPoints = applyTransformToPolygon(airbase.area, transform);
   if (!hasValidPolygon(transformedPoints)) {
     return null;
@@ -105,13 +99,14 @@ function asRenderableAirbase(airbase: Airbase, transform: MapCoordinateTransform
 
   const bounds = calculatePolygonBounds(transformedPoints);
   const centroid = calculatePolygonCentroid(transformedPoints);
+  const capacity = resolveAirbaseCapacity(airbase.id);
 
   return {
     id: airbase.id,
     infoUrl: airbase.infoUrl,
-    polygonPoints: polygonToPointsAttribute(transformedPoints),
     centroid,
-    ariaLabel: `${toAriaLabel(airbase)} (${Math.round(bounds.maxX - bounds.minX)}x${Math.round(bounds.maxY - bounds.minY)})`,
+    markerSizePx: resolveMarkerSizePx(capacity),
+    ariaLabel: `${toAriaLabel(airbase)} ${capacity} capacity (${Math.round(bounds.maxX - bounds.minX)}x${Math.round(bounds.maxY - bounds.minY)})`,
   };
 }
 
@@ -132,11 +127,34 @@ export function ConstellationMap({
 }: ConstellationMapProps) {
   const { clients } = useApi();
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [containerSize, setContainerSize] = useState<ElementSize>({ width: 0, height: 0 });
+  const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [hoveredAirbaseId, setHoveredAirbaseId] = useState<string | null>(null);
   const [uncontrolledSelectedAirbaseId, setUncontrolledSelectedAirbaseId] = useState<string | null>(
     defaultSelectedAirbaseId,
   );
+
+  const commitContainerSize = useCallback((width: number, height: number) => {
+    setContainerSize((previous) => {
+      if (previous.width === width && previous.height === height) {
+        return previous;
+      }
+
+      return { width, height };
+    });
+  }, []);
+
+  const updateContainerSize = useCallback(() => {
+    const element = containerRef.current;
+    if (!element) {
+      return;
+    }
+
+    commitContainerSize(Math.round(element.clientWidth), Math.round(element.clientHeight));
+  }, [commitContainerSize]);
+
+  useLayoutEffect(() => {
+    updateContainerSize();
+  }, [updateContainerSize]);
 
   useEffect(() => {
     const element = containerRef.current;
@@ -144,20 +162,18 @@ export function ConstellationMap({
       return;
     }
 
+    updateContainerSize();
+
     const resizeObserver = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) {
         return;
       }
 
-      const width = Math.round(entry.contentRect.width);
-      const height = Math.round(entry.contentRect.height);
-      setContainerSize((previous) => {
-        if (previous.width === width && previous.height === height) {
-          return previous;
-        }
-        return { width, height };
-      });
+      commitContainerSize(
+        Math.round(entry.contentRect.width),
+        Math.round(entry.contentRect.height),
+      );
     });
 
     resizeObserver.observe(element);
@@ -165,7 +181,7 @@ export function ConstellationMap({
     return () => {
       resizeObserver.disconnect();
     };
-  }, []);
+  }, [commitContainerSize, updateContainerSize]);
 
   const isSelectionControlled = selectedAirbaseId !== undefined;
   const effectiveSelectedAirbaseId = isSelectionControlled
@@ -191,7 +207,9 @@ export function ConstellationMap({
     return byId;
   }, [renderableAirbases]);
 
-  const hoveredAirbase = hoveredAirbaseId ? renderableAirbaseById.get(hoveredAirbaseId) ?? null : null;
+  const hoveredAirbase = hoveredAirbaseId
+    ? (renderableAirbaseById.get(hoveredAirbaseId) ?? null)
+    : null;
 
   const detailsState = useAirbaseDetails({
     mapClient: clients.map,
@@ -208,7 +226,7 @@ export function ConstellationMap({
     }
 
     return (
-      toTooltipPercentPosition(hoveredAirbase.centroid, containerSize, viewBox) ??
+      pointToRenderedPercent(hoveredAirbase.centroid, viewBox, containerSize) ??
       pointToViewBoxPercent(hoveredAirbase.centroid, viewBox)
     );
   }, [containerSize, hoveredAirbase, viewBox]);
@@ -334,15 +352,17 @@ export function ConstellationMap({
             />
           </g>
         ) : null}
-
-        <AirbaseOverlayLayer
-          airbases={renderableAirbases}
-          hoveredId={hoveredAirbaseId}
-          selectedId={effectiveSelectedAirbaseId ?? null}
-          onHoverChange={handleHoverChange}
-          onSelect={(airbaseId) => handleSelect(airbaseId)}
-        />
       </svg>
+
+      <AirbaseOverlayLayer
+        airbases={renderableAirbases}
+        hoveredId={hoveredAirbaseId}
+        selectedId={effectiveSelectedAirbaseId ?? null}
+        containerSize={containerSize}
+        viewBox={viewBox}
+        onHoverChange={handleHoverChange}
+        onSelect={(airbaseId) => handleSelect(airbaseId)}
+      />
 
       {hoveredAirbase && hoveredPointPercent ? (
         <AirbaseTooltip

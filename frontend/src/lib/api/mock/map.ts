@@ -1,45 +1,75 @@
 import type { ApiAirbase, ApiAirbaseDetails } from '@/lib/api/types';
 
+const SWEDEN_SVG_GEO_BOUNDS = {
+  west: 11.105169,
+  north: 69.061149,
+  east: 24.170696,
+  south: 55.338154,
+} as const;
+
+const SWEDEN_SVG_SIZE = {
+  width: 345.62482,
+  height: 792.52374,
+} as const;
+
+function toSvgPointFromGeo(longitude: number, latitude: number) {
+  const x =
+    ((longitude - SWEDEN_SVG_GEO_BOUNDS.west) /
+      (SWEDEN_SVG_GEO_BOUNDS.east - SWEDEN_SVG_GEO_BOUNDS.west)) *
+    SWEDEN_SVG_SIZE.width;
+  const y =
+    ((SWEDEN_SVG_GEO_BOUNDS.north - latitude) /
+      (SWEDEN_SVG_GEO_BOUNDS.north - SWEDEN_SVG_GEO_BOUNDS.south)) *
+    SWEDEN_SVG_SIZE.height;
+
+  return { x, y };
+}
+
+function createAirbaseAreaFromGeo(longitude: number, latitude: number, width = 12, height = 12) {
+  const center = toSvgPointFromGeo(longitude, latitude);
+  const halfWidth = width / 2;
+  const halfHeight = height / 2;
+
+  return [
+    {
+      x: Math.round((center.x - halfWidth) * 100) / 100,
+      y: Math.round((center.y - halfHeight) * 100) / 100,
+    },
+    {
+      x: Math.round((center.x + halfWidth) * 100) / 100,
+      y: Math.round((center.y - halfHeight + 2) * 100) / 100,
+    },
+    {
+      x: Math.round((center.x + halfWidth - 2) * 100) / 100,
+      y: Math.round((center.y + halfHeight) * 100) / 100,
+    },
+    {
+      x: Math.round((center.x - halfWidth - 2) * 100) / 100,
+      y: Math.round((center.y + halfHeight - 2) * 100) / 100,
+    },
+  ];
+}
+
 export const MOCK_AIRBASES: ApiAirbase[] = [
   {
     id: 'lulea',
     infoUrl: '/map/airbase/lulea',
-    area: [
-      { x: 214, y: 111 },
-      { x: 225, y: 114 },
-      { x: 223, y: 128 },
-      { x: 211, y: 126 },
-    ],
+    area: createAirbaseAreaFromGeo(22.1217, 65.5438),
   },
   {
     id: 'arlanda',
     infoUrl: '/map/airbase/arlanda',
-    area: [
-      { x: 245, y: 340 },
-      { x: 258, y: 343 },
-      { x: 256, y: 357 },
-      { x: 243, y: 354 },
-    ],
+    area: createAirbaseAreaFromGeo(17.9238, 59.6498),
   },
   {
     id: 'visby',
     infoUrl: '/map/airbase/visby',
-    area: [
-      { x: 212, y: 676 },
-      { x: 223, y: 679 },
-      { x: 220, y: 693 },
-      { x: 209, y: 690 },
-    ],
+    area: createAirbaseAreaFromGeo(18.3462, 57.6628),
   },
   {
     id: 'goteborg',
     infoUrl: '/map/airbase/goteborg',
-    area: [
-      { x: 69, y: 580 },
-      { x: 83, y: 585 },
-      { x: 79, y: 600 },
-      { x: 65, y: 596 },
-    ],
+    area: createAirbaseAreaFromGeo(12.2923, 57.6688),
   },
 ];
 

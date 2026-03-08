@@ -1,78 +1,93 @@
 import { memo } from 'react';
 
-import type { AirbasePoint } from '@/features/map/types';
+import {
+  AirbaseMarkerIcon,
+  type AirbaseMarkerVariant,
+} from '@/features/map/components/AirbaseMarkerIcon';
+import {
+  pointToRenderedPercent,
+  pointToViewBoxPercent,
+  type RenderContainerSize,
+} from '@/features/map/lib/geometry';
+import type { AirbasePoint, MapViewBox } from '@/features/map/types';
+
+export type AirbaseCapacity = 'small' | 'medium' | 'large';
 
 export type RenderableAirbase = {
   id: string;
   infoUrl?: string;
-  polygonPoints: string;
   centroid: AirbasePoint;
   ariaLabel: string;
+  markerSizePx: number;
 };
 
 type AirbaseOverlayLayerProps = {
   airbases: RenderableAirbase[];
   hoveredId: string | null;
   selectedId: string | null;
+  containerSize: RenderContainerSize;
+  viewBox: MapViewBox;
   onHoverChange: (airbase: RenderableAirbase | null) => void;
   onSelect: (airbaseId: string) => void;
 };
+
+function resolveMarkerVariant(isSelected: boolean, isHovered: boolean): AirbaseMarkerVariant {
+  if (isSelected) {
+    return 'selected';
+  }
+
+  if (isHovered) {
+    return 'hovered';
+  }
+
+  return 'default';
+}
 
 function AirbaseOverlayLayerComponent({
   airbases,
   hoveredId,
   selectedId,
+  containerSize,
+  viewBox,
   onHoverChange,
   onSelect,
 }: AirbaseOverlayLayerProps) {
   return (
-    <g aria-label="Airbase overlays">
+    <div className="pointer-events-none absolute inset-0 z-10" aria-label="Airbase overlays">
       {airbases.map((airbase) => {
         const isHovered = hoveredId === airbase.id;
         const isSelected = selectedId === airbase.id;
-
-        const fillClassName = isSelected
-          ? 'fill-airbase-selected-fill'
-          : isHovered
-            ? 'fill-airbase-hover'
-            : 'fill-airbase-default-fill';
-        const strokeClassName = isSelected
-          ? 'stroke-airbase-selected-border'
-          : isHovered
-            ? 'stroke-airbase-hover'
-            : 'stroke-airbase-default-stroke';
-        const strokeWidthClassName = isSelected
-          ? 'stroke-[2.2]'
-          : isHovered
-            ? 'stroke-[1.8]'
-            : 'stroke-[1.25]';
+        const markerVariant = resolveMarkerVariant(isSelected, isHovered);
+        const markerPosition =
+          pointToRenderedPercent(airbase.centroid, viewBox, containerSize) ??
+          pointToViewBoxPercent(airbase.centroid, viewBox);
+        const haloSize = airbase.markerSizePx + 10;
 
         return (
-          <polygon
+          <button
             key={airbase.id}
-            points={airbase.polygonPoints}
-            role="button"
-            tabIndex={0}
+            type="button"
             aria-label={airbase.ariaLabel}
             aria-pressed={isSelected}
-            className={`${fillClassName} ${strokeClassName} ${strokeWidthClassName} cursor-pointer outline-none transition-colors focus-visible:stroke-[2.2] focus-visible:stroke-airbase-selected-border`}
+            className="pointer-events-auto absolute flex -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent p-0 outline-none transition-transform hover:scale-105 focus-visible:scale-105"
+            style={{
+              left: `${markerPosition.x}%`,
+              top: `${markerPosition.y}%`,
+              width: haloSize,
+              height: haloSize,
+              lineHeight: 0,
+            }}
             onPointerEnter={() => onHoverChange(airbase)}
             onPointerLeave={() => onHoverChange(null)}
             onFocus={() => onHoverChange(airbase)}
             onBlur={() => onHoverChange(null)}
             onClick={() => onSelect(airbase.id)}
-            onKeyDown={(event) => {
-              if (event.key !== 'Enter' && event.key !== ' ') {
-                return;
-              }
-
-              event.preventDefault();
-              onSelect(airbase.id);
-            }}
-          />
+          >
+            <AirbaseMarkerIcon variant={markerVariant} sizePx={airbase.markerSizePx} />
+          </button>
         );
       })}
-    </g>
+    </div>
   );
 }
 
