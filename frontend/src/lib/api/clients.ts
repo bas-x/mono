@@ -2,6 +2,7 @@ import { parseApiConfigFromEnv } from '@/lib/api/config';
 import { createHttpClient } from '@/lib/api/http/client';
 import { createMockApiClients } from '@/lib/api/mock/clients';
 import { createHealthServiceClient } from '@/lib/api/services/health';
+import { createMapServiceClient } from '@/lib/api/services/map';
 import type { ApiClients, ApiConfig } from '@/lib/api/types';
 
 function resolveConfig(overrides?: Partial<ApiConfig>): ApiConfig {
@@ -22,5 +23,6 @@ export function createApiClients(overrides?: Partial<ApiConfig>): ApiClients {
 
   return {
     health: createHealthServiceClient(config, httpClient),
+    map: createMapServiceClient(httpClient),
   };
 }

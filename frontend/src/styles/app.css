@@ -7,34 +7,100 @@
 @theme {
   --font-sans: 'Segoe UI', 'SF Pro Text', -apple-system, BlinkMacSystemFont, sans-serif;
 
-  --color-primary: #1e3a8a;
-  --color-primary-strong: #0f172a;
-  --color-secondary: #334155;
-  --color-accent: #2563eb;
+  --color-primary: #d97706;
+  --color-primary-strong: #78350f;
+  --color-secondary: #52525b;
+  --color-accent: #f59e0b;
 
-  --color-bg: #f3f6fa;
-  --color-surface: #ffffff;
-  --color-text: #0f172a;
-  --color-text-muted: #334155;
-  --color-border: #d6dbe3;
-  --color-header-text: #ffffff;
+  --color-bg: #f4f4f5;
+  --color-surface: #fafafa;
+  --color-text: #18181b;
+  --color-text-muted: #52525b;
+  --color-border: #d4d4d8;
+  --color-header-text: #fafaf9;
+
+  --color-map-surface: #fef3c7;
+  --color-map-boundary: #71717a;
+
+  --color-airbase-default-fill: #b45309;
+  --color-airbase-default-stroke: #78350f;
+  --color-airbase-hover: #f59e0b;
+  --color-airbase-selected-border: #78350f;
+  --color-airbase-selected-fill: #d97706;
+
+  --color-shell-panel: rgb(244 244 245 / 0.84);
+  --color-shell-panel-soft: rgb(228 228 231 / 0.76);
+  --color-shell-border: rgb(113 113 122 / 0.26);
+  --color-shell-ring: rgb(113 113 122 / 0.14);
+  --color-shell-text: #18181b;
+  --color-shell-text-muted: #52525b;
+  --color-shell-button-bg: rgb(228 228 231 / 0.74);
+  --color-shell-button-hover: rgb(245 158 11 / 0.18);
+  --color-shell-button-border: rgb(113 113 122 / 0.22);
+  --color-shell-button-active-bg: #78350f;
+  --color-shell-button-active-hover: #d97706;
+  --color-shell-button-active-text: #fafaf9;
+  --color-shell-list-hover: rgb(245 158 11 / 0.14);
+  --color-shell-list-selected-bg: rgb(245 158 11 / 0.22);
+  --color-shell-list-selected-text: #78350f;
+  --color-shell-list-selected-dot: #d97706;
+  --color-shell-clear-bg: rgb(228 228 231 / 0.78);
+  --color-shell-clear-text: #3f3f46;
+  --color-shell-clear-icon: #b45309;
+  --color-shell-clear-hover: rgb(245 158 11 / 0.18);
+  --color-shell-error-bg: rgb(245 158 11 / 0.12);
+  --color-shell-error-border: rgb(180 83 9 / 0.28);
+  --color-shell-error-text: #92400e;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
 
-    --color-primary: #60a5fa;
-    --color-primary-strong: #1e3a8a;
-    --color-secondary: #cbd5e1;
-    --color-accent: #93c5fd;
+    --color-primary: #f59e0b;
+    --color-primary-strong: #78350f;
+    --color-secondary: #d4d4d8;
+    --color-accent: #d97706;
 
-    --color-bg: #0b1220;
-    --color-surface: #111827;
-    --color-text: #e2e8f0;
-    --color-text-muted: #cbd5e1;
-    --color-border: #253041;
-    --color-header-text: #f8fafc;
+    --color-bg: #09090b;
+    --color-surface: #18181b;
+    --color-text: #f4f4f5;
+    --color-text-muted: #d4d4d8;
+    --color-border: #3f3f46;
+    --color-header-text: #fafafa;
+
+    --color-map-surface: #3f3f46;
+    --color-map-boundary: #71717a;
+
+    --color-airbase-default-fill: #92400e;
+    --color-airbase-default-stroke: #451a03;
+    --color-airbase-hover: #d97706;
+    --color-airbase-selected-border: #f59e0b;
+    --color-airbase-selected-fill: #b45309;
+
+    --color-shell-panel: rgb(9 9 11 / 0.78);
+    --color-shell-panel-soft: rgb(24 24 27 / 0.72);
+    --color-shell-border: rgb(113 113 122 / 0.28);
+    --color-shell-ring: rgb(244 244 245 / 0.08);
+    --color-shell-text: #f4f4f5;
+    --color-shell-text-muted: #d4d4d8;
+    --color-shell-button-bg: rgb(39 39 42 / 0.74);
+    --color-shell-button-hover: rgb(245 158 11 / 0.18);
+    --color-shell-button-border: rgb(113 113 122 / 0.3);
+    --color-shell-button-active-bg: #78350f;
+    --color-shell-button-active-hover: #f59e0b;
+    --color-shell-button-active-text: #fafaf9;
+    --color-shell-list-hover: rgb(245 158 11 / 0.14);
+    --color-shell-list-selected-bg: rgb(245 158 11 / 0.18);
+    --color-shell-list-selected-text: #fcd34d;
+    --color-shell-list-selected-dot: #f59e0b;
+    --color-shell-clear-bg: rgb(39 39 42 / 0.74);
+    --color-shell-clear-text: #f4f4f5;
+    --color-shell-clear-icon: #f59e0b;
+    --color-shell-clear-hover: rgb(245 158 11 / 0.18);
+    --color-shell-error-bg: rgb(245 158 11 / 0.12);
+    --color-shell-error-border: rgb(245 158 11 / 0.24);
+    --color-shell-error-text: #fcd34d;
   }
 }
 
@@ -45,5 +111,84 @@
 
   #root {
     @apply min-h-screen;
+  }
+}
+
+@layer components {
+  .shell-panel {
+    background-color: var(--color-shell-panel);
+    border-color: var(--color-shell-border);
+    color: var(--color-shell-text);
+    box-shadow: inset 0 0 0 1px var(--color-shell-ring);
+    backdrop-filter: blur(24px);
+  }
+
+  .shell-panel-soft {
+    background-color: var(--color-shell-panel-soft);
+  }
+
+  .shell-divider {
+    border-color: var(--color-shell-border);
+  }
+
+  .shell-text-muted {
+    color: var(--color-shell-text-muted);
+  }
+
+  .shell-button {
+    background-color: var(--color-shell-button-bg);
+    border-color: var(--color-shell-button-border);
+    color: var(--color-shell-text);
+  }
+
+  .shell-button:hover {
+    background-color: var(--color-shell-button-hover);
+  }
+
+  .shell-button-active {
+    background-color: var(--color-shell-button-active-bg);
+    border-color: var(--color-primary);
+    color: var(--color-shell-button-active-text);
+  }
+
+  .shell-button-active:hover {
+    background-color: var(--color-shell-button-active-hover);
+  }
+
+  .shell-list-hover:hover {
+    background-color: var(--color-shell-list-hover);
+  }
+
+  .shell-list-selected {
+    background-color: var(--color-shell-list-selected-bg);
+    color: var(--color-shell-list-selected-text);
+  }
+
+  .shell-list-selected-dot {
+    fill: var(--color-shell-list-selected-dot);
+  }
+
+  .shell-clear-pill {
+    background-color: var(--color-shell-clear-bg);
+    color: var(--color-shell-clear-text);
+    box-shadow: inset 0 0 0 1px var(--color-shell-button-border);
+  }
+
+  .shell-clear-pill:hover {
+    background-color: var(--color-shell-clear-hover);
+  }
+
+  .shell-clear-icon {
+    stroke: color-mix(in srgb, var(--color-shell-clear-icon) 65%, transparent);
+  }
+
+  .shell-clear-pill:hover .shell-clear-icon {
+    stroke: var(--color-shell-clear-icon);
+  }
+
+  .shell-error-surface {
+    background-color: var(--color-shell-error-bg);
+    border-color: var(--color-shell-error-border);
+    color: var(--color-shell-error-text);
   }
 }
