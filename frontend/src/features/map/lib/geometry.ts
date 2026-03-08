@@ -31,6 +31,10 @@ export function calculatePolygonBounds(points: AirbasePoint[]): PolygonBounds {
   return { minX, minY, maxX, maxY };
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(Math.max(value, min), max);
+}
+
 function averagePoint(points: AirbasePoint[]): AirbasePoint {
   let sumX = 0;
   let sumY = 0;
@@ -83,6 +87,32 @@ export function pointToViewBoxPercent(point: AirbasePoint, viewBox: MapViewBox) 
   return {
     x: ((point.x - viewBox.minX) / viewBox.width) * 100,
     y: ((point.y - viewBox.minY) / viewBox.height) * 100,
+  };
+}
+
+export function createFocusedViewBox(bounds: PolygonBounds, sourceViewBox: MapViewBox): MapViewBox {
+  const aspectRatio = sourceViewBox.width / sourceViewBox.height;
+  const boundsWidth = Math.max(bounds.maxX - bounds.minX, 1);
+  const boundsHeight = Math.max(bounds.maxY - bounds.minY, 1);
+  const targetWidth = Math.min(
+    sourceViewBox.width,
+    Math.max(
+      boundsWidth * 7,
+      boundsHeight * aspectRatio * 7,
+      sourceViewBox.width * 0.24,
+    ),
+  );
+  const targetHeight = targetWidth / aspectRatio;
+  const centerX = (bounds.minX + bounds.maxX) / 2;
+  const centerY = (bounds.minY + bounds.maxY) / 2;
+  const maxMinX = sourceViewBox.minX + sourceViewBox.width - targetWidth;
+  const maxMinY = sourceViewBox.minY + sourceViewBox.height - targetHeight;
+
+  return {
+    minX: clamp(centerX - targetWidth / 2, sourceViewBox.minX, maxMinX),
+    minY: clamp(centerY - targetHeight / 2, sourceViewBox.minY, maxMinY),
+    width: targetWidth,
+    height: targetHeight,
   };
 }
 

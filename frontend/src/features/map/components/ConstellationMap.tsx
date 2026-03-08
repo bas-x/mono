@@ -22,6 +22,7 @@ import {
   type MapCoordinateTransform,
   type MapDataSource,
   type MapMode,
+  type MapViewBox,
 } from '@/features/map/types';
 
 function mergeClassNames(...parts: Array<string | undefined>) {
@@ -46,12 +47,13 @@ const SWEDEN_SVG_INNER_MARKUP = extractSvgInnerMarkup(swedenMapRaw);
 function toTooltipPercentPosition(
   point: { x: number; y: number },
   containerSize: ElementSize,
+  viewBox: MapViewBox,
 ): { x: number; y: number } | null {
   if (containerSize.width <= 0 || containerSize.height <= 0) {
     return null;
   }
 
-  const viewBoxAspectRatio = DEFAULT_MAP_VIEW_BOX.width / DEFAULT_MAP_VIEW_BOX.height;
+  const viewBoxAspectRatio = viewBox.width / viewBox.height;
   const containerAspectRatio = containerSize.width / containerSize.height;
 
   let renderedWidth = containerSize.width;
@@ -67,8 +69,8 @@ function toTooltipPercentPosition(
     offsetY = (containerSize.height - renderedHeight) / 2;
   }
 
-  const xRatio = (point.x - DEFAULT_MAP_VIEW_BOX.minX) / DEFAULT_MAP_VIEW_BOX.width;
-  const yRatio = (point.y - DEFAULT_MAP_VIEW_BOX.minY) / DEFAULT_MAP_VIEW_BOX.height;
+  const xRatio = (point.x - viewBox.minX) / viewBox.width;
+  const yRatio = (point.y - viewBox.minY) / viewBox.height;
 
   const xPixel = offsetX + xRatio * renderedWidth;
   const yPixel = offsetY + yRatio * renderedHeight;
@@ -92,6 +94,7 @@ type ConstellationMapProps = {
   detailsCacheTtlMs?: number;
   className?: string;
   showDebugOverlay?: boolean;
+  viewBox?: MapViewBox;
 };
 
 function asRenderableAirbase(airbase: Airbase, transform: MapCoordinateTransform): RenderableAirbase | null {
@@ -125,6 +128,7 @@ export function ConstellationMap({
   detailsCacheTtlMs = 60_000,
   className,
   showDebugOverlay = false,
+  viewBox = DEFAULT_MAP_VIEW_BOX,
 }: ConstellationMapProps) {
   const { clients } = useApi();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -204,10 +208,10 @@ export function ConstellationMap({
     }
 
     return (
-      toTooltipPercentPosition(hoveredAirbase.centroid, containerSize) ??
-      pointToViewBoxPercent(hoveredAirbase.centroid, DEFAULT_MAP_VIEW_BOX)
+      toTooltipPercentPosition(hoveredAirbase.centroid, containerSize, viewBox) ??
+      pointToViewBoxPercent(hoveredAirbase.centroid, viewBox)
     );
-  }, [containerSize, hoveredAirbase]);
+  }, [containerSize, hoveredAirbase, viewBox]);
 
   const handleHoverChange = useCallback(
     (airbase: RenderableAirbase | null) => {
@@ -280,7 +284,7 @@ export function ConstellationMap({
     >
       <svg
         className="block h-full w-full"
-        viewBox={`${DEFAULT_MAP_VIEW_BOX.minX} ${DEFAULT_MAP_VIEW_BOX.minY} ${DEFAULT_MAP_VIEW_BOX.width} ${DEFAULT_MAP_VIEW_BOX.height}`}
+        viewBox={`${viewBox.minX} ${viewBox.minY} ${viewBox.width} ${viewBox.height}`}
         role="img"
         aria-label="Sweden constellation map with airbase overlays"
         onClick={(event) => {

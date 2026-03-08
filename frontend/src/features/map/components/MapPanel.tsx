@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'react';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ConstellationMap } from '@/features/map/components/ConstellationMap';
 import {
@@ -7,7 +7,15 @@ import {
   type SelectedAirbaseDetailsState,
   type ViewMode,
 } from '@/features/map/components/MapSidebar';
-import type { AirbaseDetails } from '@/features/map/types';
+import { useAirbases } from '@/features/map/hooks/useAirbases';
+import { calculatePolygonBounds, createFocusedViewBox } from '@/features/map/lib/geometry';
+import {
+  DEFAULT_MAP_VIEW_BOX,
+  type Airbase,
+  type AirbaseDetails,
+  type MapDataSource,
+  type MapViewBox,
+} from '@/features/map/types';
 import { useApi } from '@/lib/api';
 
 type ThemeStyle = CSSProperties & {
@@ -51,13 +59,26 @@ function toErrorMessage(error: unknown): string {
 
 export function MapPanel() {
   const { clients } = useApi();
+  const dataSource: MapDataSource = 'mock';
   const [viewMode, setViewMode] = useState<ViewMode>('live');
+  const [isAirbaseListOpen, setIsAirbaseListOpen] = useState(false);
+  const [mapViewBox, setMapViewBox] = useState<MapViewBox>({ ...DEFAULT_MAP_VIEW_BOX });
   const [selectedAirbaseId, setSelectedAirbaseId] = useState<string | null>(null);
   const [selectedAirbaseDetailsState, setSelectedAirbaseDetailsState] =
     useState<SelectedAirbaseDetailsState>({ status: 'idle' });
   const detailsCacheRef = useRef(new Map<string, AirbaseDetails>());
   const requestSequenceRef = useRef(0);
   const activeAbortControllerRef = useRef<AbortController | null>(null);
+  const airbaseState = useAirbases({ mapClient: clients.map, dataSource });
+  const airbaseById = useMemo(() => {
+    const byId = new Map<string, Airbase>();
+
+    for (const airbase of airbaseState.airbases) {
+      byId.set(airbase.id, airbase);
+    }
+
+    return byId;
+  }, [airbaseState.airbases]);
 
   const cancelActiveRequest = useCallback(() => {
     if (activeAbortControllerRef.current) {
@@ -72,9 +93,57 @@ export function MapPanel() {
     };
   }, [cancelActiveRequest]);
 
-  const handleModeChange = useCallback((nextMode: ViewMode) => {
-    setViewMode((currentMode) => (currentMode === nextMode ? currentMode : nextMode));
+  const focusAirbase = useCallback(
+    (airbaseId: string) => {
+      const airbase = airbaseById.get(airbaseId);
+      if (!airbase) {
+        return;
+      }
+
+      const bounds = calculatePolygonBounds(airbase.area);
+      setMapViewBox(createFocusedViewBox(bounds, DEFAULT_MAP_VIEW_BOX));
+    },
+    [airbaseById],
+  );
+
+  const handleResetView = useCallback(() => {
+    setMapViewBox({ ...DEFAULT_MAP_VIEW_BOX });
   }, []);
+
+  const resetWorkspaceState = useCallback(() => {
+    cancelActiveRequest();
+    setIsAirbaseListOpen(false);
+    setSelectedAirbaseId(null);
+    setSelectedAirbaseDetailsState({ status: 'idle' });
+    setMapViewBox({ ...DEFAULT_MAP_VIEW_BOX });
+  }, [cancelActiveRequest]);
+
+  const handleModeChange = useCallback(
+    (nextMode: ViewMode) => {
+      if (viewMode === nextMode) {
+        return;
+      }
+
+      if (nextMode === 'simulate') {
+        resetWorkspaceState();
+      }
+
+      setViewMode(nextMode);
+    },
+    [resetWorkspaceState, viewMode],
+  );
+
+  const handleToggleAirbaseList = useCallback(() => {
+    setIsAirbaseListOpen((current) => {
+      const next = !current;
+
+      if (next && selectedAirbaseId) {
+        focusAirbase(selectedAirbaseId);
+      }
+
+      return next;
+    });
+  }, [focusAirbase, selectedAirbaseId]);
 
   const handleSelectAirbase = useCallback(
     (airbaseId: string | null) => {
@@ -124,6 +193,24 @@ export function MapPanel() {
     [cancelActiveRequest, clients.map],
   );
 
+  const handleClearSelection = useCallback(() => {
+    handleSelectAirbase(null);
+    setMapViewBox({ ...DEFAULT_MAP_VIEW_BOX });
+  }, [handleSelectAirbase]);
+
+  const handleSelectAirbaseFromList = useCallback(
+    (airbaseId: string) => {
+      if (selectedAirbaseId === airbaseId) {
+        handleClearSelection();
+        return;
+      }
+
+      handleSelectAirbase(airbaseId);
+      focusAirbase(airbaseId);
+    },
+    [focusAirbase, handleClearSelection, handleSelectAirbase, selectedAirbaseId],
+  );
+
   return (
     <section
       className="grid h-full min-h-0 min-w-0 overflow-hidden bg-zinc-950 min-[1040px]:grid-cols-[minmax(0,1fr)_10rem]"
@@ -133,18 +220,27 @@ export function MapPanel() {
       <div className="relative min-h-[55vh] min-w-0 bg-zinc-950 min-[1040px]:min-h-0">
         <ConstellationMap
           className="h-full min-h-full rounded-none border-0"
+          dataSource={dataSource}
           mode={viewMode === 'live' ? 'live' : 'static'}
           selectedAirbaseId={selectedAirbaseId}
+          viewBox={mapViewBox}
           onSelectAirbase={handleSelectAirbase}
         />
       </div>
 
       <MapSidebar
+        airbases={airbaseState.airbases}
+        airbaseStatus={airbaseState.status}
+        airbaseMessage={airbaseState.status === 'error' ? airbaseState.message : undefined}
         viewMode={viewMode}
+        isAirbaseListOpen={isAirbaseListOpen}
         selectedAirbaseId={selectedAirbaseId}
         selectedAirbaseDetailsState={selectedAirbaseDetailsState}
         onModeChange={handleModeChange}
-        onClearSelection={() => handleSelectAirbase(null)}
+        onClearSelection={handleClearSelection}
+        onResetView={handleResetView}
+        onToggleAirbaseList={handleToggleAirbaseList}
+        onSelectAirbaseFromList={handleSelectAirbaseFromList}
       />
     </section>
   );
