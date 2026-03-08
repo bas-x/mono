@@ -65,7 +65,7 @@ func (r *BasicRunner) Run(ctx context.Context, s *Simulation) {
 		default:
 		}
 
-		s.step()
+		s.Step()
 
 		if r.untilTick == int64(s.ts.ticks) {
 			return
@@ -152,7 +152,7 @@ func (r *ControlledRunner) Run(ctx context.Context, s *Simulation) {
 
 		catchUp := 0
 		for !now.Before(nextTick) && catchUp < int(r.maxCatchUpTicks) {
-			s.step()
+			s.Step()
 
 			if r.untilTick == int64(s.ts.ticks) {
 				return

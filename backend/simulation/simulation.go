@@ -13,6 +13,7 @@ type Simulation struct {
 
 	constellation *Constellation
 	fleet         *Fleet
+	dispatcher    *Dispatcher
 }
 
 func (s *Simulation) AssertInvariants() {
@@ -24,6 +25,8 @@ func (s *Simulation) AssertInvariants() {
 	s.constellation.AssertInvariants()
 	assert.NotNil(s.fleet, "fleet")
 	s.fleet.AssertInvariants()
+	assert.NotNil(s.dispatcher, "dispatcher")
+	s.dispatcher.AssertInvariants()
 }
 
 func NewSimulator(seed [32]byte, ts *TimeSim) *Simulation {
@@ -31,6 +34,8 @@ func NewSimulator(seed [32]byte, ts *TimeSim) *Simulation {
 
 	rndSrc := rand.NewChaCha8(seed)
 	rnd := rand.New(rndSrc)
+	constellation := NewConstellation()
+	assigner := &RoundRobinAssigner{}
 	return &Simulation{
 		ts: ts,
 		env: &Environment{
@@ -38,8 +43,9 @@ func NewSimulator(seed [32]byte, ts *TimeSim) *Simulation {
 			rnd:   rnd,
 			clock: ts,
 		},
-		constellation: NewConstellation(),
+		constellation: constellation,
 		fleet:         NewFleet(),
+		dispatcher:    NewDispatcher(constellation, assigner),
 	}
 }
 
@@ -68,10 +74,18 @@ func (s *Simulation) Init(config *SimulationOptions) error {
 	return nil
 }
 
-func (s *Simulation) step() {
+func (s *Simulation) Step() {
 	s.env.AssertInvariants()
 	s.stepTag = s.env.Rand().Uint64()
 	s.ts.Tick()
+
+	if s.fleet != nil {
+		ctx := FlightContext{
+			Clock:      s.ts,
+			Dispatcher: s.dispatcher,
+		}
+		s.fleet.StepWithContext(ctx)
+	}
 }
 
 // Clone deep copies the simulation. It pauses the
@@ -91,12 +105,19 @@ func (s *Simulation) Clone() *Simulation {
 	} else {
 		fleet = NewFleet()
 	}
+	var dispatcher *Dispatcher
+	if s.dispatcher != nil {
+		dispatcher = s.dispatcher.CloneWithConstellation(constellation)
+	} else {
+		dispatcher = NewDispatcher(constellation, &RoundRobinAssigner{})
+	}
 	return &Simulation{
 		ts:            ts,
 		env:           env,
 		stepTag:       s.stepTag,
 		constellation: constellation,
 		fleet:         fleet,
+		dispatcher:    dispatcher,
 	}
 }
 
@@ -113,4 +134,23 @@ func (s *Simulation) Aircrafts() []Aircraft {
 		return nil
 	}
 	return s.fleet.Aircrafts()
+}
+
+func (s *Simulation) Dispatcher() *Dispatcher {
+	return s.dispatcher
+}
+
+// RequestLanding registers an inbound aircraft and returns its current assignment.
+func (s *Simulation) RequestLanding(tail TailNumber) (LandingAssignment, error) {
+	return s.dispatcher.RegisterInbound(tail)
+}
+
+// OverrideLandingAssignment forces a tail to land at a specific base.
+func (s *Simulation) OverrideLandingAssignment(tail TailNumber, base BaseID) (LandingAssignment, error) {
+	return s.dispatcher.OverrideAssignment(tail, base)
+}
+
+// ClearLandingOverride reverts an override to the algorithmic choice.
+func (s *Simulation) ClearLandingOverride(tail TailNumber) (LandingAssignment, error) {
+	return s.dispatcher.ClearOverride(tail)
 }

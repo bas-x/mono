@@ -1,8 +1,10 @@
 package simulation
 
-import "maps"
+import (
+	"maps"
 
-import "github.com/bas-x/basex/geometry"
+	"github.com/bas-x/basex/geometry"
+)
 
 type BaseID [8]byte
 

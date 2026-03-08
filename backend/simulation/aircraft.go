@@ -5,9 +5,11 @@ import "github.com/bas-x/basex/assert"
 type TailNumber [8]byte
 
 type Aircraft struct {
-	TailNumber TailNumber
-	Needs      []Need
-	State      AircraftState
+	TailNumber    TailNumber
+	Needs         []Need
+	State         AircraftState
+	AssignedBase  BaseID
+	HasAssignment bool
 }
 
 func NewAircraft(
@@ -25,16 +27,16 @@ func NewAircraft(
 	}
 	aircraft := Aircraft{
 		TailNumber: tn,
-		State:      state,
+		State:      state.Clone(),
 		Needs:      clonedNeeds,
 	}
 	aircraft.AssertInvariants()
 	return aircraft
 }
 
-func (a *Aircraft) Step() {
+func (a *Aircraft) Step(ctx FlightContext) {
 	a.AssertInvariants()
-	nextState := a.State.Step(a)
+	nextState := a.State.Step(a, ctx)
 	assert.NotNil(nextState, "next state")
 	a.State = nextState
 }
@@ -45,9 +47,11 @@ func (a *Aircraft) Clone() *Aircraft {
 		clonedNeeds[i] = need.Clone()
 	}
 	return &Aircraft{
-		TailNumber: a.TailNumber,
-		State:      a.State.Clone(),
-		Needs:      clonedNeeds,
+		TailNumber:    a.TailNumber,
+		State:         a.State.Clone(),
+		Needs:         clonedNeeds,
+		AssignedBase:  a.AssignedBase,
+		HasAssignment: a.HasAssignment,
 	}
 }
 
@@ -66,4 +70,5 @@ func (a *Aircraft) AssertInvariants() {
 
 		seen |= mask
 	}
+	assert.NotNil(a.State, "aircraft state")
 }

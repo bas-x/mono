@@ -78,10 +78,10 @@ func (f *Fleet) Init(env *Environment, opts *FleetOptions) error {
 	return nil
 }
 
-func (f *Fleet) Step() {
+func (f *Fleet) StepWithContext(ctx FlightContext) {
 	f.AssertInvariants()
 	for i := range f.aircrafts {
-		f.aircrafts[i].Step()
+		f.aircrafts[i].Step(ctx)
 	}
 }
 
@@ -147,7 +147,7 @@ func normalizeFleetOptions(opts FleetOptions) FleetOptions {
 	}
 
 	if opts.StateFactory == nil {
-		opts.StateFactory = func(_ *rand.Rand) AircraftState { return ReadyState{} }
+		opts.StateFactory = func(_ *rand.Rand) AircraftState { return &OutboundState{} }
 	}
 
 	return opts
