@@ -74,9 +74,6 @@ func (c *Constellation) Init(env *Environment, opts *ConstellationOptions) error
 }
 
 func (c *Constellation) Clone() *Constellation {
-	if c == nil {
-		return NewConstellation()
-	}
 	cloned := make([]Airbase, len(c.airbases))
 	for i, base := range c.airbases {
 		cloned[i] = base.Clone()

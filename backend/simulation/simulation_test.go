@@ -15,6 +15,7 @@ import (
 )
 
 func TestRandSourceCopy(t *testing.T) {
+	t.Parallel()
 	src := rand.NewChaCha8([32]byte{1, 2, 3})
 
 	_ = src.Uint64()
@@ -32,6 +33,7 @@ func TestRandSourceCopy(t *testing.T) {
 }
 
 func TestSimulation_SimpleRun(t *testing.T) {
+	t.Parallel()
 	ts := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
 	sim := NewSimulator([32]byte{1, 2, 3}, ts)
 	runner := NewBasicRunner(BasicRunnerConfig{})
@@ -45,7 +47,9 @@ func TestSimulation_SimpleRun(t *testing.T) {
 }
 
 func TestSimulation_IdenticalStepTagsAfterClone(t *testing.T) {
+	t.Parallel()
 	t.Run("branch before start", func(t *testing.T) {
+		t.Parallel()
 		ts := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
 		sim := NewSimulator([32]byte{1, 2, 3}, ts)
 		clone := sim.Clone()
@@ -57,6 +61,7 @@ func TestSimulation_IdenticalStepTagsAfterClone(t *testing.T) {
 	})
 
 	t.Run("branch after start", func(t *testing.T) {
+		t.Parallel()
 		ts := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
 		sim := NewSimulator([32]byte{1, 2, 3}, ts)
 		sim.step()
@@ -72,7 +77,9 @@ func TestSimulation_IdenticalStepTagsAfterClone(t *testing.T) {
 }
 
 func TestSimulation_RunnerPauseAndBranch(t *testing.T) {
+	t.Parallel()
 	t.Run("branch while paused", func(t *testing.T) {
+		t.Parallel()
 		synctest.Test(t, func(t *testing.T) {
 			ts := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
 			runnerConfig := ControlledRunnerConfig{
@@ -107,6 +114,7 @@ func TestSimulation_RunnerPauseAndBranch(t *testing.T) {
 }
 
 func TestSimulationInitAirbases(t *testing.T) {
+	t.Parallel()
 	ts := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
 	sim := NewSimulator([32]byte{9, 9, 9}, ts)
 	options := &SimulationOptions{
@@ -131,7 +139,39 @@ func TestSimulationInitAirbases(t *testing.T) {
 	}
 }
 
+func TestSimulationInitFleet(t *testing.T) {
+	t.Parallel()
+	ts := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
+	sim := NewSimulator([32]byte{7, 7, 7}, ts)
+	opts := &SimulationOptions{
+		Fleet: FleetOptions{
+			AircraftMin:    3,
+			AircraftMax:    3,
+			NeedsMin:       1,
+			NeedsMax:       2,
+			NeedsPool:      []NeedType{NeedFuel, NeedMunitions, NeedRepairs},
+			SeverityMin:    30,
+			SeverityMax:    90,
+			BlockingChance: prng.New(1, 2),
+		},
+	}
+
+	require.NoError(t, sim.Init(opts))
+	aircrafts := sim.Aircrafts()
+	require.Len(t, aircrafts, 3)
+
+	seen := make(map[TailNumber]struct{}, len(aircrafts))
+	for _, aircraft := range aircrafts {
+		aircraft.AssertInvariants()
+		require.LessOrEqual(t, len(aircraft.Needs), 2)
+		require.GreaterOrEqual(t, len(aircraft.Needs), 1)
+		require.NotContains(t, seen, aircraft.TailNumber)
+		seen[aircraft.TailNumber] = struct{}{}
+	}
+}
+
 func TestSimulationInitDeterministic(t *testing.T) {
+	t.Parallel()
 	seed := [32]byte{1, 2, 3}
 	opts := &SimulationOptions{
 		Airbases: ConstellationOptions{
@@ -155,6 +195,7 @@ func TestSimulationInitDeterministic(t *testing.T) {
 }
 
 func TestSimulationInitRespectsMaxTotal(t *testing.T) {
+	t.Parallel()
 	ts := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
 	sim := NewSimulator([32]byte{5, 5, 5}, ts)
 	opts := &SimulationOptions{

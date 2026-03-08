@@ -12,6 +12,7 @@ type Simulation struct {
 	stepTag uint64
 
 	constellation *Constellation
+	fleet         *Fleet
 }
 
 func (s *Simulation) AssertInvariants() {
@@ -21,6 +22,8 @@ func (s *Simulation) AssertInvariants() {
 	s.env.AssertInvariants()
 	assert.NotNil(s.constellation, "constellation")
 	s.constellation.AssertInvariants()
+	assert.NotNil(s.fleet, "fleet")
+	s.fleet.AssertInvariants()
 }
 
 func NewSimulator(seed [32]byte, ts *TimeSim) *Simulation {
@@ -36,21 +39,29 @@ func NewSimulator(seed [32]byte, ts *TimeSim) *Simulation {
 			clock: ts,
 		},
 		constellation: NewConstellation(),
+		fleet:         NewFleet(),
 	}
 }
 
 type SimulationOptions struct {
 	Airbases ConstellationOptions
+	Fleet    FleetOptions
 }
 
 func (s *Simulation) Init(config *SimulationOptions) error {
 	var opts *ConstellationOptions
+	var fleetOpts *FleetOptions
 	if config != nil {
 		copyOpts := config.Airbases
 		opts = &copyOpts
+		copyFleet := config.Fleet
+		fleetOpts = &copyFleet
 	}
 
 	if err := s.constellation.Init(s.env, opts); err != nil {
+		return err
+	}
+	if err := s.fleet.Init(s.env, fleetOpts); err != nil {
 		return err
 	}
 	s.AssertInvariants()
@@ -74,11 +85,18 @@ func (s *Simulation) Clone() *Simulation {
 	} else {
 		constellation = NewConstellation()
 	}
+	var fleet *Fleet
+	if s.fleet != nil {
+		fleet = s.fleet.Clone()
+	} else {
+		fleet = NewFleet()
+	}
 	return &Simulation{
 		ts:            ts,
 		env:           env,
 		stepTag:       s.stepTag,
 		constellation: constellation,
+		fleet:         fleet,
 	}
 }
 
@@ -88,4 +106,11 @@ func (s *Simulation) Airbases() []Airbase {
 		return nil
 	}
 	return s.constellation.Airbases()
+}
+
+func (s *Simulation) Aircrafts() []Aircraft {
+	if s.fleet == nil {
+		return nil
+	}
+	return s.fleet.Aircrafts()
 }

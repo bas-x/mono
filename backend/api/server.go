@@ -71,8 +71,7 @@ func Run(ctx context.Context, opts *RunOptions) error {
 	return nil
 }
 
-type ServerDependencies struct {
-}
+type ServerDependencies struct{}
 
 func initDeps(config *viper.Viper) *ServerDependencies {
 	assert.NotNil(config, "config")
