@@ -197,6 +197,63 @@
     color: var(--color-shell-nav-icon-hover);
   }
 
+  .shell-field-label {
+    color: var(--color-shell-text);
+  }
+
+  .shell-field-hint {
+    color: var(--color-shell-text-muted);
+  }
+
+  .shell-input {
+    width: 100%;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-shell-button-border);
+    background-color: var(--color-shell-panel-soft);
+    color: var(--color-shell-text);
+    padding: 0.625rem 0.75rem;
+  }
+
+  .shell-input::placeholder {
+    color: color-mix(in srgb, var(--color-shell-text-muted) 74%, transparent);
+  }
+
+  .shell-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 18%, transparent);
+  }
+
+  .shell-input:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .shell-check-option {
+    background-color: var(--color-shell-button-bg);
+    border-color: var(--color-shell-button-border);
+    color: var(--color-shell-text);
+  }
+
+  .shell-check-option:hover {
+    background-color: var(--color-shell-button-hover);
+  }
+
+  .shell-check-option-selected {
+    background-color: var(--color-shell-nav-active-bg);
+    border-color: var(--color-primary);
+  }
+
+  .shell-check-indicator {
+    border-color: var(--color-shell-button-border);
+    background-color: transparent;
+  }
+
+  .shell-check-indicator-selected {
+    border-color: var(--color-primary);
+    background-color: var(--color-shell-nav-icon-active);
+  }
+
   .shell-list-hover:hover {
     background-color: var(--color-shell-list-hover);
   }
