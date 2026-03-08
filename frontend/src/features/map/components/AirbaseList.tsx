@@ -36,16 +36,16 @@ function ClearSelectionOption({ disabled, onClearSelection }: ClearSelectionOpti
         type="button"
         onClick={onClearSelection}
         disabled={disabled}
-        className="group flex w-full cursor-pointer items-center text-left text-zinc-200 transition-colors disabled:cursor-not-allowed disabled:opacity-45"
+        className="group flex w-full cursor-pointer items-center text-left transition-colors disabled:cursor-not-allowed disabled:opacity-45"
       >
-        <span className="inline-flex w-full items-center justify-between gap-x-0.5 rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 inset-ring inset-ring-red-600/10 transition-colors dark:bg-red-400/10 dark:text-red-400 dark:inset-ring-red-400/20">
+        <span className="shell-clear-pill inline-flex w-full items-center justify-between gap-x-0.5 rounded-md px-2 py-1 text-xs font-medium transition-colors">
           <span className="truncate">Clear selection</span>
-          <span className="group relative -mr-1 size-3.5 rounded-xs hover:bg-red-600/20 dark:hover:bg-red-500/30">
+          <span className="group relative -mr-1 size-3.5 rounded-xs shell-list-hover">
             <span className="sr-only">Remove</span>
             <svg
               viewBox="0 0 14 14"
               aria-hidden="true"
-              className="size-3.5 stroke-red-600/50 transition-colors group-hover:stroke-red-600/75 dark:stroke-red-400 dark:group-hover:stroke-red-300"
+              className="shell-clear-icon size-3.5 transition-colors"
               fill="none"
             >
               <path d="M4 4l6 6m0-6l-6 6" />
@@ -78,21 +78,21 @@ function AirbaseOption({
 
           onSelectAirbase(airbase.id);
         }}
-        className="flex w-full cursor-pointer items-center text-left text-zinc-200 transition-colors"
+        className="flex w-full cursor-pointer items-center text-left transition-colors"
       >
         {isSelected ? (
-          <span className="inline-flex w-full items-center gap-x-1.5 rounded-md bg-green-100 px-2 py-1 text-xs font-medium text-green-700 dark:bg-green-400/10 dark:text-green-400">
+          <span className="shell-list-selected inline-flex w-full items-center gap-x-1.5 rounded-md px-2 py-1 text-xs font-medium">
             <svg
               viewBox="0 0 6 6"
               aria-hidden="true"
-              className="size-1.5 fill-green-500 dark:fill-green-400"
+              className="shell-list-selected-dot size-1.5"
             >
               <circle r="3" cx="3" cy="3" />
             </svg>
             {label}
           </span>
         ) : (
-          <span className="inline-flex w-full truncate rounded-md px-2 py-1 text-xs font-medium transition-colors hover:bg-white/8">
+          <span className="shell-text-muted shell-list-hover inline-flex w-full truncate rounded-md px-2 py-1 text-xs font-medium transition-colors">
             {label}
           </span>
         )}
@@ -112,7 +112,7 @@ export function AirbaseList({
   }, [airbases]);
 
   return (
-    <div className="max-h-60 overflow-auto bg-white/7 p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] backdrop-blur-sm">
+    <div className="shell-panel-soft max-h-60 overflow-auto p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
       <ul className="m-0 list-none space-y-1 p-0" aria-label="Airbases">
         <ClearSelectionOption
           disabled={!selectedAirbaseId}

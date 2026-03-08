@@ -40,7 +40,8 @@
 - `MapPanel` is the full-screen workspace shell for the map view and controls selection state passed to `ConstellationMap`.
 - The right sidebar includes mode toggles (`Live`, `Simulate`) and mode-specific action buttons.
 - Mode switching is presentation-only in V1, but it must visibly change map theme colors so operators can distinguish contexts at a glance.
-- Selected-airbase details remain in the same sidebar and are secondary to mode controls.
+- In `Live` mode, selected-airbase details open in a left-side drawer triggered from the sidebar; the drawer is disabled in `Simulate`.
+- Control surfaces such as the navbar, sidebar, drawers, and list states use shared zinc/amber design tokens to avoid palette drift between light and dark modes.
 - In `Live` mode, sidebar actions support resetting to the full-map view and selecting a base from a scrollable list.
 - Selecting a base from the sidebar list must both mark it as selected in the map UI and move the map to a moderate base-focused zoom.
 

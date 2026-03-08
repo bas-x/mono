@@ -1,15 +1,13 @@
 import type { ReactNode } from 'react';
 
 import { AirbaseList } from '@/features/map/components/AirbaseList';
-import type { Airbase, AirbaseDetails } from '@/features/map/types';
+import {
+  SelectionDrawer,
+  type SelectedAirbaseDetailsState,
+} from '@/features/map/components/SelectionDrawer';
+import type { Airbase } from '@/features/map/types';
 
 export type ViewMode = 'live' | 'simulate';
-
-export type SelectedAirbaseDetailsState =
-  | { status: 'idle' }
-  | { status: 'loading'; airbaseId: string }
-  | { status: 'success'; details: AirbaseDetails }
-  | { status: 'error'; airbaseId: string; message: string };
 
 type MapSidebarProps = {
   airbases: Airbase[];
@@ -46,63 +44,16 @@ type LiveActionsSectionProps = Pick<
   | 'onSelectAirbaseFromList'
 >;
 
-type SelectionSectionProps = Pick<
-  MapSidebarProps,
-  'selectedAirbaseId' | 'selectedAirbaseDetailsState' | 'onClearSelection'
->;
-
 function noop() {}
 
 function mergeClassNames(...parts: Array<string | undefined>) {
   return parts.filter(Boolean).join(' ');
 }
 
-function renderDetailsContent(
-  selectedAirbaseId: string | null,
-  state: SelectedAirbaseDetailsState,
-) {
-  if (!selectedAirbaseId || state.status === 'idle') {
-    return (
-      <p className="m-0 text-xs text-zinc-300/80">
-        Select an airbase on the map to inspect details.
-      </p>
-    );
-  }
-
-  if (state.status === 'loading') {
-    return <p className="m-0 text-xs text-zinc-300/80">Loading details for {state.airbaseId}...</p>;
-  }
-
-  if (state.status === 'error') {
-    return (
-      <p className="m-0 text-xs text-rose-300">
-        {state.airbaseId}: {state.message}
-      </p>
-    );
-  }
-
-  const entries = Object.entries(state.details).filter(([key]) => key !== 'id');
-
-  if (entries.length === 0) {
-    return <p className="m-0 text-xs text-zinc-300/80">No additional details available.</p>;
-  }
-
-  return (
-    <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-xs">
-      {entries.map(([key, value]) => (
-        <div key={key} className="contents">
-          <dt className="font-semibold text-zinc-50">{key}</dt>
-          <dd className="m-0 truncate text-zinc-300/85">{String(value)}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
 function buttonClassName(isActive: boolean) {
   return isActive
-    ? 'bg-white text-zinc-950 shadow-[0_1px_0_rgba(255,255,255,0.4)]'
-    : 'bg-transparent text-zinc-100 hover:bg-white/10';
+    ? 'shell-button-active'
+    : 'shell-button';
 }
 
 function SidebarInsetSection({ children, className }: SectionProps) {
@@ -117,7 +68,7 @@ function ModeSection({ viewMode, onModeChange }: ModeSectionProps) {
   return (
     <SidebarInsetSection>
       <div
-        className="grid grid-cols-1 gap-1 rounded-sm border border-white/18 bg-white/6 p-1"
+        className="shell-panel-soft shell-divider grid grid-cols-1 gap-1 rounded-sm border p-1"
         aria-label="Mode selection"
         role="group"
       >
@@ -154,12 +105,12 @@ function LiveActionsSection({
   onSelectAirbaseFromList,
 }: LiveActionsSectionProps) {
   return (
-    <SidebarFlushSection className="border-t border-white/10 pt-4">
+    <SidebarFlushSection className="shell-divider border-t pt-4">
       <div className="grid gap-2 px-2">
         <button
           type="button"
           onClick={onResetView}
-          className="cursor-pointer rounded-sm border border-white/18 bg-white/6 px-3 py-2 text-sm font-medium text-zinc-50 transition-colors hover:bg-white/12"
+          className="shell-button cursor-pointer rounded-sm border px-3 py-2 text-sm font-medium transition-colors"
         >
           Full map
         </button>
@@ -169,8 +120,8 @@ function LiveActionsSection({
           onClick={onToggleAirbaseList}
           className={`cursor-pointer rounded-sm border px-3 py-2 text-sm font-medium transition-colors ${
             isAirbaseListOpen
-              ? 'border-white/40 bg-white/14 text-zinc-50'
-              : 'border-white/18 bg-white/6 text-zinc-50 hover:bg-white/12'
+              ? 'shell-button-active'
+              : 'shell-button'
           }`}
         >
           By base
@@ -178,11 +129,11 @@ function LiveActionsSection({
       </div>
       {isAirbaseListOpen ? (
         airbaseStatus === 'loading' ? (
-          <div className="mx-0 rounded-2xl border border-white/12 bg-white/6 px-3 py-3 text-xs text-zinc-300/80">
+          <div className="shell-panel-soft shell-divider shell-text-muted mx-0 rounded-2xl border px-3 py-3 text-xs">
             Loading bases...
           </div>
         ) : airbaseStatus === 'error' ? (
-          <div className="mx-0 rounded-2xl border border-rose-300/30 bg-rose-500/10 px-3 py-3 text-xs text-rose-200">
+          <div className="shell-error-surface mx-0 rounded-2xl border px-3 py-3 text-xs">
             {airbaseMessage ?? 'Unable to load airbases.'}
           </div>
         ) : (
@@ -200,11 +151,11 @@ function LiveActionsSection({
 
 function SimulateActionsSection() {
   return (
-    <SidebarInsetSection className="border-t border-white/10 pt-4">
+    <SidebarInsetSection className="shell-divider border-t pt-4">
       <button
         type="button"
         onClick={noop}
-        className="cursor-pointer rounded-sm border border-white/18 bg-white/6 px-3 py-2 text-sm font-medium text-zinc-50 transition-colors hover:bg-white/12"
+        className="shell-button cursor-pointer rounded-sm border px-3 py-2 text-sm font-medium transition-colors"
       >
         Create
       </button>
@@ -212,61 +163,34 @@ function SimulateActionsSection() {
   );
 }
 
-function SelectionSection({
-  selectedAirbaseId,
-  selectedAirbaseDetailsState,
-  onClearSelection,
-}: SelectionSectionProps) {
-  return (
-    <SidebarInsetSection className="border-t border-white/10 pt-4">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <p className="m-0 text-[0.65rem] font-semibold uppercase tracking-[0.22em] text-zinc-300/70">
-            Selection
-          </p>
-          <p className="m-0 mt-1 text-sm text-zinc-300/80">
-            Selected: <strong className="text-zinc-50">{selectedAirbaseId ?? 'none'}</strong>
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onClearSelection}
-          disabled={!selectedAirbaseId}
-          className="cursor-pointer rounded-sm border border-white/18 bg-white/6 px-2 py-1 text-[11px] font-medium text-zinc-100 transition-colors hover:bg-white/12 disabled:cursor-not-allowed disabled:opacity-45"
-        >
-          Clear
-        </button>
-      </div>
-      {renderDetailsContent(selectedAirbaseId, selectedAirbaseDetailsState)}
-    </SidebarInsetSection>
-  );
-}
-
 export function MapSidebar(props: MapSidebarProps) {
   return (
     <aside
-      className="flex h-full min-h-0 w-full max-w-40 flex-col gap-5 overflow-auto border-l border-white/10 bg-mauve-900 py-4 text-zinc-50"
+      className="shell-panel relative h-full min-h-0 w-full max-w-40 border-l"
       aria-label="Map controls"
     >
-      <ModeSection viewMode={props.viewMode} onModeChange={props.onModeChange} />
+      <div className="flex h-full min-h-0 flex-col gap-5 overflow-y-auto py-4">
+        <ModeSection viewMode={props.viewMode} onModeChange={props.onModeChange} />
 
-      {props.viewMode === 'live' ? (
-        <LiveActionsSection
-          airbases={props.airbases}
-          airbaseStatus={props.airbaseStatus}
-          airbaseMessage={props.airbaseMessage}
-          isAirbaseListOpen={props.isAirbaseListOpen}
-          selectedAirbaseId={props.selectedAirbaseId}
-          onClearSelection={props.onClearSelection}
-          onResetView={props.onResetView}
-          onToggleAirbaseList={props.onToggleAirbaseList}
-          onSelectAirbaseFromList={props.onSelectAirbaseFromList}
-        />
-      ) : (
-        <SimulateActionsSection />
-      )}
+        {props.viewMode === 'live' ? (
+          <LiveActionsSection
+            airbases={props.airbases}
+            airbaseStatus={props.airbaseStatus}
+            airbaseMessage={props.airbaseMessage}
+            isAirbaseListOpen={props.isAirbaseListOpen}
+            selectedAirbaseId={props.selectedAirbaseId}
+            onClearSelection={props.onClearSelection}
+            onResetView={props.onResetView}
+            onToggleAirbaseList={props.onToggleAirbaseList}
+            onSelectAirbaseFromList={props.onSelectAirbaseFromList}
+          />
+        ) : (
+          <SimulateActionsSection />
+        )}
+      </div>
 
-      <SelectionSection
+      <SelectionDrawer
+        viewMode={props.viewMode}
         selectedAirbaseId={props.selectedAirbaseId}
         selectedAirbaseDetailsState={props.selectedAirbaseDetailsState}
         onClearSelection={props.onClearSelection}
