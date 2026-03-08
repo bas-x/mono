@@ -22,6 +22,7 @@ type MapSidebarProps = {
   onResetView: () => void;
   onToggleAirbaseList: () => void;
   onSelectAirbaseFromList: (airbaseId: string) => void;
+  onOpenSimulationSheet: () => void;
 };
 
 type SectionProps = {
@@ -43,8 +44,6 @@ type LiveActionsSectionProps = Pick<
   | 'onToggleAirbaseList'
   | 'onSelectAirbaseFromList'
 >;
-
-function noop() {}
 
 function mergeClassNames(...parts: Array<string | undefined>) {
   return parts.filter(Boolean).join(' ');
@@ -145,12 +144,14 @@ function LiveActionsSection({
   );
 }
 
-function SimulateActionsSection() {
+type SimulateActionsSectionProps = Pick<MapSidebarProps, 'onOpenSimulationSheet'>;
+
+function SimulateActionsSection({ onOpenSimulationSheet }: SimulateActionsSectionProps) {
   return (
     <SidebarInsetSection className="shell-divider border-t pt-4">
       <button
         type="button"
-        onClick={noop}
+        onClick={onOpenSimulationSheet}
         className="shell-button cursor-pointer rounded-sm border px-3 py-2 text-sm font-medium transition-colors"
       >
         Create
@@ -181,7 +182,7 @@ export function MapSidebar(props: MapSidebarProps) {
             onSelectAirbaseFromList={props.onSelectAirbaseFromList}
           />
         ) : (
-          <SimulateActionsSection />
+          <SimulateActionsSection onOpenSimulationSheet={props.onOpenSimulationSheet} />
         )}
       </div>
 
