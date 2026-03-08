@@ -24,7 +24,7 @@
 
 ## Interactive Overlay (V1)
 
-- Base map is rendered as static SVG asset (`sweden.svg`) with airbase polygons overlaid in map-space coordinates.
+- The current base map surface reads `backend/assets/sweden.json` and `backend/assets/bounds.json` directly and renders them as a 2.5D extruded SVG layer in the same coordinate space as airbase overlays.
 - Overlay uses frontend map contract data (`/map`) projected into SVG space with an optional linear transform.
 - Mock airbase positions use curated SVG-space anchors aligned to `sweden.svg`; they are not derived from a linear geo projection.
 - Airbase interactions include hover inspection, click selection, and keyboard activation.
