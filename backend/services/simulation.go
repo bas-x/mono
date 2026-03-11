@@ -122,6 +122,23 @@ func (s *SimulationService) StartSimulation(simulationID string) error {
 	return nil
 }
 
+func (s *SimulationService) ResetSimulation(simulationID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	managed, err := s.managedSimulationByIDLocked(simulationID)
+	if err != nil {
+		return err
+	}
+	if managed.cancel != nil {
+		managed.cancel()
+	}
+	if s.base == managed {
+		s.base = nil
+	}
+	return nil
+}
+
 func (s *SimulationService) Broadcaster() *EventBroadcaster {
 	return s.broadcaster
 }
@@ -204,12 +221,7 @@ func (s *SimulationService) managedSimulationByIDLocked(simulationID string) (*m
 }
 
 func (s *SimulationService) Reset() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.base != nil && s.base.cancel != nil {
-		s.base.cancel()
-	}
-	s.base = nil
+	_ = s.ResetSimulation(BaseSimulationID)
 }
 
 func (s *SimulationService) registerHooks(simulationID string, sim *simulation.Simulation) {
