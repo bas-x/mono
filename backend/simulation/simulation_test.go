@@ -296,6 +296,94 @@ func TestSimulationLandingOverrideFlow(t *testing.T) {
 	require.False(t, ok)
 }
 
+func TestSimulation_NeedsDrivenStateTransitions(t *testing.T) {
+	t.Parallel()
+
+	ts := New(time.Second, WithEpoch(time.Unix(0, 1)))
+	sim := NewSimulator([32]byte{3}, ts)
+
+	sim.constellation.airbases = []Airbase{{ID: BaseID{0, 0, 0, 0, 0, 0, 0, 1}}}
+	sim.dispatcher = NewDispatcher(sim.constellation, &RoundRobinAssigner{})
+	tail := TailNumber{0, 0, 0, 0, 0, 0, 0, 7}
+	sim.fleet = &Fleet{aircrafts: []Aircraft{NewAircraft(tail, &OutboundState{}, []Need{
+		{Type: NeedFuel, Severity: 70, RequiredCapability: NeedFuel},
+		{Type: NeedMunitions, Severity: 60, RequiredCapability: NeedMunitions},
+	})}}
+
+	advance := func(steps int) {
+		for range steps {
+			sim.Step()
+		}
+	}
+
+	current := func() Aircraft {
+		aircrafts := sim.Aircrafts()
+		require.Len(t, aircrafts, 1)
+		return aircrafts[0]
+	}
+
+	advance(1)
+	ac := current()
+	require.Equal(t, "Outbound", ac.State.Name())
+	require.Equal(t, 70, ac.Needs[0].Severity)
+	require.Equal(t, 60, ac.Needs[1].Severity)
+
+	advance(1)
+	ac = current()
+	require.Equal(t, "Outbound", ac.State.Name())
+	require.Equal(t, 75, ac.Needs[0].Severity)
+	require.Equal(t, 65, ac.Needs[1].Severity)
+
+	advance(1)
+	ac = current()
+	require.Equal(t, "Inbound", ac.State.Name())
+	require.Equal(t, 80, ac.Needs[0].Severity)
+	require.Equal(t, 70, ac.Needs[1].Severity)
+
+	advance(int(inboundDecisionDelay/ts.Resolution) + 1)
+	ac = current()
+	require.Equal(t, "Committed", ac.State.Name())
+	require.True(t, ac.HasAssignment)
+
+	advance(int(commitApproachDuration/ts.Resolution) + 1)
+	ac = current()
+	require.Equal(t, "Servicing", ac.State.Name())
+	servicingStartFuel := ac.Needs[0].Severity
+	servicingStartMunitions := ac.Needs[1].Severity
+	require.Positive(t, servicingStartFuel)
+	require.Positive(t, servicingStartMunitions)
+
+	advance(1)
+	ac = current()
+	require.Equal(t, "Servicing", ac.State.Name())
+	require.Equal(t, servicingStartFuel, ac.Needs[0].Severity)
+	require.Equal(t, servicingStartMunitions, ac.Needs[1].Severity)
+
+	advance(1)
+	ac = current()
+	require.Equal(t, "Servicing", ac.State.Name())
+	require.Less(t, ac.Needs[0].Severity, servicingStartFuel)
+	require.Less(t, ac.Needs[1].Severity, servicingStartMunitions)
+
+	advance(int(servicingDuration/ts.Resolution) + 1)
+	ac = current()
+	require.Equal(t, "Ready", ac.State.Name())
+	for _, need := range ac.Needs {
+		require.Zero(t, need.Severity)
+	}
+
+	second := sim.Clone()
+	secondSteps := []string{}
+	firstSteps := []string{}
+	for range 2 {
+		sim.Step()
+		second.Step()
+		firstSteps = append(firstSteps, sim.Aircrafts()[0].State.Name())
+		secondSteps = append(secondSteps, second.Aircrafts()[0].State.Name())
+	}
+	require.Equal(t, firstSteps, secondSteps)
+}
+
 func TestSimulationInitDeterministic(t *testing.T) {
 	t.Parallel()
 	seed := [32]byte{1, 2, 3}

@@ -131,8 +131,8 @@ func websocketSafeOptions() *simulation.SimulationOptions {
 		FleetOpts: simulation.FleetOptions{
 			AircraftMin: 1,
 			AircraftMax: 1,
-			NeedsMin:    1,
-			NeedsMax:    2,
+			NeedsMin:    0,
+			NeedsMax:    0,
 		},
 	}
 }
