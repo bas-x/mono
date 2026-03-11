@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { parseApiConfigFromEnv } from '@/lib/api/config';
+import { useApi } from '@/lib/api/useApi';
 import { createMockSimulationStreamClient } from '@/lib/api/mock/realtime';
 import { createSimulationStreamClient } from '@/lib/api/realtime/simulationStream';
-import type { ConnectionState, SimulationEventEnvelope, SimulationStreamClient } from '@/lib/api/types';
+import type { ApiConfig, ConnectionState, SimulationEventEnvelope, SimulationStreamClient } from '@/lib/api/types';
 
 export type UseSimulationStreamResult = {
   state: ConnectionState;
@@ -12,10 +12,8 @@ export type UseSimulationStreamResult = {
   subscribe(handler: (event: SimulationEventEnvelope) => void): () => void;
 };
 
-function createStreamClient(): SimulationStreamClient {
-  const config = parseApiConfigFromEnv();
-
-  if (config.useMock) {
+function createStreamClient(config: ApiConfig): SimulationStreamClient {
+  if (config.mode === 'mock') {
     return createMockSimulationStreamClient();
   }
 
@@ -23,7 +21,8 @@ function createStreamClient(): SimulationStreamClient {
 }
 
 export function useSimulationStream(simulationId?: string): UseSimulationStreamResult {
-  const streamClient = useMemo(() => createStreamClient(), []);
+  const { config } = useApi();
+  const streamClient = useMemo(() => createStreamClient(config), [config]);
   const [state, setState] = useState<ConnectionState>('idle');
 
   useEffect(() => {
