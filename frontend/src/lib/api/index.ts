@@ -1,7 +1,7 @@
 export { createApiClients } from '@/lib/api/clients';
 export { parseApiConfigFromEnv, SIMULATION_WS_PATH } from '@/lib/api/config';
 export { queryKeys } from '@/lib/api/query-keys';
-export { useApi } from '@/lib/api/useApi';
+export { useApi, ApiProvider } from '@/lib/api/useApi.tsx';
 export { useSimulationStream } from '@/lib/api/useSimulationStream';
 export { createMapServiceClient } from '@/lib/api/services/map';
 export type {

@@ -19,14 +19,10 @@ type ExtrudedFace = {
   points: string;
 };
 
-type RegionMesh = {
-  id: string;
+type CountryMesh = {
   topPolygons: string[];
   sideFaces: ExtrudedFace[];
   shadowPolygons: string[];
-  topFill: string;
-  sideFill: string;
-  shadowFill: string;
 };
 
 type SwedenBounds = {
@@ -45,21 +41,10 @@ type SwedenRegion = {
 };
 
 const EXTRUSION_DEPTH = { x: 8, y: 12 } as const;
-const TOP_FILL_VARIANTS = [
-  'color-mix(in srgb, var(--color-map-surface) 88%, white 12%)',
-  'color-mix(in srgb, var(--color-map-surface) 94%, white 6%)',
-  'color-mix(in srgb, var(--color-map-surface) 82%, black 18%)',
-] as const;
-const SIDE_FILL_VARIANTS = [
-  'color-mix(in srgb, var(--color-map-boundary) 70%, var(--color-map-surface) 30%)',
-  'color-mix(in srgb, var(--color-map-boundary) 78%, var(--color-map-surface) 22%)',
-  'color-mix(in srgb, var(--color-map-boundary) 66%, black 34%)',
-] as const;
-const SHADOW_FILL_VARIANTS = [
-  'color-mix(in srgb, var(--color-map-boundary) 28%, transparent)',
-  'color-mix(in srgb, var(--color-map-boundary) 34%, transparent)',
-  'color-mix(in srgb, black 24%, transparent)',
-] as const;
+const TOP_FILL = 'color-mix(in srgb, var(--color-map-surface) 88%, white 12%)';
+const SIDE_FILL = 'color-mix(in srgb, var(--color-map-boundary) 70%, var(--color-map-surface) 30%)';
+const SHADOW_FILL = 'color-mix(in srgb, var(--color-map-boundary) 28%, transparent)';
+
 const SWEDEN_MAP_BOUNDS = (boundsData as SwedenBounds).overall;
 const SWEDEN_REGIONS = regionsData as SwedenRegion[];
 
@@ -74,7 +59,7 @@ function offsetPoints(points: readonly MapPoint[]) {
   }));
 }
 
-function createSideFaces(regionId: string, areaIndex: number, points: readonly MapPoint[]) {
+function createSideFaces(idPrefix: string, areaIndex: number, points: readonly MapPoint[]) {
   const faces: ExtrudedFace[] = [];
 
   for (let index = 0; index < points.length; index += 1) {
@@ -95,7 +80,7 @@ function createSideFaces(regionId: string, areaIndex: number, points: readonly M
     ];
 
     faces.push({
-      key: `${regionId}-${areaIndex}-${index}`,
+      key: `${idPrefix}-${areaIndex}-${index}`,
       points: toPointsAttribute(facePoints),
     });
   }
@@ -103,29 +88,21 @@ function createSideFaces(regionId: string, areaIndex: number, points: readonly M
   return faces;
 }
 
-function createRegionMeshes(): RegionMesh[] {
-  return SWEDEN_REGIONS.map((region, index) => {
-    const variantIndex = index % TOP_FILL_VARIANTS.length;
-    const topPolygons = region.areas.map((area) => toPointsAttribute(area));
-    const shadowPolygons = region.areas.map((area) => toPointsAttribute(offsetPoints(area)));
-    const sideFaces = region.areas.flatMap((area, areaIndex) =>
-      createSideFaces(region.id, areaIndex, area),
-    );
+function createCountryMesh(): CountryMesh {
+  const allAreas = SWEDEN_REGIONS.flatMap((region) => region.areas);
+  const topPolygons = allAreas.map((area) => toPointsAttribute(area));
+  const shadowPolygons = allAreas.map((area) => toPointsAttribute(offsetPoints(area)));
+  const sideFaces = allAreas.flatMap((area, index) => createSideFaces('sweden', index, area));
 
-    return {
-      id: region.id,
-      topPolygons,
-      sideFaces,
-      shadowPolygons,
-      topFill: TOP_FILL_VARIANTS[variantIndex] ?? TOP_FILL_VARIANTS[0],
-      sideFill: SIDE_FILL_VARIANTS[variantIndex] ?? SIDE_FILL_VARIANTS[0],
-      shadowFill: SHADOW_FILL_VARIANTS[variantIndex] ?? SHADOW_FILL_VARIANTS[0],
-    };
-  });
+  return {
+    topPolygons,
+    sideFaces,
+    shadowPolygons,
+  };
 }
 
 function SwedenMap3DLayerComponent({ viewBox }: SwedenMap3DLayerProps) {
-  const regionMeshes = useMemo(() => createRegionMeshes(), []);
+  const countryMesh = useMemo(() => createCountryMesh(), []);
   const baseShadowHeight = SWEDEN_MAP_BOUNDS.height + EXTRUSION_DEPTH.y;
   const baseShadowWidth = SWEDEN_MAP_BOUNDS.width + EXTRUSION_DEPTH.x;
 
@@ -140,34 +117,27 @@ function SwedenMap3DLayerComponent({ viewBox }: SwedenMap3DLayerProps) {
         fill="color-mix(in srgb, var(--color-map-boundary) 10%, transparent)"
       />
 
-      {regionMeshes.map((region) => (
-        <g key={region.id}>
-          {region.shadowPolygons.map((points, polygonIndex) => (
-            <polygon
-              key={`${region.id}-shadow-${polygonIndex}`}
-              points={points}
-              fill={region.shadowFill}
-              stroke="none"
-            />
-          ))}
+      <g>
+        {countryMesh.shadowPolygons.map((points, index) => (
+          <polygon key={`shadow-${index}`} points={points} fill={SHADOW_FILL} stroke="none" />
+        ))}
 
-          {region.sideFaces.map((face) => (
-            <polygon key={face.key} points={face.points} fill={region.sideFill} stroke="none" />
-          ))}
+        {countryMesh.sideFaces.map((face) => (
+          <polygon key={face.key} points={face.points} fill={SIDE_FILL} stroke="none" />
+        ))}
 
-          {region.topPolygons.map((points, polygonIndex) => (
-            <polygon
-              key={`${region.id}-top-${polygonIndex}`}
-              points={points}
-              fill={region.topFill}
-              stroke="var(--color-map-boundary)"
-              strokeWidth={0.9}
-              vectorEffect="non-scaling-stroke"
-              paintOrder="stroke fill"
-            />
-          ))}
-        </g>
-      ))}
+        {countryMesh.topPolygons.map((points, index) => (
+          <polygon
+            key={`top-${index}`}
+            points={points}
+            fill={TOP_FILL}
+            stroke={TOP_FILL}
+            strokeWidth={0.5}
+            vectorEffect="non-scaling-stroke"
+            paintOrder="stroke fill"
+          />
+        ))}
+      </g>
 
       <rect
         x={viewBox.minX}
