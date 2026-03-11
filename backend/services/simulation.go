@@ -1,6 +1,8 @@
 package services
 
 import (
+	"context"
+	"encoding/hex"
 	errors "errors"
 	"sync"
 	"time"
@@ -11,6 +13,7 @@ import (
 var (
 	ErrBaseAlreadyExists  = errors.New("simulation service: base already exists")
 	ErrBaseNotFound       = errors.New("simulation service: base not found")
+	ErrSimulationRunning  = errors.New("simulation service: simulation already running")
 	ErrSimulationNotFound = errors.New("simulation service: simulation not found")
 )
 
@@ -22,15 +25,28 @@ type SimulationServiceConfig struct {
 }
 
 type SimulationService struct {
-	mu         sync.RWMutex
-	base       *simulation.Simulation
-	resolution time.Duration
-	runnerCfg  simulation.ControlledRunnerConfig
+	mu          sync.RWMutex
+	base        *managedSimulation
+	broadcaster *EventBroadcaster
+	resolution  time.Duration
+	runnerCfg   simulation.ControlledRunnerConfig
+}
+
+type managedSimulation struct {
+	sim     *simulation.Simulation
+	runner  *simulation.ControlledRunner
+	cancel  context.CancelFunc
+	running bool
 }
 
 type BaseSimulationConfig struct {
 	Seed    [32]byte
 	Options *simulation.SimulationOptions
+}
+
+type SimulationInfo struct {
+	ID      string `json:"id"`
+	Running bool   `json:"running"`
 }
 
 func NewSimulationService(cfg SimulationServiceConfig) *SimulationService {
@@ -44,8 +60,9 @@ func NewSimulationService(cfg SimulationServiceConfig) *SimulationService {
 		cfg.RunnerConfig.MaxCatchUpTicks = 5
 	}
 	return &SimulationService{
-		resolution: cfg.Resolution,
-		runnerCfg:  cfg.RunnerConfig,
+		broadcaster: NewEventBroadcaster(0),
+		resolution:  cfg.Resolution,
+		runnerCfg:   cfg.RunnerConfig,
 	}
 }
 
@@ -58,6 +75,7 @@ func (s *SimulationService) CreateBaseSimulation(cfg BaseSimulationConfig) (*sim
 	}
 	ts := simulation.New(s.resolution, simulation.WithEpoch(time.Now()))
 	sim := simulation.NewSimulator(cfg.Seed, ts)
+	s.registerHooks(BaseSimulationID, sim)
 	options := cfg.Options
 	if options == nil {
 		options = &simulation.SimulationOptions{}
@@ -65,8 +83,47 @@ func (s *SimulationService) CreateBaseSimulation(cfg BaseSimulationConfig) (*sim
 	if err := sim.Init(options); err != nil {
 		return nil, err
 	}
-	s.base = sim
+	s.base = &managedSimulation{sim: sim}
 	return sim, nil
+}
+
+func (s *SimulationService) StartSimulation(simulationID string) error {
+	s.mu.Lock()
+	managed, err := s.managedSimulationByIDLocked(simulationID)
+	if err != nil {
+		s.mu.Unlock()
+		return err
+	}
+	if managed.running {
+		s.mu.Unlock()
+		return ErrSimulationRunning
+	}
+
+	runner := simulation.NewControlledRunner(s.runnerCfg)
+	ctx, cancel := context.WithCancel(context.Background())
+	managed.runner = runner
+	managed.cancel = cancel
+	managed.running = true
+	sim := managed.sim
+	s.mu.Unlock()
+
+	go func() {
+		runner.Run(ctx, sim)
+		s.mu.Lock()
+		defer s.mu.Unlock()
+		if s.base != managed {
+			return
+		}
+		managed.runner = nil
+		managed.cancel = nil
+		managed.running = false
+	}()
+
+	return nil
+}
+
+func (s *SimulationService) Broadcaster() *EventBroadcaster {
+	return s.broadcaster
 }
 
 func (s *SimulationService) Base() (*simulation.Simulation, bool) {
@@ -75,7 +132,7 @@ func (s *SimulationService) Base() (*simulation.Simulation, bool) {
 	if s.base == nil {
 		return nil, false
 	}
-	return s.base, true
+	return s.base.sim, true
 }
 
 func (s *SimulationService) Airbases(simulationID string) ([]Airbase, error) {
@@ -108,9 +165,33 @@ func (s *SimulationService) Aircrafts(simulationID string) ([]Aircraft, error) {
 	return aircrafts, nil
 }
 
-func (s *SimulationService) simulationByID(simulationID string) (*simulation.Simulation, error) {
+func (s *SimulationService) Simulations() []SimulationInfo {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
+
+	result := make([]SimulationInfo, 0, 1)
+	if s.base != nil {
+		result = append(result, SimulationInfo{ID: BaseSimulationID, Running: s.base.running})
+	}
+
+	return result
+}
+
+func (s *SimulationService) simulationByID(simulationID string) (*simulation.Simulation, error) {
+	managed, err := s.managedSimulationByID(simulationID)
+	if err != nil {
+		return nil, err
+	}
+	return managed.sim, nil
+}
+
+func (s *SimulationService) managedSimulationByID(simulationID string) (*managedSimulation, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.managedSimulationByIDLocked(simulationID)
+}
+
+func (s *SimulationService) managedSimulationByIDLocked(simulationID string) (*managedSimulation, error) {
 
 	if simulationID != BaseSimulationID {
 		return nil, ErrSimulationNotFound
@@ -125,5 +206,53 @@ func (s *SimulationService) simulationByID(simulationID string) (*simulation.Sim
 func (s *SimulationService) Reset() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	if s.base != nil && s.base.cancel != nil {
+		s.base.cancel()
+	}
 	s.base = nil
+}
+
+func (s *SimulationService) registerHooks(simulationID string, sim *simulation.Simulation) {
+	sim.AddAircraftStateChangeHook(func(event simulation.AircraftStateChangeEvent) {
+		s.broadcaster.Emit(AircraftStateChangeEvent{
+			Type:         EventTypeAircraftStateChange,
+			SimulationID: simulationID,
+			TailNumber:   hex.EncodeToString(event.TailNumber[:]),
+			OldState:     event.OldState,
+			NewState:     event.NewState,
+			Aircraft:     mapAircraft(event.Aircraft),
+			Timestamp:    event.Timestamp,
+		})
+	})
+
+	sim.AddLandingAssignmentHook(func(event simulation.LandingAssignmentEvent) {
+		s.broadcaster.Emit(LandingAssignmentEvent{
+			Type:         EventTypeLandingAssignment,
+			SimulationID: simulationID,
+			TailNumber:   hex.EncodeToString(event.TailNumber[:]),
+			BaseID:       hex.EncodeToString(event.Base[:]),
+			Source:       mapAssignmentSource(event.Source),
+			Timestamp:    event.Timestamp,
+		})
+	})
+
+	sim.AddSimulationStepHook(func(event simulation.SimulationStepEvent) {
+		s.broadcaster.Emit(SimulationStepEvent{
+			Type:         EventTypeSimulationStep,
+			SimulationID: simulationID,
+			Tick:         event.Tick,
+			Timestamp:    event.Timestamp,
+		})
+	})
+}
+
+func mapAssignmentSource(source simulation.LandingAssignmentSource) string {
+	switch source {
+	case simulation.AssignmentSourceAlgorithm:
+		return "algorithm"
+	case simulation.AssignmentSourceHuman:
+		return "human"
+	default:
+		return "unknown"
+	}
 }

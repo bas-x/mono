@@ -3,6 +3,7 @@ package services
 import (
 	"encoding/hex"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 
@@ -57,4 +58,99 @@ func TestSimulationService_UnknownSimulationID(t *testing.T) {
 
 	_, err = svc.Aircrafts("branch-1")
 	require.ErrorIs(t, err, ErrSimulationNotFound)
+}
+
+func TestSimulationService_SimulationsEmptyBeforeCreate(t *testing.T) {
+	t.Parallel()
+
+	svc := NewSimulationService(SimulationServiceConfig{})
+	require.Empty(t, svc.Simulations())
+
+	base, ok := svc.Base()
+	require.False(t, ok)
+	require.Nil(t, base)
+}
+
+func TestSimulationService_StartSimulationErrors(t *testing.T) {
+	t.Parallel()
+
+	svc := NewSimulationService(SimulationServiceConfig{})
+	require.ErrorIs(t, svc.StartSimulation(BaseSimulationID), ErrBaseNotFound)
+	require.ErrorIs(t, svc.StartSimulation("branch-1"), ErrSimulationNotFound)
+
+	_, err := svc.CreateBaseSimulation(BaseSimulationConfig{Options: testSimulationOptions(1, 1)})
+	require.NoError(t, err)
+
+	require.ErrorIs(t, svc.StartSimulation("branch-1"), ErrSimulationNotFound)
+}
+
+func TestSimulationService_SimulationsReflectRunningState(t *testing.T) {
+	t.Parallel()
+
+	svc := NewSimulationService(SimulationServiceConfig{RunnerConfig: simulation.ControlledRunnerConfig{TicksPerSecond: 128}})
+	_, err := svc.CreateBaseSimulation(BaseSimulationConfig{Options: testSimulationOptions(1, 1)})
+	require.NoError(t, err)
+
+	list := svc.Simulations()
+	require.Len(t, list, 1)
+	require.Equal(t, BaseSimulationID, list[0].ID)
+	require.False(t, list[0].Running)
+
+	require.NoError(t, svc.StartSimulation(BaseSimulationID))
+	require.Eventually(t, func() bool {
+		listed := svc.Simulations()
+		return len(listed) == 1 && listed[0].Running
+	}, time.Second, 10*time.Millisecond)
+}
+
+func TestSimulationService_ResetClearsSimulationAndStopsRunner(t *testing.T) {
+	t.Parallel()
+
+	svc := NewSimulationService(SimulationServiceConfig{RunnerConfig: simulation.ControlledRunnerConfig{TicksPerSecond: 128}})
+	_, err := svc.CreateBaseSimulation(BaseSimulationConfig{Options: testSimulationOptions(1, 1)})
+	require.NoError(t, err)
+	require.NoError(t, svc.StartSimulation(BaseSimulationID))
+
+	svc.Reset()
+
+	require.Empty(t, svc.Simulations())
+	base, ok := svc.Base()
+	require.False(t, ok)
+	require.Nil(t, base)
+	require.ErrorIs(t, svc.StartSimulation(BaseSimulationID), ErrBaseNotFound)
+	require.ErrorIs(t, svc.StartSimulation("branch-1"), ErrSimulationNotFound)
+}
+
+func TestSimulationService_RunnerStopsWhenUntilTickReached(t *testing.T) {
+	t.Parallel()
+
+	svc := NewSimulationService(SimulationServiceConfig{
+		RunnerConfig: simulation.ControlledRunnerConfig{TicksPerSecond: 512, UntilTick: 3},
+	})
+	_, err := svc.CreateBaseSimulation(BaseSimulationConfig{Options: testSimulationOptions(1, 1)})
+	require.NoError(t, err)
+
+	require.NoError(t, svc.StartSimulation(BaseSimulationID))
+	require.Eventually(t, func() bool {
+		listed := svc.Simulations()
+		return len(listed) == 1 && !listed[0].Running
+	}, 2*time.Second, 10*time.Millisecond)
+}
+
+func testSimulationOptions(numBases, numAircraft uint) *simulation.SimulationOptions {
+	return &simulation.SimulationOptions{
+		ConstellationOpts: simulation.ConstellationOptions{
+			IncludeRegions:    []string{"Blekinge"},
+			MinPerRegion:      numBases,
+			MaxPerRegion:      numBases,
+			MaxTotal:          numBases,
+			RegionProbability: prng.New(1, 1),
+		},
+		FleetOpts: simulation.FleetOptions{
+			AircraftMin: numAircraft,
+			AircraftMax: numAircraft,
+			NeedsMin:    1,
+			NeedsMax:    2,
+		},
+	}
 }
