@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/hex"
 	"errors"
 	"net/http"
 	"strings"
@@ -166,13 +165,9 @@ func parseSeed(raw string) ([32]byte, error) {
 	if trimmed == "" {
 		return out, nil
 	}
-	decoded, err := hex.DecodeString(trimmed)
-	if err != nil {
-		return out, err
+	if len(trimmed) == 0 {
+		return out, errors.New("empty seed")
 	}
-	if len(decoded) != len(out) {
-		return out, errors.New("seed must be 64 hex characters")
-	}
-	copy(out[:], decoded)
+	copy(out[:], []byte(trimmed))
 	return out, nil
 }
