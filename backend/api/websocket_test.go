@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -139,6 +140,38 @@ func TestStartSimulationAndListSimulationsEndpoints(t *testing.T) {
 
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&listed))
 	require.Empty(t, listed.Simulations)
+}
+
+func TestCreateBaseSimulationProvidesGeneratedAircrafts(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	resp, err := http.Post(httpServer.URL+"/simulations/base", "application/json", bytes.NewBufferString(`{"seed":"demo-seed"}`))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	resp, err = http.Get(httpServer.URL + "/simulations/base/aircrafts")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var payload struct {
+		Aircrafts []services.Aircraft `json:"aircrafts"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&payload))
+	require.NotEmpty(t, payload.Aircrafts)
+	for _, aircraft := range payload.Aircrafts {
+		require.NotEmpty(t, aircraft.TailNumber)
+		require.NotEmpty(t, aircraft.State)
+		require.NotEmpty(t, aircraft.Needs)
+	}
 }
 
 func websocketSafeOptions() *simulation.SimulationOptions {

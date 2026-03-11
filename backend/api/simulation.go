@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/log"
 	"github.com/labstack/echo/v4"
 
+	"github.com/bas-x/basex/prng"
 	"github.com/bas-x/basex/services"
 	"github.com/bas-x/basex/simulation"
 )
@@ -31,7 +32,7 @@ func PostCreateBaseSimulation(logger *log.Logger, deps *ServerDependencies) echo
 			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 		}
 
-		cfg := services.BaseSimulationConfig{Seed: seed, Options: &simulation.SimulationOptions{}}
+		cfg := services.BaseSimulationConfig{Seed: seed, Options: defaultBaseSimulationOptions()}
 		_, err = deps.SimulationService.CreateBaseSimulation(cfg)
 		if err != nil {
 			if errors.Is(err, services.ErrBaseAlreadyExists) {
@@ -170,4 +171,22 @@ func parseSeed(raw string) ([32]byte, error) {
 	}
 	copy(out[:], []byte(trimmed))
 	return out, nil
+}
+
+func defaultBaseSimulationOptions() *simulation.SimulationOptions {
+	return &simulation.SimulationOptions{
+		ConstellationOpts: simulation.ConstellationOptions{
+			IncludeRegions:    []string{"Blekinge", "Gotland"},
+			MinPerRegion:      1,
+			MaxPerRegion:      1,
+			MaxTotal:          2,
+			RegionProbability: prng.New(1, 1),
+		},
+		FleetOpts: simulation.FleetOptions{
+			AircraftMin: 4,
+			AircraftMax: 4,
+			NeedsMin:    1,
+			NeedsMax:    3,
+		},
+	}
 }
