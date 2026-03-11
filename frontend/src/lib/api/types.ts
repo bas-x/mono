@@ -35,9 +35,38 @@ export interface MapServiceClient {
   getAirbaseDetails(idOrUrl: string, signal?: AbortSignal): Promise<ApiAirbaseDetails>;
 }
 
+export type SimulationAirbase = {
+  id: string;
+  location: { x: number; y: number };
+  regionId: string;
+  region: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type SimulationAircraftNeed = {
+  type: string;
+  severity: number;
+  requiredCapability: string;
+  blocking: boolean;
+};
+
+export type SimulationAircraft = {
+  tailNumber: string;
+  needs: SimulationAircraftNeed[];
+  state: string;
+  assignedTo?: string;
+};
+
+export interface SimulationServiceClient {
+  createBaseSimulation(seed: string, signal?: AbortSignal): Promise<{ id: string }>;
+  getAirbases(simulationId: string, signal?: AbortSignal): Promise<SimulationAirbase[]>;
+  getAircrafts(simulationId: string, signal?: AbortSignal): Promise<SimulationAircraft[]>;
+}
+
 export type ApiClients = {
   health: HealthServiceClient;
   map: MapServiceClient;
+  simulation: SimulationServiceClient;
 };
 
 export type ConnectionState =
