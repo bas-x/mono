@@ -142,6 +142,40 @@ func TestStartSimulationAndListSimulationsEndpoints(t *testing.T) {
 	require.Empty(t, listed.Simulations)
 }
 
+func TestGetSimulationEndpoint(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	resp, err := http.Get(httpServer.URL + "/simulations/base")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusNotFound, resp.StatusCode)
+
+	_, err = deps.SimulationService.CreateBaseSimulation(services.BaseSimulationConfig{Options: websocketSafeOptions()})
+	require.NoError(t, err)
+
+	resp, err = http.Get(httpServer.URL + "/simulations/base")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var payload services.SimulationInfo
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&payload))
+	require.Equal(t, services.BaseSimulationID, payload.ID)
+	require.False(t, payload.Running)
+
+	resp, err = http.Get(httpServer.URL + "/simulations/branch-a")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusNotFound, resp.StatusCode)
+}
+
 func TestCreateBaseSimulationProvidesGeneratedAircrafts(t *testing.T) {
 	t.Parallel()
 

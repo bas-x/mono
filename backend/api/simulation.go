@@ -57,6 +57,30 @@ func GetSimulations(logger *log.Logger, deps *ServerDependencies) echo.HandlerFu
 	}
 }
 
+func GetSimulation(logger *log.Logger, deps *ServerDependencies) echo.HandlerFunc {
+	type request struct {
+		SimulationID string `param:"simulationId"`
+	}
+
+	return func(c echo.Context) error {
+		req, err := bindAndValidate[request](c)
+		if err != nil {
+			return err
+		}
+
+		simulationInfo, err := deps.SimulationService.Simulation(req.SimulationID)
+		if err != nil {
+			if errors.Is(err, services.ErrBaseNotFound) || errors.Is(err, services.ErrSimulationNotFound) {
+				return echo.NewHTTPError(http.StatusNotFound, "simulation not found")
+			}
+			logger.Error("get simulation", "simulationId", req.SimulationID, "err", err)
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to get simulation")
+		}
+
+		return c.JSON(http.StatusOK, simulationInfo)
+	}
+}
+
 func PostStartSimulation(logger *log.Logger, deps *ServerDependencies) echo.HandlerFunc {
 	type request struct {
 		SimulationID string `param:"simulationId"`

@@ -30,6 +30,7 @@ func registerRoutes(
 	e.GET("/ping", GetPing(logger))
 
 	e.GET("/simulations", GetSimulations(logger, deps))
+	e.GET("/simulations/:simulationId", GetSimulation(logger, deps))
 	e.POST("/simulations/base", PostCreateBaseSimulation(logger, deps))
 	e.POST("/simulations/:simulationId/start", PostStartSimulation(logger, deps))
 	e.POST("/simulations/:simulationId/reset", PostResetSimulation(logger, deps))
