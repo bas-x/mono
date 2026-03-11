@@ -47,6 +47,43 @@ func PostCreateBaseSimulation(logger *log.Logger, deps *ServerDependencies) echo
 	}
 }
 
+func GetSimulations(logger *log.Logger, deps *ServerDependencies) echo.HandlerFunc {
+	type response struct {
+		Simulations []services.SimulationInfo `json:"simulations"`
+	}
+
+	return func(c echo.Context) error {
+		return c.JSON(http.StatusOK, response{Simulations: deps.SimulationService.Simulations()})
+	}
+}
+
+func PostStartSimulation(logger *log.Logger, deps *ServerDependencies) echo.HandlerFunc {
+	type request struct {
+		SimulationID string `param:"simulationId"`
+	}
+
+	return func(c echo.Context) error {
+		req, err := bindAndValidate[request](c)
+		if err != nil {
+			return err
+		}
+
+		err = deps.SimulationService.StartSimulation(req.SimulationID)
+		if err != nil {
+			if errors.Is(err, services.ErrBaseNotFound) || errors.Is(err, services.ErrSimulationNotFound) {
+				return echo.NewHTTPError(http.StatusNotFound, "simulation not found")
+			}
+			if errors.Is(err, services.ErrSimulationRunning) {
+				return echo.NewHTTPError(http.StatusConflict, "simulation already running")
+			}
+			logger.Error("start simulation", "simulationId", req.SimulationID, "err", err)
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to start simulation")
+		}
+
+		return c.NoContent(http.StatusAccepted)
+	}
+}
+
 func GetSimulationAirbases(logger *log.Logger, deps *ServerDependencies) echo.HandlerFunc {
 	type request struct {
 		SimulationID string `param:"simulationId"`
