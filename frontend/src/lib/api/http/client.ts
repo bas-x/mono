@@ -45,6 +45,16 @@ function mergeHeaders(...headers: Array<HeadersInit | undefined>): Headers {
   return result;
 }
 
+function withJsonContentType(headers: Headers, body: BodyInit | undefined): Headers {
+  if (typeof body !== 'string' || headers.has('Content-Type')) {
+    return headers;
+  }
+
+  const nextHeaders = new Headers(headers);
+  nextHeaders.set('Content-Type', 'application/json');
+  return nextHeaders;
+}
+
 async function ensureOk(response: Response, path: string): Promise<void> {
   if (response.ok) {
     return;
@@ -57,9 +67,13 @@ async function ensureOk(response: Response, path: string): Promise<void> {
 export function createHttpClient(config: Pick<ApiConfig, 'apiBaseUrl'>): HttpClient {
   return {
     async requestJson<TResponse>(path: string, options?: RequestOptions) {
+      const headers = withJsonContentType(
+        mergeHeaders({ Accept: 'application/json' }, options?.headers),
+        options?.body,
+      );
       const response = await fetch(buildApiUrl(config.apiBaseUrl, path), {
         method: options?.method ?? 'GET',
-        headers: mergeHeaders({ Accept: 'application/json' }, options?.headers),
+        headers,
         signal: options?.signal,
         body: options?.body,
       });
