@@ -28,6 +28,10 @@ func registerRoutes(
 
 	e.GET("/health", GetHealth(logger))
 	e.GET("/ping", GetPing(logger))
+
+	e.POST("/simulations/base", PostCreateBaseSimulation(logger, deps))
+	e.GET("/simulations/:simulationId/airbases", GetSimulationAirbases(logger, deps))
+	e.GET("/simulations/:simulationId/aircrafts", GetSimulationAircrafts(logger, deps))
 }
 
 func bindAndValidate[T any](c echo.Context) (*T, error) {

@@ -50,17 +50,17 @@ func NewSimulator(seed [32]byte, ts *TimeSim) *Simulation {
 }
 
 type SimulationOptions struct {
-	Airbases ConstellationOptions
-	Fleet    FleetOptions
+	ConstellationOpts ConstellationOptions
+	FleetOpts         FleetOptions
 }
 
 func (s *Simulation) Init(config *SimulationOptions) error {
 	var opts *ConstellationOptions
 	var fleetOpts *FleetOptions
 	if config != nil {
-		copyOpts := config.Airbases
+		copyOpts := config.ConstellationOpts
 		opts = &copyOpts
-		copyFleet := config.Fleet
+		copyFleet := config.FleetOpts
 		fleetOpts = &copyFleet
 	}
 

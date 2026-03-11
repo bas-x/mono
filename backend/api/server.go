@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/bas-x/basex/assert"
+	"github.com/bas-x/basex/services"
 	"github.com/charmbracelet/log"
 	"github.com/go-playground/validator/v10"
 	"github.com/labstack/echo/v4"
@@ -71,12 +72,16 @@ func Run(ctx context.Context, opts *RunOptions) error {
 	return nil
 }
 
-type ServerDependencies struct{}
+type ServerDependencies struct {
+	SimulationService *services.SimulationService
+}
 
 func initDeps(config *viper.Viper) *ServerDependencies {
 	assert.NotNil(config, "config")
 
-	return &ServerDependencies{}
+	return &ServerDependencies{
+		SimulationService: services.NewSimulationService(services.SimulationServiceConfig{}),
+	}
 }
 
 func newServer(logger *log.Logger, config *viper.Viper, deps *ServerDependencies) *http.Server {

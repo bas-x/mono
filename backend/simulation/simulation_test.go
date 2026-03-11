@@ -118,7 +118,7 @@ func TestSimulationInitAirbases(t *testing.T) {
 	ts := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
 	sim := NewSimulator([32]byte{9, 9, 9}, ts)
 	options := &SimulationOptions{
-		Airbases: ConstellationOptions{
+		ConstellationOpts: ConstellationOptions{
 			IncludeRegions:    []string{"Blekinge"},
 			MinPerRegion:      2,
 			MaxPerRegion:      3,
@@ -144,7 +144,7 @@ func TestSimulationInitFleet(t *testing.T) {
 	ts := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
 	sim := NewSimulator([32]byte{7, 7, 7}, ts)
 	opts := &SimulationOptions{
-		Fleet: FleetOptions{
+		FleetOpts: FleetOptions{
 			AircraftMin:    3,
 			AircraftMax:    3,
 			NeedsMin:       1,
@@ -300,7 +300,7 @@ func TestSimulationInitDeterministic(t *testing.T) {
 	t.Parallel()
 	seed := [32]byte{1, 2, 3}
 	opts := &SimulationOptions{
-		Airbases: ConstellationOptions{
+		ConstellationOpts: ConstellationOptions{
 			IncludeRegions:    []string{"Blekinge", "Gotland"},
 			MinPerRegion:      1,
 			MaxPerRegion:      2,
@@ -325,7 +325,7 @@ func TestSimulationInitRespectsMaxTotal(t *testing.T) {
 	ts := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
 	sim := NewSimulator([32]byte{5, 5, 5}, ts)
 	opts := &SimulationOptions{
-		Airbases: ConstellationOptions{
+		ConstellationOpts: ConstellationOptions{
 			IncludeRegions:    []string{"Blekinge", "Gotland", "Halland"},
 			MinPerRegion:      1,
 			MaxPerRegion:      5,

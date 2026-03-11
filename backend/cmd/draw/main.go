@@ -49,7 +49,7 @@ func main() {
 	sim := simulation.NewSimulator(seed, ts)
 
 	options := &simulation.SimulationOptions{
-		Airbases: simulation.ConstellationOptions{
+		ConstellationOpts: simulation.ConstellationOptions{
 			IncludeRegions:    include,
 			MinPerRegion:      uint(*minPerRegion),
 			MaxPerRegion:      uint(*maxPerRegion),

@@ -16,12 +16,12 @@ func TestSimulationEndToEndLandingFlow(t *testing.T) {
 	simulation := sim.NewSimulator([32]byte{4}, ts)
 
 	opts := &sim.SimulationOptions{
-		Airbases: sim.ConstellationOptions{
+		ConstellationOpts: sim.ConstellationOptions{
 			MaxTotal:     2,
 			MinPerRegion: 2,
 			MaxPerRegion: 2,
 		},
-		Fleet: sim.FleetOptions{
+		FleetOpts: sim.FleetOptions{
 			AircraftMin: 1,
 			AircraftMax: 1,
 		},
