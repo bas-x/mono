@@ -43,6 +43,26 @@ type Need struct {
 	Blocking           bool
 }
 
+func (n *Need) Degrade(amount int) {
+	if n == nil || amount <= 0 {
+		return
+	}
+	n.Severity += amount
+	if n.Severity > 100 {
+		n.Severity = 100
+	}
+}
+
+func (n *Need) Restore(amount int) {
+	if n == nil || amount <= 0 {
+		return
+	}
+	n.Severity -= amount
+	if n.Severity < 0 {
+		n.Severity = 0
+	}
+}
+
 // NeedTypeIndex returns the stable index of a NeedType within AllNeedTypes.
 func NeedTypeIndex(t NeedType) (int, bool) {
 	switch t {
@@ -86,6 +106,15 @@ func (n Need) AssertInvariants() {
 	if n.RequiredCapability != "" {
 		assert.True(IsValidNeedType(n.RequiredCapability), "need required capability", n.RequiredCapability)
 	}
+}
+
+func NeedsThresholdReached(needs []Need, threshold int) bool {
+	for _, need := range needs {
+		if need.Severity >= threshold {
+			return true
+		}
+	}
+	return false
 }
 
 // Clone returns a deep copy of the Need.

@@ -51,6 +51,24 @@ func (a *Aircraft) Step(ctx FlightContext) {
 	}
 }
 
+func (a *Aircraft) ResetNeeds() {
+	for i := range a.Needs {
+		a.Needs[i].Severity = 0
+	}
+}
+
+func (a *Aircraft) DegradeNeeds(amount int) {
+	for i := range a.Needs {
+		a.Needs[i].Degrade(amount)
+	}
+}
+
+func (a *Aircraft) RestoreNeeds(amount int) {
+	for i := range a.Needs {
+		a.Needs[i].Restore(amount)
+	}
+}
+
 func (a *Aircraft) Clone() *Aircraft {
 	clonedNeeds := make([]Need, len(a.Needs))
 	for i, need := range a.Needs {
