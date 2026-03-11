@@ -84,6 +84,30 @@ func PostStartSimulation(logger *log.Logger, deps *ServerDependencies) echo.Hand
 	}
 }
 
+func PostResetSimulation(logger *log.Logger, deps *ServerDependencies) echo.HandlerFunc {
+	type request struct {
+		SimulationID string `param:"simulationId"`
+	}
+
+	return func(c echo.Context) error {
+		req, err := bindAndValidate[request](c)
+		if err != nil {
+			return err
+		}
+
+		err = deps.SimulationService.ResetSimulation(req.SimulationID)
+		if err != nil {
+			if errors.Is(err, services.ErrBaseNotFound) || errors.Is(err, services.ErrSimulationNotFound) {
+				return echo.NewHTTPError(http.StatusNotFound, "simulation not found")
+			}
+			logger.Error("reset simulation", "simulationId", req.SimulationID, "err", err)
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to reset simulation")
+		}
+
+		return c.NoContent(http.StatusAccepted)
+	}
+}
+
 func GetSimulationAirbases(logger *log.Logger, deps *ServerDependencies) echo.HandlerFunc {
 	type request struct {
 		SimulationID string `param:"simulationId"`

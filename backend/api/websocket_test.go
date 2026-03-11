@@ -117,6 +117,28 @@ func TestStartSimulationAndListSimulationsEndpoints(t *testing.T) {
 	require.Len(t, listed.Simulations, 1)
 	require.Equal(t, services.BaseSimulationID, listed.Simulations[0].ID)
 	require.True(t, listed.Simulations[0].Running)
+
+	req, err = http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/reset", nil)
+	require.NoError(t, err)
+	resp, err = http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	resp.Body.Close()
+	require.Equal(t, http.StatusAccepted, resp.StatusCode)
+
+	req, err = http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/reset", nil)
+	require.NoError(t, err)
+	resp, err = http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	resp.Body.Close()
+	require.Equal(t, http.StatusNotFound, resp.StatusCode)
+
+	resp, err = http.Get(httpServer.URL + "/simulations")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&listed))
+	require.Empty(t, listed.Simulations)
 }
 
 func websocketSafeOptions() *simulation.SimulationOptions {
