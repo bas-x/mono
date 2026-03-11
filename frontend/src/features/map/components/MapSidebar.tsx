@@ -22,6 +22,7 @@ type MapSidebarProps = {
   onResetView: () => void;
   onToggleAirbaseList: () => void;
   onSelectAirbaseFromList: (airbaseId: string) => void;
+  onOpenSimulationSheet: () => void;
 };
 
 type SectionProps = {
@@ -44,16 +45,12 @@ type LiveActionsSectionProps = Pick<
   | 'onSelectAirbaseFromList'
 >;
 
-function noop() {}
-
 function mergeClassNames(...parts: Array<string | undefined>) {
   return parts.filter(Boolean).join(' ');
 }
 
 function buttonClassName(isActive: boolean) {
-  return isActive
-    ? 'shell-button-active'
-    : 'shell-button';
+  return isActive ? 'shell-button-active' : 'shell-button';
 }
 
 function SidebarInsetSection({ children, className }: SectionProps) {
@@ -119,9 +116,7 @@ function LiveActionsSection({
           aria-pressed={isAirbaseListOpen}
           onClick={onToggleAirbaseList}
           className={`cursor-pointer rounded-sm border px-3 py-2 text-sm font-medium transition-colors ${
-            isAirbaseListOpen
-              ? 'shell-button-active'
-              : 'shell-button'
+            isAirbaseListOpen ? 'shell-button-active' : 'shell-button'
           }`}
         >
           By base
@@ -149,12 +144,14 @@ function LiveActionsSection({
   );
 }
 
-function SimulateActionsSection() {
+type SimulateActionsSectionProps = Pick<MapSidebarProps, 'onOpenSimulationSheet'>;
+
+function SimulateActionsSection({ onOpenSimulationSheet }: SimulateActionsSectionProps) {
   return (
     <SidebarInsetSection className="shell-divider border-t pt-4">
       <button
         type="button"
-        onClick={noop}
+        onClick={onOpenSimulationSheet}
         className="shell-button cursor-pointer rounded-sm border px-3 py-2 text-sm font-medium transition-colors"
       >
         Create
@@ -166,7 +163,7 @@ function SimulateActionsSection() {
 export function MapSidebar(props: MapSidebarProps) {
   return (
     <aside
-      className="shell-panel relative h-full min-h-0 w-full max-w-40 border-l"
+      className="shell-panel relative h-full min-h-0 w-full max-w-40"
       aria-label="Map controls"
     >
       <div className="flex h-full min-h-0 flex-col gap-5 overflow-y-auto py-4">
@@ -185,7 +182,7 @@ export function MapSidebar(props: MapSidebarProps) {
             onSelectAirbaseFromList={props.onSelectAirbaseFromList}
           />
         ) : (
-          <SimulateActionsSection />
+          <SimulateActionsSection onOpenSimulationSheet={props.onOpenSimulationSheet} />
         )}
       </div>
 

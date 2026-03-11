@@ -9,6 +9,11 @@ import {
 } from '@/features/map/components/MapSidebar';
 import { useAirbases } from '@/features/map/hooks/useAirbases';
 import { calculatePolygonBounds, createFocusedViewBox } from '@/features/map/lib/geometry';
+import { SimulationSetupSheet } from '@/features/simulation/components/SimulationSetupSheet';
+import {
+  DEFAULT_SIMULATION_SETUP_FORM_VALUES,
+  type SimulationSetupFormValues,
+} from '@/features/simulation/types';
 import {
   DEFAULT_MAP_VIEW_BOX,
   type Airbase,
@@ -64,6 +69,10 @@ export function MapPanel() {
   const [isAirbaseListOpen, setIsAirbaseListOpen] = useState(false);
   const [mapViewBox, setMapViewBox] = useState<MapViewBox>({ ...DEFAULT_MAP_VIEW_BOX });
   const [selectedAirbaseId, setSelectedAirbaseId] = useState<string | null>(null);
+  const [isSimulationSheetOpen, setIsSimulationSheetOpen] = useState(false);
+  const [simulationSetupValues, setSimulationSetupValues] = useState<SimulationSetupFormValues>(
+    DEFAULT_SIMULATION_SETUP_FORM_VALUES,
+  );
   const [selectedAirbaseDetailsState, setSelectedAirbaseDetailsState] =
     useState<SelectedAirbaseDetailsState>({ status: 'idle' });
   const detailsCacheRef = useRef(new Map<string, AirbaseDetails>());
@@ -123,6 +132,8 @@ export function MapPanel() {
       if (viewMode === nextMode) {
         return;
       }
+
+      setIsSimulationSheetOpen(false);
 
       if (nextMode === 'simulate') {
         resetWorkspaceState();
@@ -211,37 +222,60 @@ export function MapPanel() {
     [focusAirbase, handleClearSelection, handleSelectAirbase, selectedAirbaseId],
   );
 
-  return (
-    <section
-      className="grid h-full min-h-0 min-w-0 overflow-hidden bg-zinc-950 min-[1040px]:grid-cols-[minmax(0,1fr)_10rem]"
-      aria-label="Constellation map workspace"
-      style={MODE_THEME_STYLES[viewMode]}
-    >
-      <div className="relative min-h-[55vh] min-w-0 bg-zinc-950 min-[1040px]:min-h-0">
-        <ConstellationMap
-          className="h-full min-h-full rounded-none border-0"
-          dataSource={dataSource}
-          mode={viewMode === 'live' ? 'live' : 'static'}
-          selectedAirbaseId={selectedAirbaseId}
-          viewBox={mapViewBox}
-          onSelectAirbase={handleSelectAirbase}
-        />
-      </div>
+  const handleOpenSimulationSheet = useCallback(() => {
+    setIsSimulationSheetOpen(true);
+  }, []);
 
-      <MapSidebar
-        airbases={airbaseState.airbases}
-        airbaseStatus={airbaseState.status}
-        airbaseMessage={airbaseState.status === 'error' ? airbaseState.message : undefined}
-        viewMode={viewMode}
-        isAirbaseListOpen={isAirbaseListOpen}
-        selectedAirbaseId={selectedAirbaseId}
-        selectedAirbaseDetailsState={selectedAirbaseDetailsState}
-        onModeChange={handleModeChange}
-        onClearSelection={handleClearSelection}
-        onResetView={handleResetView}
-        onToggleAirbaseList={handleToggleAirbaseList}
-        onSelectAirbaseFromList={handleSelectAirbaseFromList}
+  const handleCloseSimulationSheet = useCallback(() => {
+    setIsSimulationSheetOpen(false);
+  }, []);
+
+  const handleSubmitSimulationSetup = useCallback((values: SimulationSetupFormValues) => {
+    setSimulationSetupValues(values);
+    setIsSimulationSheetOpen(false);
+  }, []);
+
+  return (
+    <>
+      <section
+        className="grid h-full min-h-0 min-w-0 overflow-hidden bg-bg min-[1040px]:grid-cols-[minmax(0,1fr)_10rem]"
+        aria-label="Constellation map workspace"
+        style={MODE_THEME_STYLES[viewMode]}
+      >
+        <div className="relative min-h-[55vh] min-w-0 bg-bg min-[1040px]:min-h-0">
+          <ConstellationMap
+            className="h-full min-h-full rounded-none border-0"
+            dataSource={dataSource}
+            mode={viewMode === 'live' ? 'live' : 'static'}
+            selectedAirbaseId={selectedAirbaseId}
+            viewBox={mapViewBox}
+            onSelectAirbase={handleSelectAirbase}
+          />
+        </div>
+
+        <MapSidebar
+          airbases={airbaseState.airbases}
+          airbaseStatus={airbaseState.status}
+          airbaseMessage={airbaseState.status === 'error' ? airbaseState.message : undefined}
+          viewMode={viewMode}
+          isAirbaseListOpen={isAirbaseListOpen}
+          selectedAirbaseId={selectedAirbaseId}
+          selectedAirbaseDetailsState={selectedAirbaseDetailsState}
+          onModeChange={handleModeChange}
+          onClearSelection={handleClearSelection}
+          onResetView={handleResetView}
+          onToggleAirbaseList={handleToggleAirbaseList}
+          onSelectAirbaseFromList={handleSelectAirbaseFromList}
+          onOpenSimulationSheet={handleOpenSimulationSheet}
+        />
+      </section>
+
+      <SimulationSetupSheet
+        isOpen={viewMode === 'simulate' && isSimulationSheetOpen}
+        onClose={handleCloseSimulationSheet}
+        defaultValues={simulationSetupValues}
+        onSubmit={handleSubmitSimulationSetup}
       />
-    </section>
+    </>
   );
 }

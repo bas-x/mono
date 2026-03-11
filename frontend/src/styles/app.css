@@ -44,6 +44,10 @@
   --color-shell-list-selected-bg: rgb(245 158 11 / 0.22);
   --color-shell-list-selected-text: #78350f;
   --color-shell-list-selected-dot: #d97706;
+  --color-shell-nav-icon: #71717a;
+  --color-shell-nav-icon-hover: #f59e0b;
+  --color-shell-nav-icon-active: #fbbf24;
+  --color-shell-nav-active-bg: rgb(245 158 11 / 0.12);
   --color-shell-clear-bg: rgb(228 228 231 / 0.78);
   --color-shell-clear-text: #3f3f46;
   --color-shell-clear-icon: #b45309;
@@ -94,6 +98,10 @@
     --color-shell-list-selected-bg: rgb(245 158 11 / 0.18);
     --color-shell-list-selected-text: #fcd34d;
     --color-shell-list-selected-dot: #f59e0b;
+    --color-shell-nav-icon: #a1a1aa;
+    --color-shell-nav-icon-hover: #fcd34d;
+    --color-shell-nav-icon-active: #fde68a;
+    --color-shell-nav-active-bg: rgb(245 158 11 / 0.14);
     --color-shell-clear-bg: rgb(39 39 42 / 0.74);
     --color-shell-clear-text: #f4f4f5;
     --color-shell-clear-icon: #f59e0b;
@@ -153,6 +161,97 @@
 
   .shell-button-active:hover {
     background-color: var(--color-shell-button-active-hover);
+  }
+
+  .shell-nav-item {
+    border-color: transparent;
+    background-color: transparent;
+    color: var(--color-shell-nav-icon);
+  }
+
+  .shell-nav-item:hover {
+    border-color: var(--color-shell-button-border);
+    background-color: var(--color-shell-button-hover);
+  }
+
+  .shell-nav-item-active {
+    border-color: var(--color-shell-button-border);
+    background-color: var(--color-shell-nav-active-bg);
+    color: var(--color-shell-nav-icon-active);
+  }
+
+  .shell-nav-item-active:hover {
+    background-color: var(--color-shell-button-hover);
+  }
+
+  .shell-nav-item:hover,
+  .shell-nav-item:hover .shell-nav-icon {
+    color: var(--color-shell-nav-icon-hover);
+  }
+
+  .shell-nav-item-active .shell-nav-icon {
+    color: var(--color-shell-nav-icon-active);
+  }
+
+  .shell-nav-item-active:hover .shell-nav-icon {
+    color: var(--color-shell-nav-icon-hover);
+  }
+
+  .shell-field-label {
+    color: var(--color-shell-text);
+  }
+
+  .shell-field-hint {
+    color: var(--color-shell-text-muted);
+  }
+
+  .shell-input {
+    width: 100%;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--color-shell-button-border);
+    background-color: var(--color-shell-panel-soft);
+    color: var(--color-shell-text);
+    padding: 0.625rem 0.75rem;
+  }
+
+  .shell-input::placeholder {
+    color: color-mix(in srgb, var(--color-shell-text-muted) 74%, transparent);
+  }
+
+  .shell-input:focus {
+    outline: none;
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 18%, transparent);
+  }
+
+  .shell-input:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .shell-check-option {
+    background-color: var(--color-shell-button-bg);
+    border-color: var(--color-shell-button-border);
+    color: var(--color-shell-text);
+  }
+
+  .shell-check-option:hover {
+    background-color: var(--color-shell-button-hover);
+  }
+
+  .shell-check-option-selected {
+    background-color: var(--color-shell-nav-active-bg);
+    border-color: var(--color-primary);
+  }
+
+  .shell-check-indicator {
+    border-color: var(--color-shell-button-border);
+    background-color: transparent;
+  }
+
+  .shell-check-indicator-selected {
+    border-color: var(--color-primary);
+    background-color: var(--color-shell-nav-icon-active);
   }
 
   .shell-list-hover:hover {

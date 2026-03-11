@@ -33,7 +33,7 @@ export const MOCK_AIRBASES: ApiAirbase[] = [
   {
     id: 'arlanda',
     infoUrl: '/map/airbase/arlanda',
-    area: createAirbaseAreaFromSvgCenter(183, 568),
+    area: createAirbaseAreaFromSvgCenter(211.004 - 24, 621.203 - 34),
   },
   {
     id: 'visby',
@@ -58,7 +58,7 @@ export const MOCK_AIRBASE_DETAILS: Record<string, ApiAirbaseDetails> = {
   arlanda: {
     id: 'arlanda',
     name: 'Arlanda Airbase',
-    region: 'Stockholm',
+    region: 'sweden',
     status: 'Busy',
     queue: 3,
   },

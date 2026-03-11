@@ -50,7 +50,7 @@ export function Drawer({ isOpen, onClose, children, width, positionClassName }: 
       <section
         role="dialog"
         aria-modal="false"
-        className={`shell-panel flex h-full min-w-[32rem] flex-col rounded-xl border shadow-[0_24px_80px_-28px_rgba(0,0,0,0.85)] transition-all duration-300 ease-out ${
+        className={`shell-panel flex h-full min-w-lg flex-col rounded-xl border shadow-[0_24px_80px_-28px_rgba(0,0,0,0.85)] transition-all duration-300 ease-out ${
           isOpen
             ? 'pointer-events-auto translate-x-0 opacity-100'
             : 'pointer-events-none -translate-x-6 opacity-0'

@@ -19,6 +19,12 @@
 - Conflicts are resolved by deterministic policy order (for example priority, then FIFO, then stable ID tie-break).
 - No implicit race behavior; conflict outcomes must be reproducible from inputs + seed.
 
+## Current Frontend Configuration Surface
+- The current frontend simulation setup UI is limited to fields backed by `simulation.SimulationOptions`, `simulation.ConstellationOptions`, and `simulation.FleetOptions`.
+- User-editable airbase fields are region filters, per-region counts, max total, and region probability.
+- User-editable fleet fields are aircraft count range, need count range, need pool, severity range, and blocking chance.
+- Internal factories (`MetadataFactory`, `StateFactory`) and low-level generation controls remain backend-owned and are not exposed in the UI.
+
 ## Performance Expectations
 - Must handle demo scenarios with interactive replay responsiveness.
 - Event processing should scale with event count and avoid per-step full-state recomputation.

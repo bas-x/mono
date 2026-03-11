@@ -24,7 +24,7 @@
 
 ## Interactive Overlay (V1)
 
-- Base map is rendered as static SVG asset (`sweden.svg`) with airbase polygons overlaid in map-space coordinates.
+- The current base map surface reads `backend/assets/sweden.json` and `backend/assets/bounds.json` directly and renders them as a 2.5D extruded SVG layer in the same coordinate space as airbase overlays.
 - Overlay uses frontend map contract data (`/map`) projected into SVG space with an optional linear transform.
 - Mock airbase positions use curated SVG-space anchors aligned to `sweden.svg`; they are not derived from a linear geo projection.
 - Airbase interactions include hover inspection, click selection, and keyboard activation.
@@ -41,6 +41,7 @@
 - The right sidebar includes mode toggles (`Live`, `Simulate`) and mode-specific action buttons.
 - Mode switching is presentation-only in V1, but it must visibly change map theme colors so operators can distinguish contexts at a glance.
 - In `Live` mode, selected-airbase details open in a left-side drawer triggered from the sidebar; the drawer is disabled in `Simulate`.
+- In `Simulate` mode, the sidebar `Create` action opens a bottom sheet for simulation setup rather than opening another inline sidebar state.
 - Control surfaces such as the navbar, sidebar, drawers, and list states use shared zinc/amber design tokens to avoid palette drift between light and dark modes.
 - In `Live` mode, sidebar actions support resetting to the full-map view and selecting a base from a scrollable list.
 - Selecting a base from the sidebar list must both mark it as selected in the map UI and move the map to a moderate base-focused zoom.

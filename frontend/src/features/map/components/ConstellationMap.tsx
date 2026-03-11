@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
-import swedenMapRaw from '@/assets/sweden.svg?raw';
 import { useApi } from '@/lib/api';
 
 import {
@@ -9,6 +8,7 @@ import {
   type RenderableAirbase,
 } from '@/features/map/components/AirbaseOverlayLayer';
 import { AirbaseTooltip } from '@/features/map/components/AirbaseTooltip';
+import { SwedenMap3DLayer } from '@/features/map/components/SwedenMap3DLayer';
 import { useAirbaseDetails } from '@/features/map/hooks/useAirbaseDetails';
 import { useAirbases } from '@/features/map/hooks/useAirbases';
 import {
@@ -32,16 +32,6 @@ import {
 function mergeClassNames(...parts: Array<string | undefined>) {
   return parts.filter(Boolean).join(' ');
 }
-
-function extractSvgInnerMarkup(svgRaw: string): string {
-  const withoutMetadata = svgRaw
-    .replace(/<\?xml[\s\S]*?\?>/gi, '')
-    .replace(/<!--[\s\S]*?-->/gi, '');
-  const match = withoutMetadata.match(/<svg[^>]*>([\s\S]*?)<\/svg>/i);
-  return match ? match[1] : withoutMetadata;
-}
-
-const SWEDEN_SVG_INNER_MARKUP = extractSvgInnerMarkup(swedenMapRaw);
 
 type ConstellationMapProps = {
   mode?: MapMode;
@@ -295,7 +285,7 @@ export function ConstellationMap({
     <div
       ref={containerRef}
       className={mergeClassNames(
-        'relative h-full min-h-[18rem] overflow-hidden rounded-lg border border-border bg-bg',
+        'relative h-full min-h-72 overflow-hidden rounded-lg border border-border bg-bg',
         className,
       )}
       data-mode={mode}
@@ -312,20 +302,7 @@ export function ConstellationMap({
         }}
       >
         <title>Constellation map</title>
-        <style>{`
-          .sweden-map-layer path {
-            fill: var(--color-map-surface);
-            stroke: var(--color-map-boundary);
-            stroke-width: 0.85;
-            vector-effect: non-scaling-stroke;
-            paint-order: stroke fill;
-          }
-        `}</style>
-        <g
-          className="sweden-map-layer pointer-events-none"
-          aria-hidden="true"
-          dangerouslySetInnerHTML={{ __html: SWEDEN_SVG_INNER_MARKUP }}
-        />
+        <SwedenMap3DLayer viewBox={viewBox} />
 
         {showDebugOverlay ? (
           <g aria-hidden="true">
