@@ -1,6 +1,9 @@
+export type ApiMode = 'mock' | 'remote' | 'localhost';
+
 export type ApiConfig = {
   apiBaseUrl: string;
   wsBaseUrl: string;
+  mode: ApiMode;
   useMock: boolean;
 };
 

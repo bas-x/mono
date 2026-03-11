@@ -1,9 +1,13 @@
-import type { ApiConfig } from '@/lib/api/types';
+import type { ApiConfig, ApiMode } from '@/lib/api/types';
 
 export const SIMULATION_WS_PATH = '/ws/simulations/:simulationId/events';
 
-const DEFAULT_API_BASE_URL = 'https://basex.shigure.joshuadematas.me';
-const DEFAULT_WS_BASE_URL = 'wss://basex.shigure.joshuadematas.me';
+export const REMOTE_API_BASE_URL = 'https://basex.shigure.joshuadematas.me';
+export const REMOTE_WS_BASE_URL = 'wss://basex.shigure.joshuadematas.me';
+
+export const LOCALHOST_API_BASE_URL = 'http://localhost:8080';
+export const LOCALHOST_WS_BASE_URL = 'ws://localhost:8080';
+
 const DEFAULT_USE_MOCK_API = true;
 
 function normalizeEnvString(value: string | undefined): string | undefined {
@@ -37,10 +41,29 @@ function parseUseMock(value: string | undefined): boolean {
   return DEFAULT_USE_MOCK_API;
 }
 
-export function parseApiConfigFromEnv(): ApiConfig {
+export function resolveBaseUrls(mode: ApiMode, envConfig: { apiBaseUrl: string; wsBaseUrl: string }) {
+  if (mode === 'localhost') {
+    return {
+      apiBaseUrl: LOCALHOST_API_BASE_URL,
+      wsBaseUrl: LOCALHOST_WS_BASE_URL,
+    };
+  }
+
   return {
-    apiBaseUrl: normalizeEnvString(import.meta.env.VITE_API_BASE_URL) || DEFAULT_API_BASE_URL,
-    wsBaseUrl: normalizeEnvString(import.meta.env.VITE_WS_BASE_URL) || DEFAULT_WS_BASE_URL,
-    useMock: parseUseMock(import.meta.env.VITE_USE_MOCK_API),
+    apiBaseUrl: envConfig.apiBaseUrl,
+    wsBaseUrl: envConfig.wsBaseUrl,
+  };
+}
+
+export function parseApiConfigFromEnv(): ApiConfig {
+  const apiBaseUrl = normalizeEnvString(import.meta.env.VITE_API_BASE_URL) || REMOTE_API_BASE_URL;
+  const wsBaseUrl = normalizeEnvString(import.meta.env.VITE_WS_BASE_URL) || REMOTE_WS_BASE_URL;
+  const useMock = parseUseMock(import.meta.env.VITE_USE_MOCK_API);
+
+  return {
+    apiBaseUrl,
+    wsBaseUrl,
+    mode: useMock ? 'mock' : 'remote',
+    useMock,
   };
 }
