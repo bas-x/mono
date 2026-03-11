@@ -194,6 +194,14 @@ func (s *SimulationService) Simulations() []SimulationInfo {
 	return result
 }
 
+func (s *SimulationService) Simulation(simulationID string) (SimulationInfo, error) {
+	managed, err := s.managedSimulationByID(simulationID)
+	if err != nil {
+		return SimulationInfo{}, err
+	}
+	return SimulationInfo{ID: simulationID, Running: managed.running}, nil
+}
+
 func (s *SimulationService) simulationByID(simulationID string) (*simulation.Simulation, error) {
 	managed, err := s.managedSimulationByID(simulationID)
 	if err != nil {

@@ -103,6 +103,25 @@ func TestSimulationService_SimulationsReflectRunningState(t *testing.T) {
 	}, time.Second, 10*time.Millisecond)
 }
 
+func TestSimulationService_Simulation(t *testing.T) {
+	t.Parallel()
+
+	svc := NewSimulationService(SimulationServiceConfig{})
+	_, err := svc.Simulation(BaseSimulationID)
+	require.ErrorIs(t, err, ErrBaseNotFound)
+
+	_, err = svc.CreateBaseSimulation(BaseSimulationConfig{Options: testSimulationOptions(1, 1)})
+	require.NoError(t, err)
+
+	info, err := svc.Simulation(BaseSimulationID)
+	require.NoError(t, err)
+	require.Equal(t, BaseSimulationID, info.ID)
+	require.False(t, info.Running)
+
+	_, err = svc.Simulation("branch-1")
+	require.ErrorIs(t, err, ErrSimulationNotFound)
+}
+
 func TestSimulationService_ResetClearsSimulationAndStopsRunner(t *testing.T) {
 	t.Parallel()
 
