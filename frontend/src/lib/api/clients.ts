@@ -16,7 +16,7 @@ function resolveConfig(overrides?: Partial<ApiConfig>): ApiConfig {
 export function createApiClients(overrides?: Partial<ApiConfig>): ApiClients {
   const config = resolveConfig(overrides);
 
-  if (config.useMock) {
+  if (config.mode === 'mock') {
     return createMockApiClients();
   }
 

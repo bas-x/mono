@@ -69,7 +69,7 @@ export function ApiStatusPanel() {
     <Card className="min-[900px]:col-span-2" ariaLabel="API status section" title="API Status">
       <div className="space-y-1 text-sm text-text-muted">
         <p>
-          <strong>Mode:</strong> {config.useMock ? 'Mock' : 'Real'}
+          <strong>Mode:</strong> {config.mode}
         </p>
         <p>
           <strong>API Base URL:</strong> {config.apiBaseUrl}
