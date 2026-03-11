@@ -163,6 +163,9 @@ func TestSimulationInitFleet(t *testing.T) {
 	seen := make(map[TailNumber]struct{}, len(aircrafts))
 	for _, aircraft := range aircrafts {
 		aircraft.AssertInvariants()
+		require.NotEmpty(t, aircraft.State.Name())
+		require.Equal(t, "Outbound", aircraft.State.Name())
+		require.NotEmpty(t, aircraft.Needs)
 		require.LessOrEqual(t, len(aircraft.Needs), 2)
 		require.GreaterOrEqual(t, len(aircraft.Needs), 1)
 		require.NotContains(t, seen, aircraft.TailNumber)
