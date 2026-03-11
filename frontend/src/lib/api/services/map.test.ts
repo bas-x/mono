@@ -1,76 +1,58 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
-import type { HttpClient } from '@/lib/api/http/client';
 import { createMapServiceClient } from '@/lib/api/services/map';
 
-const originalFetch = globalThis.fetch;
-
-afterEach(() => {
-  globalThis.fetch = originalFetch;
-  vi.restoreAllMocks();
-});
-
-function createHttpClientStub<TResponse>(response: TResponse): HttpClient {
-  return {
-    requestJson: async <T>() => response as unknown as T,
-    requestText: async () => '',
-  };
-}
-
 describe('createMapServiceClient', () => {
-  it('returns normalized airbases from /map', async () => {
-    const mapClient = createMapServiceClient(
-      createHttpClientStub({
-        airbases: [
-          {
-            id: 'alpha',
-            area: [
-              { x: 1, y: 2 },
-              { x: 3, y: 4 },
-              { x: 5, y: 6 },
-            ],
-          },
-        ],
-      }),
-    );
+  it('returns fixture airbases without backend map requests', async () => {
+    const mapClient = createMapServiceClient({
+      requestJson: async () => {
+        throw new Error('map client should not call requestJson');
+      },
+      requestText: async () => {
+        throw new Error('map client should not call requestText');
+      },
+    });
 
     const result = await mapClient.getAirbases();
 
-    expect(result).toHaveLength(1);
-    expect(result[0]?.id).toBe('alpha');
-    expect(result[0]?.area).toHaveLength(3);
+    expect(result).toHaveLength(4);
+    expect(result[0]?.id).toBe('lulea');
+    expect(result[0]?.area).toHaveLength(4);
   });
 
-  it('requests airbase details by id endpoint', async () => {
-    const requestJson = vi.fn(async () => ({ id: 'bravo', name: 'Bravo Airbase' })) as unknown as HttpClient['requestJson'];
-    const mapClient = createMapServiceClient(
-      {
-        requestJson,
-        requestText: async () => '',
+  it('returns fixture airbase details by id', async () => {
+    const mapClient = createMapServiceClient({
+      requestJson: async () => {
+        throw new Error('map client should not call requestJson');
       },
-    );
+      requestText: async () => {
+        throw new Error('map client should not call requestText');
+      },
+    });
 
-    const result = await mapClient.getAirbaseDetails('bravo');
+    const result = await mapClient.getAirbaseDetails('lulea');
 
-    expect(requestJson).toHaveBeenCalledWith('/map/airbase/bravo', { signal: undefined });
-    expect(result.id).toBe('bravo');
+    expect(result).toMatchObject({
+      id: 'lulea',
+      name: 'Lulea Airbase',
+    });
   });
 
-  it('uses absolute infoUrl directly when provided', async () => {
-    globalThis.fetch = vi.fn(async () => {
-      return new Response(JSON.stringify({ id: 'charlie', status: 'Operational' }), { status: 200 });
-    }) as typeof fetch;
+  it('normalizes airbase path lookup keys against fixtures', async () => {
+    const mapClient = createMapServiceClient({
+      requestJson: async () => {
+        throw new Error('map client should not call requestJson');
+      },
+      requestText: async () => {
+        throw new Error('map client should not call requestText');
+      },
+    });
 
-    const mapClient = createMapServiceClient(
-      createHttpClientStub({ airbases: [] }),
-    );
+    const result = await mapClient.getAirbaseDetails('/airbase/visby');
 
-    const result = await mapClient.getAirbaseDetails('https://demo.example.com/map/airbase/charlie');
-
-    expect(globalThis.fetch).toHaveBeenCalledWith(
-      'https://demo.example.com/map/airbase/charlie',
-      expect.objectContaining({ method: 'GET' }),
-    );
-    expect(result.id).toBe('charlie');
+    expect(result).toMatchObject({
+      id: 'visby',
+      name: 'Visby Airbase',
+    });
   });
 });

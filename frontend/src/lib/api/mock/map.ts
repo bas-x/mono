@@ -27,22 +27,18 @@ function createAirbaseAreaFromSvgCenter(centerX: number, centerY: number, width 
 export const MOCK_AIRBASES: ApiAirbase[] = [
   {
     id: 'lulea',
-    infoUrl: '/map/airbase/lulea',
     area: createAirbaseAreaFromSvgCenter(287, 178),
   },
   {
     id: 'arlanda',
-    infoUrl: '/map/airbase/arlanda',
     area: createAirbaseAreaFromSvgCenter(211.004 - 24, 621.203 - 34),
   },
   {
     id: 'visby',
-    infoUrl: '/map/airbase/visby',
     area: createAirbaseAreaFromSvgCenter(194, 682),
   },
   {
     id: 'goteborg',
-    infoUrl: '/map/airbase/goteborg',
     area: createAirbaseAreaFromSvgCenter(32, 656),
   },
 ];
@@ -79,7 +75,9 @@ export const MOCK_AIRBASE_DETAILS: Record<string, ApiAirbaseDetails> = {
 };
 
 function stripAirbasePrefix(path: string): string {
-  return path.replace(/^\/?map\/airbase\//, '');
+  const normalizedPath = path.replace(/^\/?airbase\//, '');
+  const lastSlashIndex = normalizedPath.lastIndexOf('/');
+  return lastSlashIndex >= 0 ? normalizedPath.slice(lastSlashIndex + 1) : normalizedPath;
 }
 
 function normalizeLookupKey(idOrUrl: string): string {
