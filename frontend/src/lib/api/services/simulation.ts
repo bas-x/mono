@@ -5,6 +5,10 @@ import type {
   SimulationServiceClient,
 } from '@/lib/api/types';
 
+type GetSimulationsResponse = {
+  simulations: Array<{ id: string }>;
+};
+
 type CreateBaseSimulationResponse = {
   id: string;
 };
@@ -21,17 +25,34 @@ export function createSimulationServiceClient(
   httpClient: HttpClient,
 ): SimulationServiceClient {
   return {
+    async getSimulations(signal?: AbortSignal) {
+      const response = await httpClient.requestJson<GetSimulationsResponse>('/simulations', {
+        signal,
+      });
+      return response.simulations || [];
+    },
+
     async createBaseSimulation(seed: string, signal?: AbortSignal) {
-      return httpClient.requestJson<CreateBaseSimulationResponse>('/simulation', {
+      return httpClient.requestJson<CreateBaseSimulationResponse>('/simulations/base', {
         method: 'POST',
         body: JSON.stringify({ seed }),
         signal,
       });
     },
 
+    async startSimulation(simulationId: string, signal?: AbortSignal) {
+      return httpClient.requestJson<void>(
+        `/simulations/${encodeURIComponent(simulationId)}/start`,
+        {
+          method: 'POST',
+          signal,
+        },
+      );
+    },
+
     async getAirbases(simulationId: string, signal?: AbortSignal) {
       const response = await httpClient.requestJson<GetAirbasesResponse>(
-        `/simulation/${encodeURIComponent(simulationId)}/airbases`,
+        `/simulations/${encodeURIComponent(simulationId)}/airbases`,
         { signal },
       );
       return response.airbases || [];
@@ -39,7 +60,7 @@ export function createSimulationServiceClient(
 
     async getAircrafts(simulationId: string, signal?: AbortSignal) {
       const response = await httpClient.requestJson<GetAircraftsResponse>(
-        `/simulation/${encodeURIComponent(simulationId)}/aircrafts`,
+        `/simulations/${encodeURIComponent(simulationId)}/aircrafts`,
         { signal },
       );
       return response.aircrafts || [];

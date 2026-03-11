@@ -44,9 +44,18 @@ const MOCK_AIRCRAFTS: SimulationAircraft[] = [
 
 export function createMockSimulationServiceClient(): SimulationServiceClient {
   return {
+    async getSimulations() {
+      console.log('Mock: Getting simulations');
+      return [{ id: 'base' }];
+    },
+
     async createBaseSimulation(seed: string) {
       console.log('Mock: Creating base simulation with seed', seed);
       return { id: 'base' };
+    },
+
+    async startSimulation(simulationId: string) {
+      console.log('Mock: Starting simulation', simulationId);
     },
 
     async getAirbases(simulationId: string) {
