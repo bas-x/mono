@@ -12,17 +12,15 @@ import { SwedenMap3DLayer } from '@/features/map/components/SwedenMap3DLayer';
 import { useAirbaseDetails } from '@/features/map/hooks/useAirbaseDetails';
 import { useAirbases } from '@/features/map/hooks/useAirbases';
 import {
-  calculatePolygonBounds,
-  calculatePolygonCentroid,
-  hasValidPolygon,
-  pointToRenderedPercent,
-  pointToViewBoxPercent,
+  projectPointToPercent,
   toAriaLabel,
 } from '@/features/map/lib/geometry';
-import { applyTransformToPolygon, resolveCoordinateTransform } from '@/features/map/lib/transform';
+import { getPlacementAnchor, getPlacementBounds } from '@/features/map/lib/placement';
+import { applyCoordinateTransform, resolveCoordinateTransform } from '@/features/map/lib/transform';
 import {
   DEFAULT_MAP_VIEW_BOX,
   type Airbase,
+  type AirbasePlacementSource,
   type MapCoordinateTransform,
   type MapDataSource,
   type MapMode,
@@ -47,7 +45,7 @@ type ConstellationMapProps = {
   className?: string;
   showDebugOverlay?: boolean;
   viewBox?: MapViewBox;
-  airbases?: Airbase[];
+  placementSources?: AirbasePlacementSource[];
 };
 
 const AIRBASE_CAPACITY_SEQUENCE = ['small', 'medium', 'large'] as const;
@@ -80,24 +78,20 @@ function resolveMarkerSizePx(capacity: AirbaseCapacity): number {
 }
 
 function asRenderableAirbase(
-  airbase: Airbase,
+  source: AirbasePlacementSource,
   transform: MapCoordinateTransform,
-): RenderableAirbase | null {
-  const transformedPoints = applyTransformToPolygon(airbase.area, transform);
-  if (!hasValidPolygon(transformedPoints)) {
-    return null;
-  }
-
-  const bounds = calculatePolygonBounds(transformedPoints);
-  const centroid = calculatePolygonCentroid(transformedPoints);
-  const capacity = resolveAirbaseCapacity(airbase.id);
+): RenderableAirbase {
+  const transformedAnchor = applyCoordinateTransform(getPlacementAnchor(source), transform);
+  const bounds = getPlacementBounds(source);
+  const capacity = resolveAirbaseCapacity(source.id);
 
   return {
-    id: airbase.id,
-    infoUrl: airbase.infoUrl,
-    centroid,
+    id: source.id,
+    infoUrl:
+      'infoUrl' in source && typeof source.infoUrl === 'string' ? source.infoUrl : undefined,
+    centroid: transformedAnchor,
     markerSizePx: resolveMarkerSizePx(capacity),
-    ariaLabel: `${toAriaLabel(airbase)} ${capacity} capacity (${Math.round(bounds.maxX - bounds.minX)}x${Math.round(bounds.maxY - bounds.minY)})`,
+    ariaLabel: `${toAriaLabel(source)} ${capacity} capacity (${Math.round(bounds.maxX - bounds.minX)}x${Math.round(bounds.maxY - bounds.minY)})`,
   };
 }
 
@@ -115,7 +109,7 @@ export function ConstellationMap({
   className,
   showDebugOverlay = false,
   viewBox = DEFAULT_MAP_VIEW_BOX,
-  airbases: externalAirbases,
+  placementSources: externalPlacementSources,
 }: ConstellationMapProps) {
   const { clients } = useApi();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -182,16 +176,21 @@ export function ConstellationMap({
 
   const coordinateTransform = useMemo(() => resolveCoordinateTransform(transform), [transform]);
   const airbaseState = useAirbases({ mapClient: clients.map, dataSource });
-  const effectiveAirbases = useMemo(
-    () => externalAirbases ?? airbaseState.airbases,
-    [externalAirbases, airbaseState.airbases],
+  const hasExternalPlacementSources = externalPlacementSources !== undefined;
+  const effectivePlacementSources = useMemo<AirbasePlacementSource[]>(
+    () =>
+      externalPlacementSources ??
+      airbaseState.airbases.map((airbase: Airbase) => ({
+        id: airbase.id,
+        area: airbase.area,
+        infoUrl: airbase.infoUrl,
+      })),
+    [externalPlacementSources, airbaseState.airbases],
   );
 
   const renderableAirbases = useMemo(() => {
-    return effectiveAirbases
-      .map((airbase) => asRenderableAirbase(airbase, coordinateTransform))
-      .filter((airbase): airbase is RenderableAirbase => airbase !== null);
-  }, [effectiveAirbases, coordinateTransform]);
+    return effectivePlacementSources.map((airbase) => asRenderableAirbase(airbase, coordinateTransform));
+  }, [effectivePlacementSources, coordinateTransform]);
 
   const renderableAirbaseById = useMemo(() => {
     const byId = new Map<string, RenderableAirbase>();
@@ -221,10 +220,7 @@ export function ConstellationMap({
       return null;
     }
 
-    return (
-      pointToRenderedPercent(hoveredAirbase.centroid, viewBox, containerSize) ??
-      pointToViewBoxPercent(hoveredAirbase.centroid, viewBox)
-    );
+    return projectPointToPercent(hoveredAirbase.centroid, viewBox, containerSize);
   }, [containerSize, hoveredAirbase, viewBox]);
 
   const handleHoverChange = useCallback(
@@ -247,7 +243,7 @@ export function ConstellationMap({
     [isSelectionControlled, onSelectAirbase],
   );
 
-  if (airbaseState.status === 'loading') {
+  if (!hasExternalPlacementSources && airbaseState.status === 'loading') {
     return (
       <div
         className={mergeClassNames(
@@ -260,7 +256,7 @@ export function ConstellationMap({
     );
   }
 
-  if (airbaseState.status === 'error') {
+  if (!hasExternalPlacementSources && airbaseState.status === 'error') {
     return (
       <div
         className={mergeClassNames(

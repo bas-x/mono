@@ -1,4 +1,5 @@
 import type { ApiAirbase, ApiAirbaseDetails, ApiAirbasePoint } from '@/lib/api';
+import type { SimulationAirbase } from '@/lib/api/types';
 
 export type MapMode = 'static' | 'live' | 'replay';
 
@@ -21,6 +22,14 @@ export type MapViewBox = {
 export type AirbasePoint = ApiAirbasePoint;
 export type Airbase = ApiAirbase;
 export type AirbaseDetails = ApiAirbaseDetails;
+export type PolygonBackedAirbasePlacement = Pick<Airbase, 'id' | 'area'>;
+export type PointBackedAirbasePlacement = {
+  id: SimulationAirbase['id'];
+  point: AirbasePoint;
+};
+export type AirbasePlacementSource =
+  | PolygonBackedAirbasePlacement
+  | PointBackedAirbasePlacement;
 
 export type AirbaseDetailsState =
   | { status: 'idle' }

@@ -5,8 +5,7 @@ import {
   type AirbaseMarkerVariant,
 } from '@/features/map/components/AirbaseMarkerIcon';
 import {
-  pointToRenderedPercent,
-  pointToViewBoxPercent,
+  projectPointToPercent,
   type RenderContainerSize,
 } from '@/features/map/lib/geometry';
 import type { AirbasePoint, MapViewBox } from '@/features/map/types';
@@ -58,9 +57,7 @@ function AirbaseOverlayLayerComponent({
         const isHovered = hoveredId === airbase.id;
         const isSelected = selectedId === airbase.id;
         const markerVariant = resolveMarkerVariant(isSelected, isHovered);
-        const markerPosition =
-          pointToRenderedPercent(airbase.centroid, viewBox, containerSize) ??
-          pointToViewBoxPercent(airbase.centroid, viewBox);
+        const markerPosition = projectPointToPercent(airbase.centroid, viewBox, containerSize);
         const haloSize = airbase.markerSizePx + 10;
 
         return (

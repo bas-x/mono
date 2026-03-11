@@ -27,6 +27,10 @@
 - The current base map surface reads `backend/assets/sweden.json` and `backend/assets/bounds.json` directly and renders them as a 2.5D extruded SVG layer in the same coordinate space as airbase overlays.
 - Overlay uses frontend map contract data (`/map`) projected into SVG space with an optional linear transform.
 - Mock airbase positions use curated SVG-space anchors aligned to `sweden.svg`; they are not derived from a linear geo projection.
+- Live airbases are polygon-backed and use polygon centroid anchoring for marker placement.
+- Simulation airbases are point-backed and use backend `location` directly as the canonical anchor.
+- Focused simulation views use a synthetic 12x12 SVG-unit footprint for `viewBox` math only; that footprint is not a rendered polygon contract.
+- Marker and tooltip positioning must share one projection helper so focused and full-map views stay aligned.
 - Airbase interactions include hover inspection, click selection, and keyboard activation.
 - Map region fill/stroke and airbase interaction colors are driven by theme variables in `frontend/src/styles/app.css`.
 - Airbases are rendered as triangle markers positioned at base centroids, with deterministic small/medium/large capacity sizing for consistent demos.
@@ -48,6 +52,6 @@
 
 ## Accessibility Rules
 
-- Each airbase polygon must be keyboard reachable (`tabIndex=0`) and actionable (`Enter`/`Space`).
+- Each airbase marker must be keyboard reachable and actionable (`Enter`/`Space`).
 - Visual focus and selected state must be distinguishable from default map styling.
 - Hover-only information must remain accessible via keyboard focus path.

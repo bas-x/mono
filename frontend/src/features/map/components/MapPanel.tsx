@@ -2,13 +2,14 @@ import type { CSSProperties } from 'react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ConstellationMap } from '@/features/map/components/ConstellationMap';
-import {
-  MapSidebar,
-  type SelectedAirbaseDetailsState,
-  type ViewMode,
-} from '@/features/map/components/MapSidebar';
+import { MapSidebar, type ViewMode } from '@/features/map/components/MapSidebar';
+import type { SelectedAirbaseDetailsState } from '@/features/map/components/SelectionDrawer';
 import { useAirbases } from '@/features/map/hooks/useAirbases';
-import { calculatePolygonBounds, createFocusedViewBox } from '@/features/map/lib/geometry';
+import { createFocusedViewBox } from '@/features/map/lib/geometry';
+import {
+  getPlacementBounds,
+  resolveActivePlacementSources,
+} from '@/features/map/lib/placement';
 import { SimulationSetupSheet } from '@/features/simulation/components/SimulationSetupSheet';
 import { useSimulation } from '@/features/simulation/hooks/useSimulation';
 import {
@@ -18,6 +19,7 @@ import {
 import {
   DEFAULT_MAP_VIEW_BOX,
   type Airbase,
+  type AirbasePlacementSource,
   type AirbaseDetails,
   type MapDataSource,
   type MapViewBox,
@@ -81,15 +83,43 @@ export function MapPanel() {
   const requestSequenceRef = useRef(0);
   const activeAbortControllerRef = useRef<AbortController | null>(null);
   const airbaseState = useAirbases({ mapClient: clients.map, dataSource });
-  const airbaseById = useMemo(() => {
-    const byId = new Map<string, Airbase>();
+  const activePlacementSources = useMemo<AirbasePlacementSource[]>(() => {
+    return resolveActivePlacementSources({
+      viewMode,
+      liveAirbases: airbaseState.airbases,
+      simulationAirbases: simulationState.status === 'running' ? simulationState.airbases : [],
+      hasRunningSimulation: simulationState.status === 'running',
+    });
+  }, [airbaseState.airbases, simulationState, viewMode]);
 
-    for (const airbase of airbaseState.airbases) {
-      byId.set(airbase.id, airbase);
+  const activePlacementSourceById = useMemo(() => {
+    const byId = new Map<string, AirbasePlacementSource>();
+
+    for (const source of activePlacementSources) {
+      byId.set(source.id, source);
     }
 
     return byId;
-  }, [airbaseState.airbases]);
+  }, [activePlacementSources]);
+
+  const activeRenderableAirbases = useMemo<Airbase[]>(() => {
+    return activePlacementSources.map((source) => {
+      if ('area' in source) {
+        return source;
+      }
+
+      const bounds = getPlacementBounds(source);
+      return {
+        id: source.id,
+        area: [
+          { x: bounds.minX, y: bounds.minY },
+          { x: bounds.maxX, y: bounds.minY },
+          { x: bounds.maxX, y: bounds.maxY },
+          { x: bounds.minX, y: bounds.maxY },
+        ],
+      };
+    });
+  }, [activePlacementSources]);
 
   const cancelActiveRequest = useCallback(() => {
     if (activeAbortControllerRef.current) {
@@ -106,15 +136,15 @@ export function MapPanel() {
 
   const focusAirbase = useCallback(
     (airbaseId: string) => {
-      const airbase = airbaseById.get(airbaseId);
-      if (!airbase) {
+      const source = activePlacementSourceById.get(airbaseId);
+      if (!source) {
         return;
       }
 
-      const bounds = calculatePolygonBounds(airbase.area);
+      const bounds = getPlacementBounds(source);
       setMapViewBox(createFocusedViewBox(bounds, DEFAULT_MAP_VIEW_BOX));
     },
-    [airbaseById],
+    [activePlacementSourceById],
   );
 
   const handleResetView = useCallback(() => {
@@ -123,6 +153,7 @@ export function MapPanel() {
 
   const resetWorkspaceState = useCallback(() => {
     cancelActiveRequest();
+    detailsCacheRef.current.clear();
     setIsAirbaseListOpen(false);
     setSelectedAirbaseId(null);
     setSelectedAirbaseDetailsState({ status: 'idle' });
@@ -140,6 +171,8 @@ export function MapPanel() {
       if (nextMode === 'simulate') {
         resetWorkspaceState();
       } else {
+        detailsCacheRef.current.clear();
+        setSelectedAirbaseDetailsState({ status: 'idle' });
         resetSimulation();
       }
 
@@ -238,23 +271,10 @@ export function MapPanel() {
     (values: SimulationSetupFormValues) => {
       setSimulationSetupValues(values);
       setIsSimulationSheetOpen(false);
-      createSimulation(values.seed);
+      createSimulation(values.seedHex);
     },
     [createSimulation],
   );
-
-  const simulationAirbases = useMemo(() => {
-    if (simulationState.status !== 'running') return [];
-    return simulationState.airbases.map((sa) => ({
-      id: sa.id,
-      area: [
-        { x: sa.location.x - 5, y: sa.location.y - 5 },
-        { x: sa.location.x + 5, y: sa.location.y - 5 },
-        { x: sa.location.x + 5, y: sa.location.y + 5 },
-        { x: sa.location.x - 5, y: sa.location.y + 5 },
-      ],
-    }));
-  }, [simulationState]);
 
   return (
     <>
@@ -268,7 +288,11 @@ export function MapPanel() {
             className="h-full min-h-full rounded-none border-0"
             dataSource={viewMode === 'simulate' ? 'api' : dataSource}
             mode={viewMode === 'live' ? 'live' : 'static'}
-            airbases={viewMode === 'simulate' && simulationState.status === 'running' ? simulationAirbases : undefined}
+            placementSources={
+              viewMode === 'simulate' && simulationState.status === 'running'
+                ? activePlacementSources
+                : undefined
+            }
             selectedAirbaseId={selectedAirbaseId}
             viewBox={mapViewBox}
             onSelectAirbase={handleSelectAirbase}
@@ -276,7 +300,7 @@ export function MapPanel() {
         </div>
 
         <MapSidebar
-          airbases={viewMode === 'simulate' && simulationState.status === 'running' ? simulationAirbases : airbaseState.airbases}
+          airbases={viewMode === 'simulate' && simulationState.status === 'running' ? activeRenderableAirbases : airbaseState.airbases}
           airbaseStatus={viewMode === 'simulate' ? (simulationState.status === 'running' ? 'success' : 'loading') : airbaseState.status}
           airbaseMessage={
             viewMode === 'simulate'
