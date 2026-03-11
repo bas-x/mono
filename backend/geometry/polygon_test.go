@@ -96,12 +96,13 @@ func TestSampleFromPolygonInvalid(t *testing.T) {
 	t.Parallel()
 	seed := [32]byte{7, 8, 9}
 	rng := rand.New(rand.NewChaCha8(seed))
-	defer func() {
-		if r := recover(); r == nil {
-			t.Fatalf("expected panic for invalid polygon")
-		}
-	}()
-	SampleFromPolygon(rng, []Point{{0, 0}, {1, 1}}, 8)
+	pt, ok := SampleFromPolygon(rng, []Point{{0, 0}, {1, 1}}, 8)
+	if ok {
+		t.Fatalf("expected invalid polygon to fail sampling")
+	}
+	if pt != (Point{}) {
+		t.Fatalf("expected zero point for invalid polygon, got %+v", pt)
+	}
 }
 
 func pointInPolygon(p Point, vertices []Point) bool {

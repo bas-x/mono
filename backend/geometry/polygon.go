@@ -200,12 +200,16 @@ func SampleFromPolygons(rng *rand.Rand, polygons [][]Point, maxAttempts uint) (P
 	return SampleFromPolygon(rng, polygons[polygonIdx], maxAttempts)
 }
 
-// SampleFromPolygon returns a uniformly random point sampled from a single polygon. Any fatal error
-// results in a panic to aid deterministic debugging.
+// SampleFromPolygon returns a uniformly random point sampled from a single polygon. When no point
+// can be sampled, it returns Point{} and false.
 func SampleFromPolygon(rng *rand.Rand, polygon []Point, maxAttempts uint) (Point, bool) {
-	assert.True(len(polygon) >= 3, "sample from polygon vertices", "invalid polygon")
+	if len(polygon) < 3 {
+		return Point{}, false
+	}
 	area := PolygonArea(polygon)
-	assert.True(area > 0, "sample from polygon area", "non-positive area")
+	if area <= 0 {
+		return Point{}, false
+	}
 
 	pt, err := RandomPointInPolygon(rng, polygon)
 	if err == nil {
@@ -216,7 +220,6 @@ func SampleFromPolygon(rng *rand.Rand, polygon []Point, maxAttempts uint) (Point
 			return fallback, true
 		}
 	}
-	assert.Fail("sample from polygon", err)
 	return Point{}, false
 }
 
