@@ -42,7 +42,9 @@ func bindAndValidate[T any](c echo.Context) (*T, error) {
 	var req T
 	err := c.Bind(&req)
 	if err != nil {
-		return nil, echo.NewHTTPError(http.StatusBadRequest, err)
+		if err != echo.ErrUnsupportedMediaType {
+			return nil, echo.NewHTTPError(http.StatusBadRequest, err)
+		}
 	}
 
 	err = c.Validate(req)
