@@ -10,6 +10,7 @@ import {
 import { useAirbases } from '@/features/map/hooks/useAirbases';
 import { calculatePolygonBounds, createFocusedViewBox } from '@/features/map/lib/geometry';
 import { SimulationSetupSheet } from '@/features/simulation/components/SimulationSetupSheet';
+import { useSimulation } from '@/features/simulation/hooks/useSimulation';
 import {
   DEFAULT_SIMULATION_SETUP_FORM_VALUES,
   type SimulationSetupFormValues,
@@ -75,6 +76,7 @@ export function MapPanel() {
   );
   const [selectedAirbaseDetailsState, setSelectedAirbaseDetailsState] =
     useState<SelectedAirbaseDetailsState>({ status: 'idle' });
+  const { state: simulationState, createSimulation, reset: resetSimulation } = useSimulation();
   const detailsCacheRef = useRef(new Map<string, AirbaseDetails>());
   const requestSequenceRef = useRef(0);
   const activeAbortControllerRef = useRef<AbortController | null>(null);
@@ -137,11 +139,13 @@ export function MapPanel() {
 
       if (nextMode === 'simulate') {
         resetWorkspaceState();
+      } else {
+        resetSimulation();
       }
 
       setViewMode(nextMode);
     },
-    [resetWorkspaceState, viewMode],
+    [resetWorkspaceState, resetSimulation, viewMode],
   );
 
   const handleToggleAirbaseList = useCallback(() => {
@@ -230,10 +234,27 @@ export function MapPanel() {
     setIsSimulationSheetOpen(false);
   }, []);
 
-  const handleSubmitSimulationSetup = useCallback((values: SimulationSetupFormValues) => {
-    setSimulationSetupValues(values);
-    setIsSimulationSheetOpen(false);
-  }, []);
+  const handleSubmitSimulationSetup = useCallback(
+    (values: SimulationSetupFormValues) => {
+      setSimulationSetupValues(values);
+      setIsSimulationSheetOpen(false);
+      createSimulation(values.seed);
+    },
+    [createSimulation],
+  );
+
+  const simulationAirbases = useMemo(() => {
+    if (simulationState.status !== 'running') return [];
+    return simulationState.airbases.map((sa) => ({
+      id: sa.id,
+      area: [
+        { x: sa.location.x - 5, y: sa.location.y - 5 },
+        { x: sa.location.x + 5, y: sa.location.y - 5 },
+        { x: sa.location.x + 5, y: sa.location.y + 5 },
+        { x: sa.location.x - 5, y: sa.location.y + 5 },
+      ],
+    }));
+  }, [simulationState]);
 
   return (
     <>
@@ -245,8 +266,9 @@ export function MapPanel() {
         <div className="relative min-h-[55vh] min-w-0 bg-bg min-[1040px]:min-h-0">
           <ConstellationMap
             className="h-full min-h-full rounded-none border-0"
-            dataSource={dataSource}
+            dataSource={viewMode === 'simulate' ? 'api' : dataSource}
             mode={viewMode === 'live' ? 'live' : 'static'}
+            airbases={viewMode === 'simulate' && simulationState.status === 'running' ? simulationAirbases : undefined}
             selectedAirbaseId={selectedAirbaseId}
             viewBox={mapViewBox}
             onSelectAirbase={handleSelectAirbase}
@@ -254,9 +276,13 @@ export function MapPanel() {
         </div>
 
         <MapSidebar
-          airbases={airbaseState.airbases}
-          airbaseStatus={airbaseState.status}
-          airbaseMessage={airbaseState.status === 'error' ? airbaseState.message : undefined}
+          airbases={viewMode === 'simulate' && simulationState.status === 'running' ? simulationAirbases : airbaseState.airbases}
+          airbaseStatus={viewMode === 'simulate' ? (simulationState.status === 'running' ? 'success' : 'loading') : airbaseState.status}
+          airbaseMessage={
+            viewMode === 'simulate'
+              ? (simulationState.status === 'error' ? simulationState.message : undefined)
+              : (airbaseState.status === 'error' ? airbaseState.message : undefined)
+          }
           viewMode={viewMode}
           isAirbaseListOpen={isAirbaseListOpen}
           selectedAirbaseId={selectedAirbaseId}

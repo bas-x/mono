@@ -47,6 +47,7 @@ type ConstellationMapProps = {
   className?: string;
   showDebugOverlay?: boolean;
   viewBox?: MapViewBox;
+  airbases?: Airbase[];
 };
 
 const AIRBASE_CAPACITY_SEQUENCE = ['small', 'medium', 'large'] as const;
@@ -114,6 +115,7 @@ export function ConstellationMap({
   className,
   showDebugOverlay = false,
   viewBox = DEFAULT_MAP_VIEW_BOX,
+  airbases: externalAirbases,
 }: ConstellationMapProps) {
   const { clients } = useApi();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -180,12 +182,16 @@ export function ConstellationMap({
 
   const coordinateTransform = useMemo(() => resolveCoordinateTransform(transform), [transform]);
   const airbaseState = useAirbases({ mapClient: clients.map, dataSource });
+  const effectiveAirbases = useMemo(
+    () => externalAirbases ?? airbaseState.airbases,
+    [externalAirbases, airbaseState.airbases],
+  );
 
   const renderableAirbases = useMemo(() => {
-    return airbaseState.airbases
+    return effectiveAirbases
       .map((airbase) => asRenderableAirbase(airbase, coordinateTransform))
       .filter((airbase): airbase is RenderableAirbase => airbase !== null);
-  }, [airbaseState.airbases, coordinateTransform]);
+  }, [effectiveAirbases, coordinateTransform]);
 
   const renderableAirbaseById = useMemo(() => {
     const byId = new Map<string, RenderableAirbase>();
