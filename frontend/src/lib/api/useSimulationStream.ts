@@ -7,7 +7,7 @@ import type { ConnectionState, SimulationEventEnvelope, SimulationStreamClient }
 
 export type UseSimulationStreamResult = {
   state: ConnectionState;
-  connect(): void;
+  connect(simulationId: string): void;
   disconnect(code?: number, reason?: string): void;
   subscribe(handler: (event: SimulationEventEnvelope) => void): () => void;
 };
@@ -22,23 +22,29 @@ function createStreamClient(): SimulationStreamClient {
   return createSimulationStreamClient(config);
 }
 
-export function useSimulationStream(): UseSimulationStreamResult {
+export function useSimulationStream(simulationId?: string): UseSimulationStreamResult {
   const streamClient = useMemo(() => createStreamClient(), []);
   const [state, setState] = useState<ConnectionState>('idle');
 
   useEffect(() => {
     const unsubscribe = streamClient.onConnectionStateChange(setState);
-    streamClient.connect();
+
+    if (simulationId) {
+      streamClient.connect(simulationId);
+    }
 
     return () => {
       unsubscribe();
       streamClient.disconnect(1000, 'component unmounted');
     };
-  }, [streamClient]);
+  }, [streamClient, simulationId]);
 
-  const connect = useCallback(() => {
-    streamClient.connect();
-  }, [streamClient]);
+  const connect = useCallback(
+    (id: string) => {
+      streamClient.connect(id);
+    },
+    [streamClient],
+  );
 
   const disconnect = useCallback(
     (code?: number, reason?: string) => {

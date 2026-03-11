@@ -1,6 +1,6 @@
 import type { ApiConfig } from '@/lib/api/types';
 
-export const SIMULATION_WS_PATH = '/ws/simulation';
+export const SIMULATION_WS_PATH = '/ws/simulations/:simulationId/events';
 
 const DEFAULT_API_BASE_URL = 'https://basex.shigure.joshuadematas.me';
 const DEFAULT_WS_BASE_URL = 'wss://basex.shigure.joshuadematas.me';

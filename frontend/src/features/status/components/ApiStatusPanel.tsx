@@ -25,7 +25,7 @@ function friendlyError(error: unknown): string {
 
 export function ApiStatusPanel() {
   const { clients, config } = useApi();
-  const { state: streamState, subscribe } = useSimulationStream();
+  const { state: streamState, subscribe } = useSimulationStream('base');
 
   const [latestEvent, setLatestEvent] = useState<SimulationEventEnvelope | null>(null);
   const [pingState, setPingState] = useState<PingState>({
