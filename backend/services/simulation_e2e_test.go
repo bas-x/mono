@@ -39,6 +39,7 @@ func TestSimulationServiceEndToEnd_BaseReadModels(t *testing.T) {
 		require.NoError(t, decodeErr)
 		require.NotEmpty(t, aircraft.State)
 		require.NotNil(t, aircraft.Needs)
+		require.NotEmpty(t, aircraft.Needs)
 	}
 }
 
