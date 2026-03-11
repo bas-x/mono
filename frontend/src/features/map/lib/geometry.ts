@@ -120,6 +120,14 @@ export function pointToRenderedPercent(
   };
 }
 
+export function projectPointToPercent(
+  point: AirbasePoint,
+  viewBox: MapViewBox,
+  containerSize: RenderContainerSize,
+): { x: number; y: number } {
+  return pointToRenderedPercent(point, viewBox, containerSize) ?? pointToViewBoxPercent(point, viewBox);
+}
+
 export function getRenderedViewBoxMetrics(
   viewBox: MapViewBox,
   containerSize: RenderContainerSize,
