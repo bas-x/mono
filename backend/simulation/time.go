@@ -70,6 +70,12 @@ func (ts *TimeSim) Now() time.Time {
 	return ts.Realtime()
 }
 
+func (ts *TimeSim) Ticks() uint64 {
+	ts.mutex.Lock()
+	defer ts.mutex.Unlock()
+	return ts.ticks
+}
+
 func (ts *TimeSim) Clone() *TimeSim {
 	return &TimeSim{
 		ticks:      ts.ticks,

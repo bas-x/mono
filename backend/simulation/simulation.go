@@ -14,6 +14,10 @@ type Simulation struct {
 	constellation *Constellation
 	fleet         *Fleet
 	dispatcher    *Dispatcher
+
+	aircraftStateChangeHooks []AircraftStateChangeHook
+	landingAssignmentHooks   []LandingAssignmentHook
+	simulationStepHooks      []SimulationStepHook
 }
 
 func (s *Simulation) AssertInvariants() {
@@ -36,17 +40,22 @@ func NewSimulator(seed [32]byte, ts *TimeSim) *Simulation {
 	rnd := rand.New(rndSrc)
 	constellation := NewConstellation()
 	assigner := &RoundRobinAssigner{}
-	return &Simulation{
+	sim := &Simulation{
 		ts: ts,
 		env: &Environment{
 			src:   rndSrc,
 			rnd:   rnd,
 			clock: ts,
 		},
-		constellation: constellation,
-		fleet:         NewFleet(),
-		dispatcher:    NewDispatcher(constellation, assigner),
+		constellation:            constellation,
+		fleet:                    NewFleet(),
+		dispatcher:               NewDispatcher(constellation, assigner),
+		aircraftStateChangeHooks: make([]AircraftStateChangeHook, 0),
+		landingAssignmentHooks:   make([]LandingAssignmentHook, 0),
+		simulationStepHooks:      make([]SimulationStepHook, 0),
 	}
+	sim.bindInternalHooks()
+	return sim
 }
 
 type SimulationOptions struct {
@@ -83,9 +92,14 @@ func (s *Simulation) Step() {
 		ctx := FlightContext{
 			Clock:      s.ts,
 			Dispatcher: s.dispatcher,
+			OnAircraftStateChange: func(event AircraftStateChangeEvent) {
+				safeInvoke(s.aircraftStateChangeHooks, event)
+			},
 		}
 		s.fleet.StepWithContext(ctx)
 	}
+
+	safeInvoke(s.simulationStepHooks, SimulationStepEvent{Tick: s.ts.Ticks(), Timestamp: s.ts.Now()})
 }
 
 // Clone deep copies the simulation. It pauses the
@@ -111,14 +125,19 @@ func (s *Simulation) Clone() *Simulation {
 	} else {
 		dispatcher = NewDispatcher(constellation, &RoundRobinAssigner{})
 	}
-	return &Simulation{
-		ts:            ts,
-		env:           env,
-		stepTag:       s.stepTag,
-		constellation: constellation,
-		fleet:         fleet,
-		dispatcher:    dispatcher,
+	clone := &Simulation{
+		ts:                       ts,
+		env:                      env,
+		stepTag:                  s.stepTag,
+		constellation:            constellation,
+		fleet:                    fleet,
+		dispatcher:               dispatcher,
+		aircraftStateChangeHooks: append([]AircraftStateChangeHook(nil), s.aircraftStateChangeHooks...),
+		landingAssignmentHooks:   append([]LandingAssignmentHook(nil), s.landingAssignmentHooks...),
+		simulationStepHooks:      append([]SimulationStepHook(nil), s.simulationStepHooks...),
 	}
+	clone.bindInternalHooks()
+	return clone
 }
 
 // Airbases returns a shallow copy of the generated airbases slice.
@@ -138,6 +157,31 @@ func (s *Simulation) Aircrafts() []Aircraft {
 
 func (s *Simulation) Dispatcher() *Dispatcher {
 	return s.dispatcher
+}
+
+func (s *Simulation) AddAircraftStateChangeHook(hook AircraftStateChangeHook) {
+	assert.NotNil(hook, "aircraft state change hook")
+	s.aircraftStateChangeHooks = append(s.aircraftStateChangeHooks, hook)
+}
+
+func (s *Simulation) AddLandingAssignmentHook(hook LandingAssignmentHook) {
+	assert.NotNil(hook, "landing assignment hook")
+	s.landingAssignmentHooks = append(s.landingAssignmentHooks, hook)
+}
+
+func (s *Simulation) AddSimulationStepHook(hook SimulationStepHook) {
+	assert.NotNil(hook, "simulation step hook")
+	s.simulationStepHooks = append(s.simulationStepHooks, hook)
+}
+
+func (s *Simulation) bindInternalHooks() {
+	if s.dispatcher == nil {
+		return
+	}
+	s.dispatcher.now = s.ts.Now
+	s.dispatcher.onAssignment = func(event LandingAssignmentEvent) {
+		safeInvoke(s.landingAssignmentHooks, event)
+	}
 }
 
 // RequestLanding registers an inbound aircraft and returns its current assignment.

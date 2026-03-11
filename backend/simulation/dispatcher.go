@@ -2,6 +2,7 @@ package simulation
 
 import (
 	"errors"
+	"time"
 
 	"github.com/bas-x/basex/assert"
 )
@@ -12,6 +13,8 @@ type Dispatcher struct {
 	assigner      LandingAssigner
 	inbound       map[TailNumber]*InboundRecord
 	inboundOrder  []TailNumber
+	onAssignment  func(LandingAssignmentEvent)
+	now           func() time.Time
 }
 
 // LandingAssignmentSource indicates how an assignment was produced.
@@ -117,6 +120,7 @@ func (d *Dispatcher) OverrideAssignment(tail TailNumber, base BaseID) (LandingAs
 	}
 	record.Assigned = true
 	record.Assignment = LandingAssignment{Base: baseRef.ID, Source: AssignmentSourceHuman}
+	d.emitAssignment(record)
 	return record.Assignment, nil
 }
 
@@ -167,7 +171,27 @@ func (d *Dispatcher) assign(record *InboundRecord) error {
 	}
 	record.Assigned = true
 	record.Assignment = LandingAssignment{Base: assignment, Source: AssignmentSourceAlgorithm}
+	d.emitAssignment(record)
 	return nil
+}
+
+func (d *Dispatcher) emitAssignment(record *InboundRecord) {
+	if d.onAssignment == nil || record == nil || !record.Assigned {
+		return
+	}
+	d.onAssignment(LandingAssignmentEvent{
+		TailNumber: record.Tail,
+		Base:       record.Assignment.Base,
+		Source:     record.Assignment.Source,
+		Timestamp:  d.currentTime(),
+	})
+}
+
+func (d *Dispatcher) currentTime() time.Time {
+	if d.now == nil {
+		return time.Time{}
+	}
+	return d.now()
 }
 
 func (d *Dispatcher) findAirbase(id BaseID) (*Airbase, error) {

@@ -36,9 +36,19 @@ func NewAircraft(
 
 func (a *Aircraft) Step(ctx FlightContext) {
 	a.AssertInvariants()
+	oldState := a.State.Name()
 	nextState := a.State.Step(a, ctx)
 	assert.NotNil(nextState, "next state")
 	a.State = nextState
+	if oldState != a.State.Name() && ctx.OnAircraftStateChange != nil {
+		ctx.OnAircraftStateChange(AircraftStateChangeEvent{
+			TailNumber: a.TailNumber,
+			OldState:   oldState,
+			NewState:   a.State.Name(),
+			Aircraft:   *a.Clone(),
+			Timestamp:  ctx.Clock.Now(),
+		})
+	}
 }
 
 func (a *Aircraft) Clone() *Aircraft {

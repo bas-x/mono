@@ -3,8 +3,9 @@ package simulation
 import "time"
 
 type FlightContext struct {
-	Clock      *TimeSim
-	Dispatcher *Dispatcher
+	Clock                 *TimeSim
+	Dispatcher            *Dispatcher
+	OnAircraftStateChange func(AircraftStateChangeEvent)
 }
 
 type AircraftState interface {
