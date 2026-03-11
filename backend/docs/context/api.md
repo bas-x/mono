@@ -22,6 +22,31 @@
 }
 ```
 
+### List simulations
+
+- **Method**: `GET`
+- **Path**: `/simulations`
+- **Response** `200`:
+
+```json
+{
+  "simulations": [
+    {
+      "id": "base",
+      "running": true
+    }
+  ]
+}
+```
+
+### Start a simulation
+
+- **Method**: `POST`
+- **Path**: `/simulations/:simulationId/start`
+- **Response** `202`: no body
+- **Response** `404`: simulation not found
+- **Response** `409`: simulation already running
+
 ### List airbases for a simulation
 
 - **Method**: `GET`
@@ -65,6 +90,54 @@
       "assignedTo": "3a5f..."
     }
   ]
+}
+```
+
+### Stream simulation events
+
+- **Method**: `GET`
+- **Path**: `/ws/simulations/:simulationId/events`
+- **Transport**: WebSocket
+- **Behavior**:
+  - Streams all event types for the requested simulation.
+  - Slow clients are disconnected instead of blocking simulation progress.
+
+- **Example payloads**:
+
+```json
+{
+  "type": "simulation_step",
+  "simulationId": "base",
+  "tick": 1,
+  "timestamp": "2026-03-11T18:00:00Z"
+}
+```
+
+```json
+{
+  "type": "aircraft_state_change",
+  "simulationId": "base",
+  "tailNumber": "9b2e...",
+  "oldState": "Outbound",
+  "newState": "Engaged",
+  "aircraft": {
+    "tailNumber": "9b2e...",
+    "state": "Engaged",
+    "needs": [],
+    "assignedTo": null
+  },
+  "timestamp": "2026-03-11T18:00:05Z"
+}
+```
+
+```json
+{
+  "type": "landing_assignment",
+  "simulationId": "base",
+  "tailNumber": "9b2e...",
+  "baseId": "3a5f...",
+  "source": "algorithm",
+  "timestamp": "2026-03-11T18:00:08Z"
 }
 ```
 
