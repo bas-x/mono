@@ -18,7 +18,7 @@ type WebSocketClientOptions<TEvent> = {
 };
 
 type WebSocketClient<TEvent> = {
-  connect(): void;
+  connect(path?: string): void;
   disconnect(code?: number, reason?: string): void;
   subscribe(handler: (event: TEvent) => void): Unsubscribe;
   onConnectionStateChange(handler: (state: ConnectionState) => void): Unsubscribe;
@@ -61,11 +61,14 @@ export function createWebSocketClient<TEvent>(
   let reconnectAttempt = 0;
   let manuallyClosed = false;
   let connectionState: ConnectionState = 'idle';
+  let lastConnectPath: string | undefined = undefined;
 
   const eventSubscribers = new Set<(event: TEvent) => void>();
   const connectionStateSubscribers = new Set<(state: ConnectionState) => void>();
 
-  const wsUrl = normalizeWsUrl(config.wsBaseUrl, options.path);
+  function getWsUrl(path: string) {
+    return normalizeWsUrl(config.wsBaseUrl, path);
+  }
 
   function notifyConnectionState(nextState: ConnectionState) {
     connectionState = nextState;
@@ -100,11 +103,14 @@ export function createWebSocketClient<TEvent>(
     const delay = computeReconnectDelay(reconnectAttempt, reconnectOptions);
     reconnectTimer = setTimeout(() => {
       reconnectTimer = null;
-      connect();
+      connect(lastConnectPath);
     }, delay);
   }
 
-  function connect() {
+  function connect(path?: string) {
+    const effectivePath = path ?? lastConnectPath ?? options.path;
+    lastConnectPath = effectivePath;
+
     if (socket && (socket.readyState === WebSocket.CONNECTING || socket.readyState === WebSocket.OPEN)) {
       return;
     }
@@ -113,7 +119,7 @@ export function createWebSocketClient<TEvent>(
     notifyConnectionState(reconnectAttempt === 0 ? 'connecting' : 'reconnecting');
 
     manuallyClosed = false;
-    socket = socketFactory(wsUrl);
+    socket = socketFactory(getWsUrl(effectivePath));
 
     socket.onopen = () => {
       reconnectAttempt = 0;

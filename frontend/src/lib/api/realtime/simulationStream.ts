@@ -37,8 +37,16 @@ export function createSimulationStreamClient(overrides?: Partial<ApiConfig>): Si
     ...overrides,
   };
 
-  return createWebSocketClient(config, {
+  const client = createWebSocketClient(config, {
     path: SIMULATION_WS_PATH,
     parseEvent: parseSimulationEvent,
   });
+
+  return {
+    ...client,
+    connect(simulationId: string) {
+      const path = SIMULATION_WS_PATH.replace(':simulationId', encodeURIComponent(simulationId));
+      return client.connect(path);
+    },
+  };
 }

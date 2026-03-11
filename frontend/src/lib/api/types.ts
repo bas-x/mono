@@ -58,7 +58,9 @@ export type SimulationAircraft = {
 };
 
 export interface SimulationServiceClient {
+  getSimulations(signal?: AbortSignal): Promise<Array<{ id: string }>>;
   createBaseSimulation(seed: string, signal?: AbortSignal): Promise<{ id: string }>;
+  startSimulation(simulationId: string, signal?: AbortSignal): Promise<void>;
   getAirbases(simulationId: string, signal?: AbortSignal): Promise<SimulationAirbase[]>;
   getAircrafts(simulationId: string, signal?: AbortSignal): Promise<SimulationAircraft[]>;
 }
@@ -95,7 +97,7 @@ export type SimulationEventEnvelope<TPayload = unknown> = {
 export type Unsubscribe = () => void;
 
 export interface SimulationStreamClient {
-  connect(): void;
+  connect(simulationId: string): void;
   disconnect(code?: number, reason?: string): void;
   subscribe(handler: (event: SimulationEventEnvelope) => void): Unsubscribe;
   onConnectionStateChange(handler: (state: ConnectionState) => void): Unsubscribe;

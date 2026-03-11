@@ -74,11 +74,12 @@ export function createMockSimulationStreamClient(): SimulationStreamClient {
     scriptIndex = (scriptIndex + 1) % SCRIPTED_EVENTS.length;
   }
 
-  function connect() {
+  function connect(simulationId: string) {
     if (connectTimer || intervalTimer || connectionState === 'open') {
       return;
     }
 
+    console.log('Mock: Connecting to simulation stream', simulationId);
     emitState('connecting');
 
     connectTimer = setTimeout(() => {
