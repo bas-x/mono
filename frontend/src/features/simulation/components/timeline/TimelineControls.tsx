@@ -92,6 +92,12 @@ export function TimelineControls({ status, isLoading, onStart, onPause, onResume
           colorClass="bg-white/60"
         />
         <FilterToggle 
+          label="Positions" 
+          isActive={filters.all_aircraft_positions !== false} 
+          onClick={() => onToggleFilter('all_aircraft_positions')} 
+          colorClass="bg-blue-500"
+        />
+        <FilterToggle 
           label="Assignments" 
           isActive={filters.landing_assignment !== false} 
           onClick={() => onToggleFilter('landing_assignment')} 

@@ -31,6 +31,7 @@ export function SimulationTimeline({
     landing_assignment: true,
     aircraft_state_change: true,
     ThreatSpawnedEvent: true,
+    all_aircraft_positions: false,
   });
 
   const handleToggleFilter = (type: string) => {
@@ -67,7 +68,7 @@ export function SimulationTimeline({
   return (
     <div className="pointer-events-none fixed bottom-6 left-0 right-0 z-30 flex justify-center px-4">
       <div className="pointer-events-auto relative flex w-full max-w-7xl flex-col gap-2 rounded-2xl border border-[color:var(--color-shell-panel-border)] bg-[#0a0a0a]/80 p-4 shadow-[0_8px_32px_rgba(0,0,0,0.8)] backdrop-blur-xl">
-        <div className="absolute -top-8 right-8 flex h-8 items-center justify-center rounded-t-lg border-x border-t border-[color:var(--color-shell-panel-border)] bg-[#0a0a0a]/90 pt-3 px-3 backdrop-blur-xl">
+        <div className="absolute -top-8 right-8 flex h-8 items-center justify-center rounded-t-lg border-x border-t border-[color:var(--color-shell-panel-border)] bg-[#0a0a0a]/90 px-3 backdrop-blur-xl">
           <span
             className={`inline-flex items-center gap-x-1.5 rounded-md px-1.5 py-0.5 text-xs font-medium uppercase tracking-widest ${statusStyle.container}`}
           >
