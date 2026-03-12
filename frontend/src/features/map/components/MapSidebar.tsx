@@ -1,3 +1,4 @@
+import { useState, useRef, useEffect } from 'react';
 import type { ReactNode } from 'react';
 
 import { AirbaseList } from '@/features/map/components/AirbaseList';
@@ -28,6 +29,7 @@ type MapSidebarProps = {
   isSimulationRunning?: boolean;
   simulations?: Array<{ id: string }>;
   onLoadSimulation?: (id: string) => void;
+  simulationError?: string;
 };
 
 type SectionProps = {
@@ -151,7 +153,12 @@ function LiveActionsSection({
 
 type SimulateActionsSectionProps = Pick<
   MapSidebarProps,
-  'onOpenSimulationSheet' | 'onResetSimulation' | 'isSimulationRunning' | 'simulations' | 'onLoadSimulation' | 'airbaseStatus' | 'airbaseMessage'
+  | 'onOpenSimulationSheet'
+  | 'onResetSimulation'
+  | 'isSimulationRunning'
+  | 'simulations'
+  | 'onLoadSimulation'
+  | 'simulationError'
 >;
 
 function SimulateActionsSection({
@@ -160,9 +167,36 @@ function SimulateActionsSection({
   isSimulationRunning,
   simulations = [],
   onLoadSimulation,
-  airbaseStatus,
-  airbaseMessage,
+  simulationError,
 }: SimulateActionsSectionProps) {
+  const [isConfirmingReset, setIsConfirmingReset] = useState(false);
+  const resetTimeoutRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (resetTimeoutRef.current !== null) {
+        window.clearTimeout(resetTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleResetClick = () => {
+    if (!isConfirmingReset) {
+      setIsConfirmingReset(true);
+      resetTimeoutRef.current = window.setTimeout(() => {
+        setIsConfirmingReset(false);
+      }, 3000);
+    } else {
+      if (resetTimeoutRef.current !== null) {
+        window.clearTimeout(resetTimeoutRef.current);
+      }
+      setIsConfirmingReset(false);
+      if (onResetSimulation) {
+        onResetSimulation();
+      }
+    }
+  };
+
   return (
     <SidebarInsetSection className="shell-divider border-t pt-4">
       <button
@@ -173,9 +207,9 @@ function SimulateActionsSection({
         Create
       </button>
 
-      {airbaseStatus === 'error' && airbaseMessage && (
+      {simulationError && (
         <div className="mt-4">
-          <ErrorMessage message={airbaseMessage} />
+          <ErrorMessage message={simulationError} />
         </div>
       )}
 
@@ -210,15 +244,18 @@ function SimulateActionsSection({
         )}
       </div>
 
-      {isSimulationRunning && onResetSimulation && (
-        <button
-          type="button"
-          onClick={onResetSimulation}
-          className="shell-button cursor-pointer rounded-sm border px-3 py-2 text-sm font-medium transition-colors w-full mt-4"
-        >
-          Reset
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={handleResetClick}
+        disabled={simulations.length === 0 || !isSimulationRunning}
+        className={
+          isConfirmingReset
+            ? 'cursor-pointer rounded-sm border px-3 py-2 text-sm font-medium transition-colors w-full mt-4 bg-red-600 text-white border-red-700 hover:bg-red-700'
+            : 'shell-button cursor-pointer rounded-sm border px-3 py-2 text-sm font-medium transition-colors w-full mt-4 disabled:opacity-50 disabled:cursor-not-allowed'
+        }
+      >
+        {isConfirmingReset ? 'Confirm reset' : 'Reset'}
+      </button>
     </SidebarInsetSection>
   );
 }
@@ -251,8 +288,7 @@ export function MapSidebar(props: MapSidebarProps) {
             isSimulationRunning={props.isSimulationRunning}
             simulations={props.simulations}
             onLoadSimulation={props.onLoadSimulation}
-            airbaseStatus={props.airbaseStatus}
-            airbaseMessage={props.airbaseMessage}
+            simulationError={props.simulationError}
           />
         )}
       </div>
