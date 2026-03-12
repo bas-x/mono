@@ -26,7 +26,7 @@ export function AccordionCard({
     >
       <div className="rounded-xl flex flex-none items-center justify-between rounded-t-xl bg-inherit px-5 py-4 z-10">
         <h2
-          className={`m-0 text-lg font-semibold text-[color:var(--color-shell-text)] origin-left transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${
+          className={`m-0 text-xl/6 font-medium tracking-tight text-[color:var(--color-shell-text)] origin-left transition-all duration-500 ease-[cubic-bezier(0.32,0.72,0,1)] ${
             isOpen ? 'scale-100 opacity-100' : 'scale-[0.96] opacity-80'
           }`}
         >
@@ -34,7 +34,7 @@ export function AccordionCard({
         </h2>
         <button
           onClick={onToggle}
-          className="cursor-pointer text-[10px] font-bold uppercase tracking-wider text-white transition-all duration-200 ease-out hover:text-white/70 active:scale-95"
+          className="cursor-pointer text-xs font-medium uppercase tracking-wider text-white transition-all duration-200 ease-out hover:text-white/70 active:scale-95"
         >
           {isOpen ? 'HIDE DETAILS' : 'SEE DETAILS'}
         </button>

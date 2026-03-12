@@ -53,7 +53,7 @@ export function SimulationInfoCard({ simulationState, simulations = [] }: Simula
         onToggle={() => setIsSimOpen(!isSimOpen)}
         flexRatio={7}
       >
-        <div className="grid grid-cols-4 gap-4 px-2 py-1">
+        <div className="grid grid-cols-4 gap-2">
           <div className="flex flex-col">
             <span className="text-[10px] font-semibold uppercase tracking-widest text-white/50">
               Tick
@@ -88,15 +88,15 @@ export function SimulationInfoCard({ simulationState, simulations = [] }: Simula
           </div>
         </div>
 
-        <div className="flex flex-col items-center justify-center py-2 transition-transform duration-500 hover:scale-[1.02]">
-          <span className="font-mono text-3xl font-bold tracking-tight text-green-500 drop-shadow-[0_0_8px_rgba(34,197,94,0.4)] transition-all duration-300">
+        <div className="flex flex-col justify-center transition-transform duration-500 hover:scale-[1.02]">
+          <span className="text-xl font-medium tracking-tight text-emerald-500 drop-shadow-[0_0_8px_rgba(34,197,94,0.4)] transition-all duration-300">
             {timeString}
           </span>
-          <span className="mt-1 font-mono text-xs text-green-600/70">{dateString}</span>
+          <span className="mt-1 text-xs text-emerald-600/70">{dateString}</span>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border-[8px] border-[color:var(--color-shell-panel-border)] bg-black mt-2">
-          <div className="flex items-center justify-between border-b border-[color:var(--color-shell-panel-border)] bg-[#111] px-4 py-3">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-large bg-black">
+          <div className="flex items-center justify-between border-b border-[color:var(--color-shell-panel-border)] bg-[#111] px-2 py-3">
             <h3 className="m-0 flex items-center gap-2 text-sm font-medium text-white/90">
               <svg
                 xmlns="http://www.w3.org/2000/svg"

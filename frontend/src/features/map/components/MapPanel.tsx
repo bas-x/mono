@@ -347,7 +347,7 @@ export function MapPanel() {
       </section>
 
       {viewMode === 'simulate' && simulationState.status === 'running' && (
-        <SimulationInfoCard simulationState={simulationState} />
+        <SimulationInfoCard simulationState={simulationState} simulations={simulations} />
       )}
 
       <SimulationSetupSheet
