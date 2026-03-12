@@ -3,7 +3,7 @@ import type { SimulationEvent } from '@/lib/api/types';
 type TimelineEventNodeProps = {
   event: SimulationEvent;
   isSelected: boolean;
-  onClick: () => void;
+  onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
 };
 
 export function TimelineEventNode({ event, isSelected, onClick }: TimelineEventNodeProps) {

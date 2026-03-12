@@ -42,12 +42,13 @@ export function TimelineTrack({ events, currentTick, maxTick, playbackTick, onSc
   }, [maxTick, onScrub]);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if ((e.target as HTMLElement).closest('button')) return;
+
     dragRef.current = {
       isDown: true,
       isDragging: false,
       startX: e.clientX,
     };
-    e.currentTarget.setPointerCapture(e.pointerId);
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -57,6 +58,7 @@ export function TimelineTrack({ events, currentTick, maxTick, playbackTick, onSc
       if (Math.abs(e.clientX - dragRef.current.startX) > 5) {
         dragRef.current.isDragging = true;
         setIsDraggingUI(true);
+        e.currentTarget.setPointerCapture(e.pointerId);
       }
     }
 
@@ -70,12 +72,13 @@ export function TimelineTrack({ events, currentTick, maxTick, playbackTick, onSc
     
     if (!dragRef.current.isDragging) {
       updateScrubberPosition(e.clientX);
+    } else {
+      e.currentTarget.releasePointerCapture(e.pointerId);
     }
 
     dragRef.current.isDown = false;
     dragRef.current.isDragging = false;
     setIsDraggingUI(false);
-    e.currentTarget.releasePointerCapture(e.pointerId);
   };
 
   const getPositionPercent = (tick: number) => {
