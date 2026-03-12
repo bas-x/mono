@@ -32,3 +32,5 @@ air.log
 # Editor/IDE
 # .idea/
 # .vscode/
+
+.sisyphus/
