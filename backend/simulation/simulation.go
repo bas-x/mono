@@ -2,6 +2,7 @@ package simulation
 
 import (
 	"math/rand/v2"
+	"time"
 
 	"github.com/bas-x/basex/assert"
 )
@@ -14,10 +15,15 @@ type Simulation struct {
 	constellation *Constellation
 	fleet         *Fleet
 	dispatcher    *Dispatcher
+	threats       *ThreatSet
+	threatOpts    ThreatOptions
+	threatRegions []threatRegion
 
 	aircraftStateChangeHooks []AircraftStateChangeHook
 	landingAssignmentHooks   []LandingAssignmentHook
 	simulationStepHooks      []SimulationStepHook
+	threatSpawnedHooks       []ThreatSpawnedHook
+	threatClaimedHooks       []ThreatClaimedHook
 }
 
 func (s *Simulation) AssertInvariants() {
@@ -50,9 +56,12 @@ func NewSimulator(seed [32]byte, ts *TimeSim) *Simulation {
 		constellation:            constellation,
 		fleet:                    NewFleet(),
 		dispatcher:               NewDispatcher(constellation, assigner),
+		threats:                  NewThreatSet(),
 		aircraftStateChangeHooks: make([]AircraftStateChangeHook, 0),
 		landingAssignmentHooks:   make([]LandingAssignmentHook, 0),
 		simulationStepHooks:      make([]SimulationStepHook, 0),
+		threatSpawnedHooks:       make([]ThreatSpawnedHook, 0),
+		threatClaimedHooks:       make([]ThreatClaimedHook, 0),
 	}
 	sim.bindInternalHooks()
 	return sim
@@ -61,6 +70,7 @@ func NewSimulator(seed [32]byte, ts *TimeSim) *Simulation {
 type SimulationOptions struct {
 	ConstellationOpts ConstellationOptions
 	FleetOpts         FleetOptions
+	ThreatOpts        ThreatOptions
 }
 
 func (s *Simulation) Init(config *SimulationOptions) error {
@@ -71,7 +81,9 @@ func (s *Simulation) Init(config *SimulationOptions) error {
 		opts = &copyOpts
 		copyFleet := config.FleetOpts
 		fleetOpts = &copyFleet
+		s.threatOpts = config.ThreatOpts
 	}
+	s.threatRegions = threatRegionsAll()
 
 	if err := s.constellation.Init(s.env, opts); err != nil {
 		return err
@@ -89,11 +101,24 @@ func (s *Simulation) Step() {
 	s.ts.Tick()
 
 	if s.fleet != nil {
+		if s.threats != nil {
+			regions := s.threatRegions
+			if len(regions) == 0 {
+				regions = threatRegionsAll()
+			}
+			if spawned, ok := s.threats.TrySpawnFromRegions(s.env, regions, s.threatOpts, s.ts.Ticks()); ok {
+				safeInvoke(s.threatSpawnedHooks, ThreatSpawnedEvent{Threat: spawned, Timestamp: s.ts.Now()})
+			}
+		}
 		ctx := FlightContext{
 			Clock:      s.ts,
 			Dispatcher: s.dispatcher,
+			Threats:    s.threats,
 			OnAircraftStateChange: func(event AircraftStateChangeEvent) {
 				safeInvoke(s.aircraftStateChangeHooks, event)
+			},
+			OnThreatClaimed: func(event ThreatClaimedEvent) {
+				safeInvoke(s.threatClaimedHooks, event)
 			},
 		}
 		s.fleet.StepWithContext(ctx)
@@ -132,9 +157,14 @@ func (s *Simulation) Clone() *Simulation {
 		constellation:            constellation,
 		fleet:                    fleet,
 		dispatcher:               dispatcher,
+		threats:                  s.threats.Clone(),
+		threatOpts:               s.threatOpts,
+		threatRegions:            append([]threatRegion(nil), s.threatRegions...),
 		aircraftStateChangeHooks: append([]AircraftStateChangeHook(nil), s.aircraftStateChangeHooks...),
 		landingAssignmentHooks:   append([]LandingAssignmentHook(nil), s.landingAssignmentHooks...),
 		simulationStepHooks:      append([]SimulationStepHook(nil), s.simulationStepHooks...),
+		threatSpawnedHooks:       append([]ThreatSpawnedHook(nil), s.threatSpawnedHooks...),
+		threatClaimedHooks:       append([]ThreatClaimedHook(nil), s.threatClaimedHooks...),
 	}
 	clone.bindInternalHooks()
 	return clone
@@ -155,6 +185,27 @@ func (s *Simulation) Aircrafts() []Aircraft {
 	return s.fleet.Aircrafts()
 }
 
+func (s *Simulation) Threats() []Threat {
+	if s.threats == nil {
+		return nil
+	}
+	return s.threats.Pending()
+}
+
+func (s *Simulation) Tick() uint64 {
+	if s == nil || s.ts == nil {
+		return 0
+	}
+	return s.ts.Ticks()
+}
+
+func (s *Simulation) Now() time.Time {
+	if s == nil || s.ts == nil {
+		return time.Time{}
+	}
+	return s.ts.Now()
+}
+
 func (s *Simulation) Dispatcher() *Dispatcher {
 	return s.dispatcher
 }
@@ -172,6 +223,16 @@ func (s *Simulation) AddLandingAssignmentHook(hook LandingAssignmentHook) {
 func (s *Simulation) AddSimulationStepHook(hook SimulationStepHook) {
 	assert.NotNil(hook, "simulation step hook")
 	s.simulationStepHooks = append(s.simulationStepHooks, hook)
+}
+
+func (s *Simulation) AddThreatSpawnedHook(hook ThreatSpawnedHook) {
+	assert.NotNil(hook, "threat spawned hook")
+	s.threatSpawnedHooks = append(s.threatSpawnedHooks, hook)
+}
+
+func (s *Simulation) AddThreatClaimedHook(hook ThreatClaimedHook) {
+	assert.NotNil(hook, "threat claimed hook")
+	s.threatClaimedHooks = append(s.threatClaimedHooks, hook)
 }
 
 func (s *Simulation) bindInternalHooks() {

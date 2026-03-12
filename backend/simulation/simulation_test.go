@@ -387,6 +387,58 @@ func TestSimulation_NeedsDrivenStateTransitions(t *testing.T) {
 	require.Equal(t, firstSteps, secondSteps)
 }
 
+func TestThreatSpawnDeterministic(t *testing.T) {
+	t.Parallel()
+
+	seed := [32]byte{7, 7, 7}
+	opts := &SimulationOptions{
+		ConstellationOpts: ConstellationOptions{
+			IncludeRegions:    []string{"Blekinge"},
+			MinPerRegion:      1,
+			MaxPerRegion:      1,
+			MaxTotal:          1,
+			RegionProbability: prng.New(1, 1),
+		},
+		ThreatOpts: ThreatOptions{
+			SpawnChance: prng.New(1, 1),
+			MaxActive:   3,
+		},
+	}
+
+	ts1 := New(time.Second, WithEpoch(time.Unix(0, 1)))
+	sim1 := NewSimulator(seed, ts1)
+	require.NoError(t, sim1.Init(opts))
+
+	ts2 := New(time.Second, WithEpoch(time.Unix(0, 1)))
+	sim2 := NewSimulator(seed, ts2)
+	require.NoError(t, sim2.Init(opts))
+
+	for range 3 {
+		sim1.Step()
+		sim2.Step()
+	}
+
+	require.Equal(t, sim1.Threats(), sim2.Threats())
+	require.Len(t, sim1.Threats(), 3)
+}
+
+func TestReadyStateRedeploysOnThreat(t *testing.T) {
+	t.Parallel()
+
+	ts := New(time.Second, WithEpoch(time.Unix(0, 1)))
+	sim := NewSimulator([32]byte{8}, ts)
+	sim.constellation.airbases = []Airbase{{ID: BaseID{0, 0, 0, 0, 0, 0, 0, 1}, RegionID: "SE-K", Region: "Blekinge"}}
+	sim.dispatcher = NewDispatcher(sim.constellation, &RoundRobinAssigner{})
+	sim.threats = &ThreatSet{pending: []Threat{{ID: makeThreatID(1), RegionID: "SE-K", Region: "Blekinge", CreatedAt: ts.Now(), CreatedTick: 0}}}
+	sim.fleet = &Fleet{aircrafts: []Aircraft{NewAircraft(TailNumber{9}, &ReadyState{}, []Need{{Type: NeedFuel, Severity: 0, RequiredCapability: NeedFuel}})}}
+
+	sim.Step()
+	aircrafts := sim.Aircrafts()
+	require.Len(t, aircrafts, 1)
+	require.Equal(t, "Outbound", aircrafts[0].State.Name())
+	require.Empty(t, sim.Threats())
+}
+
 func TestSimulationInitDeterministic(t *testing.T) {
 	t.Parallel()
 	seed := [32]byte{1, 2, 3}

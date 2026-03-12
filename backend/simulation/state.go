@@ -5,7 +5,9 @@ import "time"
 type FlightContext struct {
 	Clock                 *TimeSim
 	Dispatcher            *Dispatcher
+	Threats               *ThreatSet
 	OnAircraftStateChange func(AircraftStateChangeEvent)
+	OnThreatClaimed       func(ThreatClaimedEvent)
 }
 
 type AircraftState interface {
@@ -31,10 +33,19 @@ type ReadyState struct {
 
 func (r *ReadyState) Name() string { return "Ready" }
 
-func (r *ReadyState) Step(_ *Aircraft, ctx FlightContext) AircraftState {
+func (r *ReadyState) Step(a *Aircraft, ctx FlightContext) AircraftState {
 	if !r.entered {
 		r.entered = true
 		r.enteredAt = ctx.Clock.Now()
+	}
+	if ctx.Threats != nil {
+		if threat, ok := ctx.Threats.ClaimNext(); ok {
+			a.HasAssignment = false
+			if ctx.OnThreatClaimed != nil {
+				ctx.OnThreatClaimed(ThreatClaimedEvent{Threat: threat, TailNumber: a.TailNumber, Timestamp: ctx.Clock.Now()})
+			}
+			return &OutboundState{}
+		}
 	}
 	return r
 }
