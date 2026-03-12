@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/bas-x/basex/prng"
 )
 
 func TestSimulationHooks_StateChangeRecoversAndContinues(t *testing.T) {
@@ -75,6 +77,42 @@ func TestSimulationHooks_StepEvent(t *testing.T) {
 		require.Equal(t, ts.Now(), event.Timestamp)
 	case <-time.After(time.Second):
 		t.Fatal("expected simulation step event")
+	}
+}
+
+func TestSimulationHooks_ThreatEvents(t *testing.T) {
+	t.Parallel()
+
+	ts := New(time.Second, WithEpoch(time.Unix(0, 1)))
+	sim := NewSimulator([32]byte{2}, ts)
+	sim.constellation.airbases = []Airbase{{ID: BaseID{0, 0, 0, 0, 0, 0, 0, 1}, RegionID: "SE-K", Region: "Blekinge"}}
+	sim.dispatcher = NewDispatcher(sim.constellation, &RoundRobinAssigner{})
+	sim.bindInternalHooks()
+	sim.threatOpts = ThreatOptions{SpawnChance: prng.New(1, 1), MaxActive: 1}
+	sim.fleet = &Fleet{aircrafts: []Aircraft{NewAircraft(TailNumber{9}, &ReadyState{}, []Need{{Type: NeedFuel, Severity: 0, RequiredCapability: NeedFuel}})}}
+
+	spawned := make(chan ThreatSpawnedEvent, 1)
+	claimed := make(chan ThreatClaimedEvent, 1)
+	sim.AddThreatSpawnedHook(func(event ThreatSpawnedEvent) { spawned <- event })
+	sim.AddThreatClaimedHook(func(event ThreatClaimedEvent) { claimed <- event })
+
+	sim.Step()
+
+	select {
+	case event := <-spawned:
+		require.NotEmpty(t, event.Threat.Region)
+		require.NotEmpty(t, event.Threat.RegionID)
+	case <-time.After(time.Second):
+		t.Fatal("expected threat spawned event")
+	}
+
+	select {
+	case event := <-claimed:
+		require.Equal(t, TailNumber{9}, event.TailNumber)
+		require.NotEmpty(t, event.Threat.Region)
+		require.NotEmpty(t, event.Threat.RegionID)
+	case <-time.After(time.Second):
+		t.Fatal("expected threat claimed event")
 	}
 }
 

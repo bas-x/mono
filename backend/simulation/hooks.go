@@ -22,11 +22,26 @@ type SimulationStepEvent struct {
 	Timestamp time.Time
 }
 
+type ThreatSpawnedEvent struct {
+	Threat    Threat
+	Timestamp time.Time
+}
+
+type ThreatClaimedEvent struct {
+	Threat     Threat
+	TailNumber TailNumber
+	Timestamp  time.Time
+}
+
 type AircraftStateChangeHook func(AircraftStateChangeEvent)
 
 type LandingAssignmentHook func(LandingAssignmentEvent)
 
 type SimulationStepHook func(SimulationStepEvent)
+
+type ThreatSpawnedHook func(ThreatSpawnedEvent)
+
+type ThreatClaimedHook func(ThreatClaimedEvent)
 
 func safeInvoke[T any, H ~func(T)](hooks []H, event T) {
 	for _, hook := range hooks {
