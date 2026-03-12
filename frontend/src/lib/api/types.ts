@@ -64,6 +64,8 @@ export interface SimulationServiceClient {
   getSimulations(signal?: AbortSignal): Promise<Array<{ id: string }>>;
   createBaseSimulation(seed: string, signal?: AbortSignal): Promise<{ id: string }>;
   startSimulation(simulationId: string, signal?: AbortSignal): Promise<void>;
+  pauseSimulation(simulationId: string, signal?: AbortSignal): Promise<void>;
+  resumeSimulation(simulationId: string, signal?: AbortSignal): Promise<void>;
   resetSimulation(simulationId: string, signal?: AbortSignal): Promise<void>;
   getAirbases(simulationId: string, signal?: AbortSignal): Promise<SimulationAirbase[]>;
   getAircrafts(simulationId: string, signal?: AbortSignal): Promise<SimulationAircraft[]>;

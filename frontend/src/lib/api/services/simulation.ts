@@ -50,6 +50,26 @@ export function createSimulationServiceClient(
       );
     },
 
+    async pauseSimulation(simulationId: string, signal?: AbortSignal) {
+      return httpClient.requestJson<void>(
+        `/simulations/${encodeURIComponent(simulationId)}/pause`,
+        {
+          method: 'POST',
+          signal,
+        },
+      );
+    },
+
+    async resumeSimulation(simulationId: string, signal?: AbortSignal) {
+      return httpClient.requestJson<void>(
+        `/simulations/${encodeURIComponent(simulationId)}/resume`,
+        {
+          method: 'POST',
+          signal,
+        },
+      );
+    },
+
     async resetSimulation(simulationId: string, signal?: AbortSignal) {
       return httpClient.requestJson<void>(
         `/simulations/${encodeURIComponent(simulationId)}/reset`,
