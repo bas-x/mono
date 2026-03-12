@@ -136,7 +136,10 @@ func normalizeFleetOptions(opts FleetOptions) FleetOptions {
 	}
 
 	if opts.SeverityMax == 0 {
-		opts.SeverityMax = 100
+		opts.SeverityMax = 90
+	}
+	if opts.SeverityMin == 0 {
+		opts.SeverityMin = 60
 	}
 	if opts.SeverityMin > opts.SeverityMax {
 		opts.SeverityMin = opts.SeverityMax

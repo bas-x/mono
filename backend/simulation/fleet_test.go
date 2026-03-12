@@ -80,3 +80,26 @@ func TestFleetInitDeterministic(t *testing.T) {
 
 	require.Equal(t, fleet1.Aircrafts(), fleet2.Aircrafts())
 }
+
+func TestFleetInitDefaultsToHighSeverityNeeds(t *testing.T) {
+	t.Parallel()
+
+	ts := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
+	sim := NewSimulator([32]byte{4, 5, 6}, ts)
+	fleet := NewFleet()
+	opts := FleetOptions{
+		AircraftMin: 2,
+		AircraftMax: 2,
+		NeedsMin:    1,
+		NeedsMax:    2,
+	}
+
+	require.NoError(t, fleet.Init(sim.env, &opts))
+	for _, aircraft := range fleet.Aircrafts() {
+		require.NotEmpty(t, aircraft.Needs)
+		for _, need := range aircraft.Needs {
+			require.GreaterOrEqual(t, need.Severity, 60)
+			require.LessOrEqual(t, need.Severity, 90)
+		}
+	}
+}
