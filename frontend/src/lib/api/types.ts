@@ -90,12 +90,11 @@ export type SimulationEventType =
   | 'simulation.error'
   | (string & {});
 
-export type SimulationEventEnvelope<TPayload = unknown> = {
-  type: SimulationEventType;
-  runId: string;
-  sequence: number;
+export type SimulationEvent = {
+  type: string;
+  simulationId: string;
   timestamp: string;
-  payload: TPayload;
+  [key: string]: any;
 };
 
 export type Unsubscribe = () => void;
@@ -103,6 +102,6 @@ export type Unsubscribe = () => void;
 export interface SimulationStreamClient {
   connect(simulationId: string): void;
   disconnect(code?: number, reason?: string): void;
-  subscribe(handler: (event: SimulationEventEnvelope) => void): Unsubscribe;
+  subscribe(handler: (event: SimulationEvent) => void): Unsubscribe;
   onConnectionStateChange(handler: (state: ConnectionState) => void): Unsubscribe;
 }
