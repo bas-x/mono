@@ -5,9 +5,10 @@ import { AccordionCard } from '@/features/ui/components/AccordionCard';
 
 type SimulationInfoCardProps = {
   simulationState: SimulationState;
+  simulations?: Array<{ id: string }>;
 };
 
-export function SimulationInfoCard({ simulationState }: SimulationInfoCardProps) {
+export function SimulationInfoCard({ simulationState, simulations = [] }: SimulationInfoCardProps) {
   const [isSimOpen, setIsSimOpen] = useState(true);
   const [isAirOpen, setIsAirOpen] = useState(false);
 
@@ -30,12 +31,19 @@ export function SimulationInfoCard({ simulationState }: SimulationInfoCardProps)
   const aircraftCount = simulationState.aircrafts?.length ?? 0;
   const airbaseCount = simulationState.airbases?.length ?? 0;
 
-  // Mock branches for now since they don't exist yet
-  const mockBranches = [
-    { id: '1', name: 'Alpha Strike Plan', status: 'active', timeSaved: '+12m' },
-    { id: '2', name: 'Conservative Fueling', status: 'idle', timeSaved: '-4m' },
-    { id: '3', name: 'Max Rearm Speed', status: 'idle', timeSaved: '+18m' },
-  ];
+  const isMockMode = import.meta.env.VITE_USE_MOCK_API === 'true';
+  const branches = isMockMode
+    ? [
+        { id: '1', name: 'Alpha Strike Plan', status: 'active', timeSaved: '+12m' },
+        { id: '2', name: 'Conservative Fueling', status: 'idle', timeSaved: '-4m' },
+        { id: '3', name: 'Max Rearm Speed', status: 'idle', timeSaved: '+18m' },
+      ]
+    : simulations.map((sim) => ({
+        id: sim.id,
+        name: `${sim.id.substring(0, 8)}`,
+        status: simulationState.simulationId === sim.id ? 'active' : 'idle',
+        timeSaved: 'N/A',
+      }));
 
   return createPortal(
     <div className="pointer-events-none fixed inset-y-4 left-20 z-20 flex w-96 flex-col gap-4 pl-4">
@@ -45,30 +53,38 @@ export function SimulationInfoCard({ simulationState }: SimulationInfoCardProps)
         onToggle={() => setIsSimOpen(!isSimOpen)}
         flexRatio={7}
       >
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div
-            className="shell-panel-soft flex cursor-default items-center justify-center rounded-lg border p-3 text-xl font-bold text-[color:var(--color-shell-text)] transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:scale-105 hover:bg-white/5 hover:shadow-lg"
-            title="Tick"
-          >
-            {simulationState.tick ?? 0}
+        <div className="grid grid-cols-4 gap-4 px-2 py-1">
+          <div className="flex flex-col">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-white/50">
+              Tick
+            </span>
+            <span className="mt-1 font-mono text-xl font-medium tracking-tight text-white/90">
+              {simulationState.tick ?? 0}
+            </span>
           </div>
-          <div
-            className="shell-panel-soft flex cursor-default items-center justify-center rounded-lg border p-3 text-xl font-bold text-[color:var(--color-shell-text)] transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:scale-105 hover:bg-white/5 hover:shadow-lg"
-            title="Aircraft Count"
-          >
-            {aircraftCount}
+          <div className="flex flex-col">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-white/50">
+              Aircraft
+            </span>
+            <span className="mt-1 font-mono text-xl font-medium tracking-tight text-white/90">
+              {aircraftCount}
+            </span>
           </div>
-          <div
-            className="shell-panel-soft flex cursor-default items-center justify-center rounded-lg border p-3 text-xl font-bold text-[color:var(--color-shell-text)] transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:scale-105 hover:bg-white/5 hover:shadow-lg"
-            title="Airbase Count"
-          >
-            {airbaseCount}
+          <div className="flex flex-col">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-white/50">
+              Airbase
+            </span>
+            <span className="mt-1 font-mono text-xl font-medium tracking-tight text-white/90">
+              {airbaseCount}
+            </span>
           </div>
-          <div
-            className="shell-panel-soft flex cursor-default items-center justify-center rounded-lg border p-3 text-xl font-bold text-[color:var(--color-shell-text)] transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:scale-105 hover:bg-white/5 hover:shadow-lg"
-            title="Events Processed"
-          >
-            4
+          <div className="flex flex-col">
+            <span className="text-[10px] font-semibold uppercase tracking-widest text-white/50">
+              Events
+            </span>
+            <span className="mt-1 font-mono text-xl font-medium tracking-tight text-white/90">
+              4
+            </span>
           </div>
         </div>
 
@@ -102,11 +118,11 @@ export function SimulationInfoCard({ simulationState }: SimulationInfoCardProps)
               Branches
             </h3>
             <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] uppercase tracking-wider text-white/40 transition-colors hover:bg-white/20 hover:text-white/60">
-              {mockBranches.length} Available
+              {branches.length} Available
             </span>
           </div>
           <div className="flex-1 space-y-1 overflow-y-auto p-2">
-            {mockBranches.map((branch, idx) => (
+            {branches.map((branch, idx) => (
               <div key={branch.id}>
                 <button
                   className={`group flex w-full items-center justify-between rounded-md p-3 text-left transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-[0.98] ${
@@ -146,7 +162,7 @@ export function SimulationInfoCard({ simulationState }: SimulationInfoCardProps)
                     {branch.timeSaved}
                   </div>
                 </button>
-                {idx < mockBranches.length - 1 && <div className="my-1 h-px w-full bg-white/5" />}
+                {idx < branches.length - 1 && <div className="my-1 h-px w-full bg-white/5" />}
               </div>
             ))}
           </div>
