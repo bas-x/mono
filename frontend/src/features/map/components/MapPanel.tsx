@@ -84,6 +84,10 @@ export function MapPanel() {
   const activeAbortControllerRef = useRef<AbortController | null>(null);
   const airbaseState = useAirbases({ mapClient: clients.map, dataSource });
   const activePlacementSources = useMemo<AirbasePlacementSource[]>(() => {
+    if (viewMode === 'simulate' && simulationState.status !== 'running') {
+      return [];
+    }
+
     return resolveActivePlacementSources({
       viewMode,
       liveAirbases: airbaseState.airbases,
@@ -288,11 +292,7 @@ export function MapPanel() {
             className="h-full min-h-full rounded-none border-0"
             dataSource={viewMode === 'simulate' ? 'api' : dataSource}
             mode={viewMode === 'live' ? 'live' : 'static'}
-            placementSources={
-              viewMode === 'simulate' && simulationState.status === 'running'
-                ? activePlacementSources
-                : undefined
-            }
+            placementSources={activePlacementSources}
             selectedAirbaseId={selectedAirbaseId}
             viewBox={mapViewBox}
             onSelectAirbase={handleSelectAirbase}
