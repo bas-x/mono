@@ -30,7 +30,7 @@ func TestThreatSpawnFromConfiguredRegionsNotLimitedByBases(t *testing.T) {
 	require.Greater(t, len(seen), 2)
 }
 
-func TestSimulationThreatRegionsAlwaysUseAllAssets(t *testing.T) {
+func TestSimulationThreatRegionsRestrictedToConstellation(t *testing.T) {
 	t.Parallel()
 
 	ts := New(time.Second, WithEpoch(time.Unix(0, 1)))
@@ -39,6 +39,6 @@ func TestSimulationThreatRegionsAlwaysUseAllAssets(t *testing.T) {
 		ConstellationOpts: ConstellationOptions{IncludeRegions: []string{"Blekinge"}},
 	}))
 
-	require.Len(t, sim.threatRegions, len(threatRegionsAll()))
-	require.Greater(t, len(sim.threatRegions), 1)
+	require.Len(t, sim.threatRegions, 1)
+	require.Equal(t, "Blekinge", sim.threatRegions[0].Region)
 }

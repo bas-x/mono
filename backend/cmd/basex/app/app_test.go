@@ -19,7 +19,7 @@ func TestEventRequiresUIRefresh(t *testing.T) {
 		Tick:         12,
 		Timestamp:    time.Unix(0, 1),
 	}))
-	require.False(t, eventRequiresUIRefresh(services.AircraftStateChangeEvent{
+	require.True(t, eventRequiresUIRefresh(services.AircraftStateChangeEvent{
 		Type:         services.EventTypeAircraftStateChange,
 		SimulationID: services.BaseSimulationID,
 		TailNumber:   "abcd",

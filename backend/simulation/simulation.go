@@ -18,12 +18,14 @@ type Simulation struct {
 	threats       *ThreatSet
 	threatOpts    ThreatOptions
 	threatRegions []threatRegion
+	lifecycle     LifecycleModel
 
-	aircraftStateChangeHooks []AircraftStateChangeHook
-	landingAssignmentHooks   []LandingAssignmentHook
-	simulationStepHooks      []SimulationStepHook
-	threatSpawnedHooks       []ThreatSpawnedHook
-	threatClaimedHooks       []ThreatClaimedHook
+	aircraftStateChangeHooks  []AircraftStateChangeHook
+	landingAssignmentHooks    []LandingAssignmentHook
+	simulationStepHooks       []SimulationStepHook
+	threatSpawnedHooks        []ThreatSpawnedHook
+	threatClaimedHooks        []ThreatClaimedHook
+	allAircraftPositionsHooks []AllAircraftPositionsHook
 }
 
 func (s *Simulation) AssertInvariants() {
@@ -53,15 +55,17 @@ func NewSimulator(seed [32]byte, ts *TimeSim) *Simulation {
 			rnd:   rnd,
 			clock: ts,
 		},
-		constellation:            constellation,
-		fleet:                    NewFleet(),
-		dispatcher:               NewDispatcher(constellation, assigner),
-		threats:                  NewThreatSet(),
-		aircraftStateChangeHooks: make([]AircraftStateChangeHook, 0),
-		landingAssignmentHooks:   make([]LandingAssignmentHook, 0),
-		simulationStepHooks:      make([]SimulationStepHook, 0),
-		threatSpawnedHooks:       make([]ThreatSpawnedHook, 0),
-		threatClaimedHooks:       make([]ThreatClaimedHook, 0),
+		constellation:             constellation,
+		fleet:                     NewFleet(),
+		dispatcher:                NewDispatcher(constellation, assigner),
+		threats:                   NewThreatSet(),
+		lifecycle:                 DefaultLifecycleModel(),
+		aircraftStateChangeHooks:  make([]AircraftStateChangeHook, 0),
+		landingAssignmentHooks:    make([]LandingAssignmentHook, 0),
+		simulationStepHooks:       make([]SimulationStepHook, 0),
+		threatSpawnedHooks:        make([]ThreatSpawnedHook, 0),
+		threatClaimedHooks:        make([]ThreatClaimedHook, 0),
+		allAircraftPositionsHooks: make([]AllAircraftPositionsHook, 0),
 	}
 	sim.bindInternalHooks()
 	return sim
@@ -88,6 +92,9 @@ func (s *Simulation) Init(config *SimulationOptions) error {
 	if err := s.constellation.Init(s.env, opts); err != nil {
 		return err
 	}
+	if bases := s.constellation.Airbases(); len(bases) > 0 {
+		s.threatRegions = threatRegionsFromBases(bases)
+	}
 	if err := s.fleet.Init(s.env, fleetOpts); err != nil {
 		return err
 	}
@@ -100,29 +107,42 @@ func (s *Simulation) Step() {
 	s.stepTag = s.env.Rand().Uint64()
 	s.ts.Tick()
 
-	if s.fleet != nil {
-		if s.threats != nil {
-			regions := s.threatRegions
-			if len(regions) == 0 {
-				regions = threatRegionsAll()
-			}
-			if spawned, ok := s.threats.TrySpawnFromRegions(s.env, regions, s.threatOpts, s.ts.Ticks()); ok {
-				safeInvoke(s.threatSpawnedHooks, ThreatSpawnedEvent{Threat: spawned, Timestamp: s.ts.Now()})
-			}
-		}
-		ctx := FlightContext{
-			Clock:      s.ts,
-			Dispatcher: s.dispatcher,
-			Threats:    s.threats,
-			OnAircraftStateChange: func(event AircraftStateChangeEvent) {
-				safeInvoke(s.aircraftStateChangeHooks, event)
-			},
-			OnThreatClaimed: func(event ThreatClaimedEvent) {
-				safeInvoke(s.threatClaimedHooks, event)
-			},
-		}
-		s.fleet.StepWithContext(ctx)
+	regions := s.threatRegions
+	if len(regions) == 0 {
+		regions = threatRegionsAll()
 	}
+	if spawned, ok := s.threats.TrySpawnFromRegions(s.env, regions, s.threatOpts, s.ts.Ticks()); ok {
+		safeInvoke(s.threatSpawnedHooks, ThreatSpawnedEvent{Threat: spawned, Timestamp: s.ts.Now()})
+	}
+	ctx := FlightContext{
+		Clock:      s.ts,
+		Dispatcher: s.dispatcher,
+		Airbases:   s.constellation.Airbases(),
+		Lifecycle:  s.lifecycle,
+		Threats:    s.threats,
+		OnAircraftStateChange: func(event AircraftStateChangeEvent) {
+			safeInvoke(s.aircraftStateChangeHooks, event)
+		},
+		OnThreatClaimed: func(event ThreatClaimedEvent) {
+			safeInvoke(s.threatClaimedHooks, event)
+		},
+	}
+	s.fleet.StepWithContext(ctx)
+
+	aircrafts := s.fleet.Aircrafts()
+	snapshots := make([]AircraftPositionSnapshot, len(aircrafts))
+	for i, a := range aircrafts {
+		snapshots[i] = AircraftPositionSnapshot{
+			TailNumber: a.TailNumber,
+			Position:   a.Position,
+			State:      a.State.Name(),
+		}
+	}
+	safeInvoke(s.allAircraftPositionsHooks, AllAircraftPositionsEvent{
+		Tick:      s.ts.Ticks(),
+		Timestamp: s.ts.Now(),
+		Positions: snapshots,
+	})
 
 	safeInvoke(s.simulationStepHooks, SimulationStepEvent{Tick: s.ts.Ticks(), Timestamp: s.ts.Now()})
 }
@@ -151,20 +171,22 @@ func (s *Simulation) Clone() *Simulation {
 		dispatcher = NewDispatcher(constellation, &RoundRobinAssigner{})
 	}
 	clone := &Simulation{
-		ts:                       ts,
-		env:                      env,
-		stepTag:                  s.stepTag,
-		constellation:            constellation,
-		fleet:                    fleet,
-		dispatcher:               dispatcher,
-		threats:                  s.threats.Clone(),
-		threatOpts:               s.threatOpts,
-		threatRegions:            append([]threatRegion(nil), s.threatRegions...),
-		aircraftStateChangeHooks: append([]AircraftStateChangeHook(nil), s.aircraftStateChangeHooks...),
-		landingAssignmentHooks:   append([]LandingAssignmentHook(nil), s.landingAssignmentHooks...),
-		simulationStepHooks:      append([]SimulationStepHook(nil), s.simulationStepHooks...),
-		threatSpawnedHooks:       append([]ThreatSpawnedHook(nil), s.threatSpawnedHooks...),
-		threatClaimedHooks:       append([]ThreatClaimedHook(nil), s.threatClaimedHooks...),
+		ts:                        ts,
+		env:                       env,
+		stepTag:                   s.stepTag,
+		constellation:             constellation,
+		fleet:                     fleet,
+		dispatcher:                dispatcher,
+		threats:                   s.threats.Clone(),
+		threatOpts:                s.threatOpts,
+		threatRegions:             append([]threatRegion(nil), s.threatRegions...),
+		lifecycle:                 s.lifecycle,
+		aircraftStateChangeHooks:  append([]AircraftStateChangeHook(nil), s.aircraftStateChangeHooks...),
+		landingAssignmentHooks:    append([]LandingAssignmentHook(nil), s.landingAssignmentHooks...),
+		simulationStepHooks:       append([]SimulationStepHook(nil), s.simulationStepHooks...),
+		threatSpawnedHooks:        append([]ThreatSpawnedHook(nil), s.threatSpawnedHooks...),
+		threatClaimedHooks:        append([]ThreatClaimedHook(nil), s.threatClaimedHooks...),
+		allAircraftPositionsHooks: append([]AllAircraftPositionsHook(nil), s.allAircraftPositionsHooks...),
 	}
 	clone.bindInternalHooks()
 	return clone
@@ -233,6 +255,11 @@ func (s *Simulation) AddThreatSpawnedHook(hook ThreatSpawnedHook) {
 func (s *Simulation) AddThreatClaimedHook(hook ThreatClaimedHook) {
 	assert.NotNil(hook, "threat claimed hook")
 	s.threatClaimedHooks = append(s.threatClaimedHooks, hook)
+}
+
+func (s *Simulation) AddAllAircraftPositionsHook(hook AllAircraftPositionsHook) {
+	assert.NotNil(hook, "all aircraft positions hook")
+	s.allAircraftPositionsHooks = append(s.allAircraftPositionsHooks, hook)
 }
 
 func (s *Simulation) bindInternalHooks() {

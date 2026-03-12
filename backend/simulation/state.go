@@ -11,7 +11,7 @@ import (
 const (
 	EngagementRange        = 25.0
 	LandingRange           = 15.0
-	OrbitRadius            = 20.0
+	OrbitRadius            = 8.0
 	OrbitAngleDeltaPerTick = 0.314
 )
 

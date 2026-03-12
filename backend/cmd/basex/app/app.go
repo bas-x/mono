@@ -579,6 +579,10 @@ func (r *Runtime) refreshDynamicUI() {
 }
 
 func eventRequiresUIRefresh(event services.Event) bool {
+	switch event.(type) {
+	case services.AircraftStateChangeEvent, services.AllAircraftPositionsEvent:
+		return true
+	}
 	return false
 }
 

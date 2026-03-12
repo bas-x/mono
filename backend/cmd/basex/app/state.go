@@ -139,6 +139,7 @@ func (s *State) ApplyEvent(event services.Event) {
 			for i := range s.Aircraft {
 				if s.Aircraft[i].TailNumber == snap.TailNumber {
 					s.Aircraft[i].Position = snap.Position
+					s.Aircraft[i].State = snap.State
 					break
 				}
 			}

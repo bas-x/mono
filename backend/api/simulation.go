@@ -2,6 +2,7 @@ package api
 
 import (
 	"errors"
+	"math/rand/v2"
 	"net/http"
 	"strings"
 
@@ -108,6 +109,60 @@ func PostStartSimulation(logger *log.Logger, deps *ServerDependencies) echo.Hand
 	}
 }
 
+func PostPauseSimulation(logger *log.Logger, deps *ServerDependencies) echo.HandlerFunc {
+	type request struct {
+		SimulationID string `param:"simulationId"`
+	}
+
+	return func(c echo.Context) error {
+		req, err := bindAndValidate[request](c)
+		if err != nil {
+			return err
+		}
+
+		err = deps.SimulationService.PauseSimulation(req.SimulationID)
+		if err != nil {
+			if errors.Is(err, services.ErrBaseNotFound) || errors.Is(err, services.ErrSimulationNotFound) {
+				return echo.NewHTTPError(http.StatusNotFound, "simulation not found")
+			}
+			if errors.Is(err, services.ErrSimulationNotRunning) || errors.Is(err, services.ErrSimulationPaused) {
+				return echo.NewHTTPError(http.StatusConflict, err.Error())
+			}
+			logger.Error("pause simulation", "simulationId", req.SimulationID, "err", err)
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to pause simulation")
+		}
+
+		return c.NoContent(http.StatusAccepted)
+	}
+}
+
+func PostResumeSimulation(logger *log.Logger, deps *ServerDependencies) echo.HandlerFunc {
+	type request struct {
+		SimulationID string `param:"simulationId"`
+	}
+
+	return func(c echo.Context) error {
+		req, err := bindAndValidate[request](c)
+		if err != nil {
+			return err
+		}
+
+		err = deps.SimulationService.ResumeSimulation(req.SimulationID)
+		if err != nil {
+			if errors.Is(err, services.ErrBaseNotFound) || errors.Is(err, services.ErrSimulationNotFound) {
+				return echo.NewHTTPError(http.StatusNotFound, "simulation not found")
+			}
+			if errors.Is(err, services.ErrSimulationNotRunning) || errors.Is(err, services.ErrSimulationNotPaused) {
+				return echo.NewHTTPError(http.StatusConflict, err.Error())
+			}
+			logger.Error("resume simulation", "simulationId", req.SimulationID, "err", err)
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to resume simulation")
+		}
+
+		return c.NoContent(http.StatusAccepted)
+	}
+}
+
 func PostResetSimulation(logger *log.Logger, deps *ServerDependencies) echo.HandlerFunc {
 	type request struct {
 		SimulationID string `param:"simulationId"`
@@ -184,6 +239,33 @@ func GetSimulationAircrafts(logger *log.Logger, deps *ServerDependencies) echo.H
 	}
 }
 
+func GetSimulationThreats(logger *log.Logger, deps *ServerDependencies) echo.HandlerFunc {
+	type request struct {
+		SimulationID string `param:"simulationId"`
+	}
+	type response struct {
+		Threats []services.Threat `json:"threats"`
+	}
+
+	return func(c echo.Context) error {
+		req, err := bindAndValidate[request](c)
+		if err != nil {
+			return err
+		}
+
+		threats, err := deps.SimulationService.Threats(req.SimulationID)
+		if err != nil {
+			if errors.Is(err, services.ErrBaseNotFound) || errors.Is(err, services.ErrSimulationNotFound) {
+				return echo.NewHTTPError(http.StatusNotFound, "simulation not found")
+			}
+			logger.Error("list simulation threats", "simulationId", req.SimulationID, "err", err)
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to list threats")
+		}
+
+		return c.JSON(http.StatusOK, response{Threats: threats})
+	}
+}
+
 func parseSeed(raw string) ([32]byte, error) {
 	var out [32]byte
 	trimmed := strings.TrimSpace(raw)
@@ -207,12 +289,13 @@ func defaultBaseSimulationOptions() *simulation.SimulationOptions {
 			RegionProbability: prng.New(1, 1),
 		},
 		FleetOpts: simulation.FleetOptions{
-			AircraftMin: 4,
-			AircraftMax: 4,
-			NeedsMin:    1,
-			NeedsMax:    3,
-			SeverityMin: 60,
-			SeverityMax: 90,
+			AircraftMin:  4,
+			AircraftMax:  4,
+			NeedsMin:     1,
+			NeedsMax:     3,
+			SeverityMin:  60,
+			SeverityMax:  90,
+			StateFactory: func(_ *rand.Rand) simulation.AircraftState { return &simulation.ReadyState{} },
 		},
 		ThreatOpts: simulation.ThreatOptions{
 			SpawnChance: prng.New(1, 4),
