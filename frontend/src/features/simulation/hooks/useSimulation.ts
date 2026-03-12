@@ -158,7 +158,7 @@ export function useSimulation() {
     if (state.status !== 'running') return;
     try {
       await clients.simulation.resetSimulation(state.simulationId);
-      await refreshData();
+      setState({ status: 'idle' });
       toast.success('Simulation reset successfully', {
         action: {
           label: 'Undo',
@@ -169,7 +169,7 @@ export function useSimulation() {
       const errorMessage = extractErrorMessage(error);
       toast.error(errorMessage);
     }
-  }, [clients.simulation, state, refreshData]);
+  }, [clients.simulation, state]);
 
   return {
     state,
