@@ -59,7 +59,11 @@ func (r *BasicRunner) Run(ctx context.Context, s *Simulation) {
 	for r.active.Load() {
 		select {
 		case <-r.pause:
-			<-r.unpause
+			select {
+			case <-r.unpause:
+			case <-ctx.Done():
+				return
+			}
 		case <-ctx.Done():
 			return
 		default:
@@ -138,7 +142,11 @@ func (r *ControlledRunner) Run(ctx context.Context, s *Simulation) {
 	for r.active.Load() {
 		select {
 		case <-r.pause:
-			<-r.unpause
+			select {
+			case <-r.unpause:
+			case <-ctx.Done():
+				return
+			}
 		case <-ctx.Done():
 			return
 		default:
