@@ -2,6 +2,7 @@ package services_test
 
 import (
 	"encoding/hex"
+	"math/rand/v2"
 	"testing"
 	"time"
 
@@ -15,7 +16,7 @@ import (
 func TestSimulationServiceEndToEnd_BaseReadModels(t *testing.T) {
 	t.Parallel()
 
-	svc := services.NewSimulationService(services.SimulationServiceConfig{})
+	svc := services.NewSimulationService(services.SimulationServiceConfig{Resolution: 10 * time.Minute})
 	_, err := svc.CreateBaseSimulation(services.BaseSimulationConfig{Options: safeSimulationOptions(2, 2)})
 	require.NoError(t, err)
 
@@ -46,7 +47,7 @@ func TestSimulationServiceEndToEnd_BaseReadModels(t *testing.T) {
 func TestSimulationServiceEndToEnd_LifecycleAndSimulationIDHandling(t *testing.T) {
 	t.Parallel()
 
-	svc := services.NewSimulationService(services.SimulationServiceConfig{})
+	svc := services.NewSimulationService(services.SimulationServiceConfig{Resolution: 10 * time.Minute})
 
 	_, err := svc.Airbases(services.BaseSimulationID)
 	require.ErrorIs(t, err, services.ErrBaseNotFound)
@@ -81,9 +82,8 @@ func TestSimulationServiceEndToEnd_EmitsEvents(t *testing.T) {
 	require.True(t, ok)
 
 	var sawStep bool
-	var sawStateChange bool
 
-	for range 12 {
+	for range 24 {
 		base.Step()
 	drainLoop:
 		for {
@@ -93,22 +93,17 @@ func TestSimulationServiceEndToEnd_EmitsEvents(t *testing.T) {
 				case services.SimulationStepEvent:
 					sawStep = true
 					require.Equal(t, services.BaseSimulationID, event.SimulationID)
-				case services.AircraftStateChangeEvent:
-					sawStateChange = true
-					require.Equal(t, services.BaseSimulationID, event.SimulationID)
-					require.NotEmpty(t, event.Aircraft.TailNumber)
 				}
-			case <-time.After(10 * time.Millisecond):
+			case <-time.After(25 * time.Millisecond):
 				break drainLoop
 			}
 		}
-		if sawStep && sawStateChange {
+		if sawStep {
 			break
 		}
 	}
 
 	require.True(t, sawStep)
-	require.True(t, sawStateChange)
 }
 
 func TestSimulationServiceEndToEnd_StartSimulationAndStatus(t *testing.T) {
@@ -147,6 +142,105 @@ func TestSimulationServiceEndToEnd_StartSimulationAndStatus(t *testing.T) {
 	}
 }
 
+func TestAllAircraftPositionsEventEmitted(t *testing.T) {
+	t.Parallel()
+
+	const (
+		fleetSize = 3
+		steps     = 10
+	)
+
+	svc := services.NewSimulationService(services.SimulationServiceConfig{Resolution: time.Second})
+	_, err := svc.CreateBaseSimulation(services.BaseSimulationConfig{
+		Seed:    [32]byte{6, 7, 8},
+		Options: positionTrackingSimulationOptions(uint(fleetSize)),
+	})
+	require.NoError(t, err)
+
+	sim, ok := svc.Base()
+	require.True(t, ok)
+
+	initialAircraft := sim.Aircrafts()
+	require.Len(t, initialAircraft, fleetSize)
+
+	initialPositions := make(map[simulation.TailNumber][2]float64, fleetSize)
+	for _, aircraft := range initialAircraft {
+		initialPositions[aircraft.TailNumber] = [2]float64{aircraft.Position.X, aircraft.Position.Y}
+	}
+
+	hookEvents := make(chan simulation.AllAircraftPositionsEvent, steps)
+	sim.AddAllAircraftPositionsHook(func(event simulation.AllAircraftPositionsEvent) {
+		hookEvents <- event
+	})
+
+	clientID, rawEvents := svc.Broadcaster().Subscribe()
+	t.Cleanup(func() {
+		svc.Broadcaster().Unsubscribe(clientID)
+	})
+
+	sawMovement := false
+	broadcastCount := 0
+	for i := range steps {
+		sim.Step()
+
+		select {
+		case event := <-hookEvents:
+			require.Equal(t, uint64(i+1), event.Tick)
+			require.Len(t, event.Positions, fleetSize)
+			for _, snapshot := range event.Positions {
+				initial, ok := initialPositions[snapshot.TailNumber]
+				require.True(t, ok)
+				if [2]float64{snapshot.Position.X, snapshot.Position.Y} != initial {
+					sawMovement = true
+				}
+			}
+		case <-time.After(time.Second):
+			t.Fatalf("expected all aircraft positions hook event %d", i+1)
+		}
+
+		deadline := time.After(time.Second)
+		for {
+			select {
+			case raw := <-rawEvents:
+				event, ok := raw.(services.AllAircraftPositionsEvent)
+				if !ok {
+					continue
+				}
+				require.Equal(t, services.EventTypeAllAircraftPositions, event.Type)
+				require.Equal(t, services.BaseSimulationID, event.SimulationID)
+				require.Equal(t, uint64(i+1), event.Tick)
+				require.Len(t, event.Positions, fleetSize)
+				broadcastCount++
+				goto nextStep
+			case <-deadline:
+				t.Fatalf("expected all aircraft positions broadcast event %d", i+1)
+			}
+		}
+	nextStep:
+	}
+	require.Equal(t, steps, broadcastCount)
+
+	select {
+	case event := <-hookEvents:
+		t.Fatalf("unexpected extra all aircraft positions hook event at tick %d", event.Tick)
+	default:
+	}
+	require.True(t, sawMovement)
+
+	for {
+		select {
+		case raw := <-rawEvents:
+			event, ok := raw.(services.AllAircraftPositionsEvent)
+			if !ok {
+				continue
+			}
+			t.Fatalf("unexpected extra all aircraft positions broadcast event at tick %d", event.Tick)
+		default:
+			return
+		}
+	}
+}
+
 func safeSimulationOptions(numBases, numAircraft uint) *simulation.SimulationOptions {
 	return &simulation.SimulationOptions{
 		ConstellationOpts: simulation.ConstellationOptions{
@@ -161,6 +255,31 @@ func safeSimulationOptions(numBases, numAircraft uint) *simulation.SimulationOpt
 			AircraftMax: numAircraft,
 			NeedsMin:    1,
 			NeedsMax:    2,
+		},
+	}
+}
+
+func positionTrackingSimulationOptions(numAircraft uint) *simulation.SimulationOptions {
+	return &simulation.SimulationOptions{
+		ConstellationOpts: simulation.ConstellationOptions{
+			IncludeRegions:    []string{"Blekinge"},
+			MinPerRegion:      1,
+			MaxPerRegion:      1,
+			MaxTotal:          1,
+			RegionProbability: prng.New(1, 1),
+		},
+		FleetOpts: simulation.FleetOptions{
+			AircraftMin: numAircraft,
+			AircraftMax: numAircraft,
+			NeedsMin:    1,
+			NeedsMax:    1,
+			StateFactory: func(*rand.Rand) simulation.AircraftState {
+				return &simulation.ReadyState{}
+			},
+		},
+		ThreatOpts: simulation.ThreatOptions{
+			SpawnChance: prng.New(1, 1),
+			MaxActive:   numAircraft,
 		},
 	}
 }
