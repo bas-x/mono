@@ -177,6 +177,7 @@ func TestAircraftStateTransitions(t *testing.T) {
 	t.Parallel()
 	ts := New(time.Second, WithEpoch(time.Unix(0, 1)))
 	sim := NewSimulator([32]byte{1}, ts)
+	sim.lifecycle = testLifecycleModel()
 
 	sim.constellation.airbases = []Airbase{
 		{ID: BaseID{0, 0, 0, 0, 0, 0, 0, 1}},
@@ -208,21 +209,21 @@ func TestAircraftStateTransitions(t *testing.T) {
 
 	_, name := current()
 	require.Equal(t, "Outbound", name)
-	advance(stepsFor(outboundDuration))
+	advance(stepsFor(sim.lifecycle.Durations.Outbound))
 	_, name = current()
 	require.Equal(t, "Engaged", name)
-	advance(stepsFor(engagedDuration))
+	advance(stepsFor(sim.lifecycle.Durations.Engaged))
 	ac, name := current()
 	require.Equal(t, "Inbound", name)
-	advance(stepsFor(inboundDecisionDelay))
+	advance(stepsFor(sim.lifecycle.Durations.InboundDecision))
 	ac, name = current()
 	require.Equal(t, "Committed", name)
 	require.True(t, ac.HasAssignment)
 	require.Equal(t, BaseID{0, 0, 0, 0, 0, 0, 0, 1}, ac.AssignedBase)
-	advance(stepsFor(commitApproachDuration))
+	advance(stepsFor(sim.lifecycle.Durations.CommitApproach))
 	_, name = current()
 	require.Equal(t, "Servicing", name)
-	advance(stepsFor(servicingDuration))
+	advance(stepsFor(sim.lifecycle.Durations.Servicing))
 	_, name = current()
 	require.Equal(t, "Ready", name)
 
@@ -234,6 +235,7 @@ func TestSimulationLandingOverrideFlow(t *testing.T) {
 	t.Parallel()
 	ts := New(time.Second, WithEpoch(time.Unix(0, 1)))
 	sim := NewSimulator([32]byte{2}, ts)
+	sim.lifecycle = testLifecycleModel()
 
 	baseA := BaseID{0, 0, 0, 0, 0, 0, 0, 1}
 	baseB := BaseID{0, 0, 0, 0, 0, 0, 0, 2}
@@ -258,8 +260,8 @@ func TestSimulationLandingOverrideFlow(t *testing.T) {
 		}
 	}
 
-	advance(stepsFor(outboundDuration))
-	advance(stepsFor(engagedDuration))
+	advance(stepsFor(sim.lifecycle.Durations.Outbound))
+	advance(stepsFor(sim.lifecycle.Durations.Engaged))
 
 	_, ok := sim.Dispatcher().AssignmentFor(tailA)
 	require.False(t, ok)
@@ -277,7 +279,7 @@ func TestSimulationLandingOverrideFlow(t *testing.T) {
 	require.Equal(t, baseB, override.Base)
 	require.Equal(t, AssignmentSourceHuman, override.Source)
 
-	advance(stepsFor(inboundDecisionDelay))
+	advance(stepsFor(sim.lifecycle.Durations.InboundDecision))
 
 	acs := sim.Aircrafts()
 	require.Len(t, acs, 2)
@@ -286,8 +288,8 @@ func TestSimulationLandingOverrideFlow(t *testing.T) {
 	require.True(t, acs[1].HasAssignment)
 	require.NotEqual(t, BaseID{}, acs[1].AssignedBase)
 
-	advance(stepsFor(commitApproachDuration))
-	advance(stepsFor(servicingDuration))
+	advance(stepsFor(sim.lifecycle.Durations.CommitApproach))
+	advance(stepsFor(sim.lifecycle.Durations.Servicing))
 
 	acs = sim.Aircrafts()
 	require.Equal(t, "Ready", acs[0].State.Name())
@@ -304,6 +306,7 @@ func TestSimulation_NeedsDrivenStateTransitions(t *testing.T) {
 
 	ts := New(time.Second, WithEpoch(time.Unix(0, 1)))
 	sim := NewSimulator([32]byte{3}, ts)
+	sim.lifecycle = testLifecycleModel()
 
 	sim.constellation.airbases = []Airbase{{ID: BaseID{0, 0, 0, 0, 0, 0, 0, 1}}}
 	sim.dispatcher = NewDispatcher(sim.constellation, &RoundRobinAssigner{})
@@ -343,12 +346,12 @@ func TestSimulation_NeedsDrivenStateTransitions(t *testing.T) {
 	require.Equal(t, 80, ac.Needs[0].Severity)
 	require.Equal(t, 70, ac.Needs[1].Severity)
 
-	advance(int(inboundDecisionDelay/ts.Resolution) + 1)
+	advance(int(sim.lifecycle.Durations.InboundDecision/ts.Resolution) + 1)
 	ac = current()
 	require.Equal(t, "Committed", ac.State.Name())
 	require.True(t, ac.HasAssignment)
 
-	advance(int(commitApproachDuration/ts.Resolution) + 1)
+	advance(1)
 	ac = current()
 	require.Equal(t, "Servicing", ac.State.Name())
 	servicingStartFuel := ac.Needs[0].Severity
@@ -368,7 +371,7 @@ func TestSimulation_NeedsDrivenStateTransitions(t *testing.T) {
 	require.Less(t, ac.Needs[0].Severity, servicingStartFuel)
 	require.Less(t, ac.Needs[1].Severity, servicingStartMunitions)
 
-	advance(int(servicingDuration/ts.Resolution) + 1)
+	advance(int(sim.lifecycle.Durations.Servicing/ts.Resolution) + 1)
 	ac = current()
 	require.Equal(t, "Ready", ac.State.Name())
 	for _, need := range ac.Needs {

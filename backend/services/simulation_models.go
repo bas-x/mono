@@ -33,6 +33,7 @@ type Aircraft struct {
 	Needs      []Need  `json:"needs"`
 	State      string  `json:"state"`
 	AssignedTo *string `json:"assignedTo,omitempty"`
+	Position   Point   `json:"position"`
 }
 
 type Threat struct {
@@ -41,6 +42,12 @@ type Threat struct {
 	Region      string    `json:"region"`
 	CreatedAt   time.Time `json:"createdAt"`
 	CreatedTick uint64    `json:"createdTick"`
+}
+
+type AircraftPositionSnapshot struct {
+	TailNumber string `json:"tailNumber"`
+	Position   Point  `json:"position"`
+	State      string `json:"state"`
 }
 
 func mapAirbase(input simulation.Airbase) Airbase {
@@ -81,6 +88,7 @@ func mapAircraft(input simulation.Aircraft) Aircraft {
 		Needs:      needs,
 		State:      input.State.Name(),
 		AssignedTo: assignedTo,
+		Position:   Point{X: input.Position.X, Y: input.Position.Y},
 	}
 }
 

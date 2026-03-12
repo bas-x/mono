@@ -33,11 +33,31 @@
   "simulations": [
     {
       "id": "base",
-      "running": true
+      "running": true,
+      "paused": false,
+      "tick": 42,
+      "timestamp": "2026-03-12T03:15:05Z"
     }
   ]
 }
 ```
+
+### Get a simulation
+
+- **Method**: `GET`
+- **Path**: `/simulations/:simulationId`
+- **Response** `200`:
+
+```json
+{
+  "id": "base",
+  "running": true,
+  "paused": false,
+  "tick": 42,
+  "timestamp": "2026-03-12T03:15:05Z"
+}
+```
+- **Response** `404`: simulation not found
 
 ### Start a simulation
 
@@ -46,6 +66,29 @@
 - **Response** `202`: no body
 - **Response** `404`: simulation not found
 - **Response** `409`: simulation already running
+
+### Pause a simulation
+
+- **Method**: `POST`
+- **Path**: `/simulations/:simulationId/pause`
+- **Response** `202`: no body
+- **Response** `404`: simulation not found
+- **Response** `409`: simulation not running or already paused
+
+### Resume a simulation
+
+- **Method**: `POST`
+- **Path**: `/simulations/:simulationId/resume`
+- **Response** `202`: no body
+- **Response** `404`: simulation not found
+- **Response** `409`: simulation not running or not paused
+
+### Reset a simulation
+
+- **Method**: `POST`
+- **Path**: `/simulations/:simulationId/reset`
+- **Response** `202`: no body
+- **Response** `404`: simulation not found
 
 ### List airbases for a simulation
 
@@ -93,6 +136,27 @@
 }
 ```
 
+### List threats for a simulation
+
+- **Method**: `GET`
+- **Path**: `/simulations/:simulationId/threats`
+- **Response** `200`:
+
+```json
+{
+  "threats": [
+    {
+      "id": "3a5f...",
+      "regionId": "SE-K",
+      "region": "Blekinge",
+      "createdAt": "2026-03-12T03:15:05Z",
+      "createdTick": 42
+    }
+  ]
+}
+```
+- **Response** `404`: simulation not found
+
 ### Stream simulation events
 
 - **Method**: `GET`
@@ -138,6 +202,37 @@
   "baseId": "3a5f...",
   "source": "algorithm",
   "timestamp": "2026-03-11T18:00:08Z"
+}
+```
+
+```json
+{
+  "type": "threat_spawned",
+  "simulationId": "base",
+  "threat": {
+    "id": "3a5f...",
+    "regionId": "SE-K",
+    "region": "Blekinge",
+    "createdAt": "2026-03-12T03:15:05Z",
+    "createdTick": 42
+  },
+  "timestamp": "2026-03-12T03:15:05Z"
+}
+```
+
+```json
+{
+  "type": "threat_claimed",
+  "simulationId": "base",
+  "threat": {
+    "id": "3a5f...",
+    "regionId": "SE-K",
+    "region": "Blekinge",
+    "createdAt": "2026-03-12T03:15:05Z",
+    "createdTick": 42
+  },
+  "tailNumber": "9b2e...",
+  "timestamp": "2026-03-12T03:15:10Z"
 }
 ```
 

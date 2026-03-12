@@ -64,6 +64,7 @@ func TestSimulationHooks_StepEvent(t *testing.T) {
 
 	ts := New(time.Second, WithEpoch(time.Unix(0, 1)))
 	sim := NewSimulator([32]byte{1}, ts)
+	sim.lifecycle = testLifecycleModel()
 	steps := make(chan SimulationStepEvent, 1)
 	sim.AddSimulationStepHook(func(event SimulationStepEvent) {
 		steps <- event
@@ -85,6 +86,7 @@ func TestSimulationHooks_ThreatEvents(t *testing.T) {
 
 	ts := New(time.Second, WithEpoch(time.Unix(0, 1)))
 	sim := NewSimulator([32]byte{2}, ts)
+	sim.lifecycle = testLifecycleModel()
 	sim.constellation.airbases = []Airbase{{ID: BaseID{0, 0, 0, 0, 0, 0, 0, 1}, RegionID: "SE-K", Region: "Blekinge"}}
 	sim.dispatcher = NewDispatcher(sim.constellation, &RoundRobinAssigner{})
 	sim.bindInternalHooks()
@@ -116,11 +118,60 @@ func TestSimulationHooks_ThreatEvents(t *testing.T) {
 	}
 }
 
+func TestAllAircraftPositionsHook(t *testing.T) {
+	t.Parallel()
+
+	ts := New(time.Second, WithEpoch(time.Unix(0, 1)))
+	sim := NewSimulator([32]byte{42}, ts)
+	sim.lifecycle = testLifecycleModel()
+	sim.constellation.airbases = []Airbase{{ID: BaseID{0, 0, 0, 0, 0, 0, 0, 1}}}
+	sim.dispatcher = NewDispatcher(sim.constellation, &RoundRobinAssigner{})
+	sim.bindInternalHooks()
+
+	// Create a fleet with 2 aircraft
+	sim.fleet = &Fleet{aircrafts: []Aircraft{
+		NewAircraft(TailNumber{0, 0, 0, 0, 0, 0, 0, 1}, &ReadyState{}, nil),
+		NewAircraft(TailNumber{0, 0, 0, 0, 0, 0, 0, 2}, &ReadyState{}, nil),
+	}}
+
+	positions := make(chan AllAircraftPositionsEvent, 5)
+	sim.AddAllAircraftPositionsHook(func(event AllAircraftPositionsEvent) {
+		positions <- event
+	})
+
+	// Step 5 times
+	for range 5 {
+		sim.Step()
+	}
+
+	// Verify hook was called exactly 5 times
+	for i := 0; i < 5; i++ {
+		select {
+		case event := <-positions:
+			require.Equal(t, uint64(i+1), event.Tick)
+			require.Equal(t, 2, len(event.Positions))
+			require.Equal(t, TailNumber{0, 0, 0, 0, 0, 0, 0, 1}, event.Positions[0].TailNumber)
+			require.Equal(t, TailNumber{0, 0, 0, 0, 0, 0, 0, 2}, event.Positions[1].TailNumber)
+		case <-time.After(time.Second):
+			t.Fatalf("expected all aircraft positions event %d", i+1)
+		}
+	}
+
+	// Verify no extra events
+	select {
+	case <-positions:
+		t.Fatal("unexpected extra event")
+	case <-time.After(100 * time.Millisecond):
+		// Expected: no more events
+	}
+}
+
 func newHookTestSimulation(t *testing.T) *Simulation {
 	t.Helper()
 
 	ts := New(time.Second, WithEpoch(time.Unix(0, 1)))
 	sim := NewSimulator([32]byte{1}, ts)
+	sim.lifecycle = testLifecycleModel()
 	sim.constellation.airbases = []Airbase{{ID: BaseID{0, 0, 0, 0, 0, 0, 0, 1}}}
 	sim.dispatcher = NewDispatcher(sim.constellation, &RoundRobinAssigner{})
 	sim.bindInternalHooks()

@@ -58,7 +58,7 @@ type SimulationInfo struct {
 
 func NewSimulationService(cfg SimulationServiceConfig) *SimulationService {
 	if cfg.Resolution <= 0 {
-		cfg.Resolution = 500 * time.Millisecond
+		cfg.Resolution = 5 * time.Second
 	}
 	if cfg.RunnerConfig.TicksPerSecond == 0 {
 		cfg.RunnerConfig.TicksPerSecond = 64
@@ -364,6 +364,24 @@ func (s *SimulationService) registerHooks(simulationID string, sim *simulation.S
 			Threat:       mapThreat(event.Threat),
 			TailNumber:   hex.EncodeToString(event.TailNumber[:]),
 			Timestamp:    event.Timestamp,
+		})
+	})
+
+	sim.AddAllAircraftPositionsHook(func(event simulation.AllAircraftPositionsEvent) {
+		snapshots := make([]AircraftPositionSnapshot, len(event.Positions))
+		for i, snap := range event.Positions {
+			snapshots[i] = AircraftPositionSnapshot{
+				TailNumber: hex.EncodeToString(snap.TailNumber[:]),
+				Position:   Point{X: snap.Position.X, Y: snap.Position.Y},
+				State:      snap.State,
+			}
+		}
+		s.broadcaster.Emit(AllAircraftPositionsEvent{
+			Type:         EventTypeAllAircraftPositions,
+			SimulationID: simulationID,
+			Tick:         event.Tick,
+			Timestamp:    event.Timestamp,
+			Positions:    snapshots,
 		})
 	})
 }

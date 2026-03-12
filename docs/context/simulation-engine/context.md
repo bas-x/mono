@@ -10,6 +10,14 @@
 - No wall-clock dependencies in simulation decisions.
 - Deterministic ordering is required for same-time events (stable tie-break rules).
 
+## Current Aircraft State Progression
+- `simulation/state.go` applies deterministic per-step aircraft movement using `ctx.Clock.Resolution` as the movement interval.
+- Ready aircraft cache the claimed threat and compute a deterministic target point from the centroid of the first polygon in the named threat region.
+- Outbound aircraft move toward the cached threat centroid and may transition to `Engaged` either by elapsed duration or by reaching `EngagementRange` proximity.
+- Engaged aircraft orbit the cached threat centroid with fixed `OrbitRadius` and `OrbitAngleDeltaPerTick`; no randomness is used in orbit updates.
+- Inbound and Committed aircraft move toward the assigned airbase location; Committed transitions to `Servicing` primarily by `LandingRange` proximity with the existing duration-based fallback retained.
+- Servicing snaps the aircraft position to the assigned base on entry and does not continue moving the aircraft afterward.
+
 ## Resource Locking
 - Tasks require explicit resource reservation before start.
 - Resource lock lifetime is defined by task start/end events.

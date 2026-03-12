@@ -52,6 +52,9 @@ var Regions []Region
 // BoundsData provides the parsed contents of bounds.json.
 var BoundsData BoundsFile
 
+// RegionNames provides all region names from bounds.json.
+var RegionNames []string
+
 // RegionBoundsByName maps a region name to its bounding box entry.
 var RegionBoundsByName map[string]RegionBounds
 
@@ -65,7 +68,9 @@ func init() {
 	}
 
 	RegionBoundsByName = make(map[string]RegionBounds, len(BoundsData.Regions))
+	RegionNames = make([]string, 0, len(BoundsData.Regions))
 	for _, entry := range BoundsData.Regions {
+		RegionNames = append(RegionNames, entry.Name)
 		RegionBoundsByName[entry.Name] = entry
 	}
 }

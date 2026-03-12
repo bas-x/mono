@@ -2,6 +2,7 @@ package simulation
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -62,15 +63,30 @@ func TestNeed_Restore(t *testing.T) {
 
 func TestNeedsThresholdReached(t *testing.T) {
 	t.Parallel()
+	threshold := testLifecycleModel().ReturnThreshold
 
-	require.False(t, NeedsThresholdReached(nil, needsReturnThreshold))
-	require.False(t, NeedsThresholdReached([]Need{}, needsReturnThreshold))
+	require.False(t, NeedsThresholdReached(nil, threshold))
+	require.False(t, NeedsThresholdReached([]Need{}, threshold))
 	require.False(t, NeedsThresholdReached([]Need{
 		{Type: NeedFuel, Severity: 79, RequiredCapability: NeedFuel},
 		{Type: NeedMunitions, Severity: 12, RequiredCapability: NeedMunitions},
-	}, needsReturnThreshold))
+	}, threshold))
 	require.True(t, NeedsThresholdReached([]Need{
 		{Type: NeedFuel, Severity: 80, RequiredCapability: NeedFuel},
 		{Type: NeedMunitions, Severity: 12, RequiredCapability: NeedMunitions},
-	}, needsReturnThreshold))
+	}, threshold))
+}
+
+func TestNeedProgressionDeterministic(t *testing.T) {
+	t.Parallel()
+
+	lifecycle := testLifecycleModel()
+	a := NewAircraft(TailNumber{1, 2, 3}, &OutboundState{}, []Need{{Type: NeedFuel, Severity: 20, RequiredCapability: NeedFuel}})
+	b := NewAircraft(TailNumber{1, 2, 3}, &OutboundState{}, []Need{{Type: NeedFuel, Severity: 20, RequiredCapability: NeedFuel}})
+
+	a.ApplyNeedPhase(30*time.Second, NeedPhaseOutbound, lifecycle, nil)
+	b.ApplyNeedPhase(30*time.Second, NeedPhaseOutbound, lifecycle, nil)
+
+	require.Equal(t, a.Needs, b.Needs)
+	require.Equal(t, a.NeedRemainders, b.NeedRemainders)
 }

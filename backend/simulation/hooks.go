@@ -1,6 +1,10 @@
 package simulation
 
-import "time"
+import (
+	"time"
+
+	"github.com/bas-x/basex/geometry"
+)
 
 type AircraftStateChangeEvent struct {
 	TailNumber TailNumber
@@ -53,3 +57,20 @@ func safeInvoke[T any, H ~func(T)](hooks []H, event T) {
 		}(hook)
 	}
 }
+
+// AircraftPositionSnapshot captures the position of a single aircraft at a point in time.
+type AircraftPositionSnapshot struct {
+	TailNumber TailNumber
+	Position   geometry.Point
+	State      string
+}
+
+// AllAircraftPositionsEvent is emitted every simulation tick with the current
+// position of every aircraft in the fleet.
+type AllAircraftPositionsEvent struct {
+	Tick      uint64
+	Timestamp time.Time
+	Positions []AircraftPositionSnapshot
+}
+
+type AllAircraftPositionsHook func(AllAircraftPositionsEvent)

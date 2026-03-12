@@ -12,7 +12,7 @@ import (
 func TestSimulationEndToEndLandingFlow(t *testing.T) {
 	t.Parallel()
 
-	ts := sim.New(500*time.Millisecond, sim.WithEpoch(time.Unix(0, 1)))
+	ts := sim.New(10*time.Minute, sim.WithEpoch(time.Unix(0, 1)))
 	simulation := sim.NewSimulator([32]byte{4}, ts)
 
 	opts := &sim.SimulationOptions{

@@ -162,10 +162,11 @@ func (c *Constellation) generateAirbases(env *Environment, opts ConstellationOpt
 				continue
 			}
 			airbase := Airbase{
-				ID:       makeBaseID(rng.Uint64()),
-				Location: pt,
-				RegionID: region.ID,
-				Region:   region.Name,
+				ID:           makeBaseID(rng.Uint64()),
+				Location:     pt,
+				RegionID:     region.ID,
+				Region:       region.Name,
+				Capabilities: defaultAirbaseCapabilities(),
 			}
 			if opts.MetadataFactory != nil {
 				airbase.Metadata = opts.MetadataFactory(region)

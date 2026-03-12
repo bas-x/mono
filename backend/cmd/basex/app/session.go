@@ -2,7 +2,9 @@ package app
 
 import (
 	"errors"
+	"slices"
 
+	"github.com/bas-x/basex/assets"
 	"github.com/bas-x/basex/prng"
 	"github.com/bas-x/basex/services"
 	"github.com/bas-x/basex/simulation"
@@ -109,19 +111,19 @@ func (s *Session) resubscribe() {
 func defaultSimulationOptions() *simulation.SimulationOptions {
 	return &simulation.SimulationOptions{
 		ConstellationOpts: simulation.ConstellationOptions{
-			IncludeRegions:    []string{"Blekinge", "Gotland"},
+			IncludeRegions:    slices.Clone(assets.RegionNames),
 			MinPerRegion:      1,
 			MaxPerRegion:      3,
 			MaxTotal:          15,
 			RegionProbability: prng.New(1, 2),
 		},
 		FleetOpts: simulation.FleetOptions{
-			AircraftMin: 4,
-			AircraftMax: 4,
+			AircraftMin: 6,
+			AircraftMax: 40,
 			NeedsMin:    1,
-			NeedsMax:    3,
-			SeverityMin: 60,
-			SeverityMax: 90,
+			NeedsMax:    uint(len(simulation.AllNeedTypes)),
+			SeverityMin: 0,
+			SeverityMax: 40,
 		},
 		ThreatOpts: simulation.ThreatOptions{
 			SpawnChance: prng.New(1, 4),

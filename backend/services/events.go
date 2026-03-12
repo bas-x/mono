@@ -3,11 +3,12 @@ package services
 import "time"
 
 const (
-	EventTypeAircraftStateChange = "aircraft_state_change"
-	EventTypeLandingAssignment   = "landing_assignment"
-	EventTypeSimulationStep      = "simulation_step"
-	EventTypeThreatSpawned       = "threat_spawned"
-	EventTypeThreatClaimed       = "threat_claimed"
+	EventTypeAircraftStateChange  = "aircraft_state_change"
+	EventTypeLandingAssignment    = "landing_assignment"
+	EventTypeSimulationStep       = "simulation_step"
+	EventTypeThreatSpawned        = "threat_spawned"
+	EventTypeThreatClaimed        = "threat_claimed"
+	EventTypeAllAircraftPositions = "all_aircraft_positions"
 )
 
 type Event interface {
@@ -93,5 +94,21 @@ func (e ThreatClaimedEvent) EventType() string {
 }
 
 func (e ThreatClaimedEvent) EventSimulationID() string {
+	return e.SimulationID
+}
+
+type AllAircraftPositionsEvent struct {
+	Type         string                     `json:"type"`
+	SimulationID string                     `json:"simulationId"`
+	Tick         uint64                     `json:"tick"`
+	Timestamp    time.Time                  `json:"timestamp"`
+	Positions    []AircraftPositionSnapshot `json:"positions"`
+}
+
+func (e AllAircraftPositionsEvent) EventType() string {
+	return e.Type
+}
+
+func (e AllAircraftPositionsEvent) EventSimulationID() string {
 	return e.SimulationID
 }

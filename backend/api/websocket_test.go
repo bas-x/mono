@@ -26,6 +26,7 @@ func TestSimulationEventsWebSocketEndToEnd(t *testing.T) {
 	logger := log.New(io.Discard)
 	config := viper.New()
 	deps := initDeps(config)
+	deps.SimulationService = services.NewSimulationService(services.SimulationServiceConfig{Resolution: 10 * time.Minute})
 	server := newServer(logger, config, deps)
 	httpServer := httptest.NewServer(server.Handler)
 	defer httpServer.Close()
@@ -169,11 +170,93 @@ func TestGetSimulationEndpoint(t *testing.T) {
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&payload))
 	require.Equal(t, services.BaseSimulationID, payload.ID)
 	require.False(t, payload.Running)
+	require.False(t, payload.Paused)
+	require.Zero(t, payload.Tick)
+	require.False(t, payload.Timestamp.IsZero())
 
 	resp, err = http.Get(httpServer.URL + "/simulations/branch-a")
 	require.NoError(t, err)
 	defer resp.Body.Close()
 	require.Equal(t, http.StatusNotFound, resp.StatusCode)
+}
+
+func TestPauseResumeAndThreatEndpoints(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	deps.SimulationService = services.NewSimulationService(services.SimulationServiceConfig{
+		RunnerConfig: simulation.ControlledRunnerConfig{TicksPerSecond: 128},
+	})
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	_, err := deps.SimulationService.CreateBaseSimulation(services.BaseSimulationConfig{Options: &simulation.SimulationOptions{
+		ConstellationOpts: simulation.ConstellationOptions{
+			IncludeRegions:    []string{"Blekinge"},
+			MinPerRegion:      1,
+			MaxPerRegion:      1,
+			MaxTotal:          1,
+			RegionProbability: prng.New(1, 1),
+		},
+		ThreatOpts: simulation.ThreatOptions{SpawnChance: prng.New(1, 1), MaxActive: 2},
+	}})
+	require.NoError(t, err)
+
+	req, err := http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/start", nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	resp.Body.Close()
+	require.Equal(t, http.StatusAccepted, resp.StatusCode)
+
+	req, err = http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/pause", nil)
+	require.NoError(t, err)
+	resp, err = http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	resp.Body.Close()
+	require.Equal(t, http.StatusAccepted, resp.StatusCode)
+
+	resp, err = http.Get(httpServer.URL + "/simulations/base")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var info services.SimulationInfo
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&info))
+	require.True(t, info.Running)
+	require.True(t, info.Paused)
+
+	req, err = http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/resume", nil)
+	require.NoError(t, err)
+	resp, err = http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	resp.Body.Close()
+	require.Equal(t, http.StatusAccepted, resp.StatusCode)
+
+	req, err = http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/resume", nil)
+	require.NoError(t, err)
+	resp, err = http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	resp.Body.Close()
+	require.Equal(t, http.StatusConflict, resp.StatusCode)
+
+	base, ok := deps.SimulationService.Base()
+	require.True(t, ok)
+	base.Step()
+
+	resp, err = http.Get(httpServer.URL + "/simulations/base/threats")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	var threatsPayload struct {
+		Threats []services.Threat `json:"threats"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&threatsPayload))
+	require.NotEmpty(t, threatsPayload.Threats)
+	require.NotEmpty(t, threatsPayload.Threats[0].Region)
+	require.NotEmpty(t, threatsPayload.Threats[0].RegionID)
 }
 
 func TestCreateBaseSimulationProvidesGeneratedAircrafts(t *testing.T) {
