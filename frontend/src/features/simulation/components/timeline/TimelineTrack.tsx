@@ -90,69 +90,71 @@ export function TimelineTrack({ events, currentTick, maxTick, playbackTick, onSc
   const progressPercent = getPositionPercent(activeTick);
 
   return (
-    <div 
-      ref={scrollRef}
-      className="relative flex h-24 w-full flex-col justify-center overflow-x-auto overflow-y-visible [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
-    >
-      <div className="min-w-full px-4" style={{ width: `${zoom * 100}%` }}>
-        <div 
-          ref={trackRef}
-          className="relative h-2 w-full cursor-pointer rounded-full bg-white/10 touch-none"
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
-        >
+    <>
+      <div 
+        ref={scrollRef}
+        className="relative flex h-24 w-full flex-col justify-center overflow-x-auto overflow-y-visible [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+      >
+        <div className="min-w-full px-4" style={{ width: `${zoom * 100}%` }}>
           <div 
-            className="absolute left-0 top-0 h-full rounded-full bg-amber-500/80 transition-all duration-200"
-            style={{ width: `${progressPercent}%` }}
-          />
+            ref={trackRef}
+            className="relative h-2 w-full cursor-pointer rounded-full bg-white/10 touch-none"
+            onPointerDown={handlePointerDown}
+            onPointerMove={handlePointerMove}
+            onPointerUp={handlePointerUp}
+            onPointerCancel={handlePointerUp}
+          >
+            <div 
+              className="absolute left-0 top-0 h-full rounded-full bg-amber-500/80 transition-all duration-200"
+              style={{ width: `${progressPercent}%` }}
+            />
 
-          <div className="absolute left-0 -top-6 text-[8px] font-bold uppercase tracking-widest text-white/50">
-            Start
-          </div>
-          
-          <div className="absolute right-0 -top-6 text-[8px] font-bold uppercase tracking-widest text-white/50">
-            {activeTick} / {maxTick}
-          </div>
-
-          {events.length === 0 && (
-            <div className="absolute left-1/2 top-4 -translate-x-1/2 text-[10px] uppercase tracking-widest text-white/30">
-              Waiting for events...
+            <div className="absolute left-0 -top-6 text-[8px] font-bold uppercase tracking-widest text-white/50">
+              Start
             </div>
-          )}
+            
+            <div className="absolute right-0 -top-6 text-[8px] font-bold uppercase tracking-widest text-white/50">
+              {activeTick} / {maxTick}
+            </div>
 
-          {events.map((evt, idx) => {
-            const evtTick = evt.tick as number;
-            if (evtTick === undefined) return null;
-            
-            const percent = getPositionPercent(evtTick);
-            
-            return (
-              <div 
-                key={`${evt.type}-${idx}-${evt.timestamp || idx}`}
-                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2"
-                style={{ left: `${percent}%` }}
-              >
-                <TimelineEventNode 
-                  event={evt} 
-                  isSelected={selectedEvent === evt}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (!dragRef.current.isDragging) {
-                      setSelectedEvent(evt === selectedEvent ? null : evt);
-                      onScrub(evtTick);
-                    }
-                  }}
-                />
+            {events.length === 0 && (
+              <div className="absolute left-1/2 top-4 -translate-x-1/2 text-[10px] uppercase tracking-widest text-white/30">
+                Waiting for events...
               </div>
-            );
-          })}
+            )}
 
-          <div 
-            className={`absolute top-1/2 h-6 w-2.5 -translate-y-1/2 -translate-x-1/2 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all duration-200 ${isDraggingUI ? 'scale-125 cursor-grabbing' : 'hover:scale-110 cursor-grab'}`}
-            style={{ left: `${progressPercent}%` }}
-          />
+            {events.map((evt, idx) => {
+              const evtTick = evt.tick as number;
+              if (evtTick === undefined) return null;
+              
+              const percent = getPositionPercent(evtTick);
+              
+              return (
+                <div 
+                  key={`${evt.type}-${idx}-${evt.timestamp || idx}`}
+                  className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2"
+                  style={{ left: `${percent}%` }}
+                >
+                  <TimelineEventNode 
+                    event={evt} 
+                    isSelected={selectedEvent === evt}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (!dragRef.current.isDragging) {
+                        setSelectedEvent(evt === selectedEvent ? null : evt);
+                        onScrub(evtTick);
+                      }
+                    }}
+                  />
+                </div>
+              );
+            })}
+
+            <div 
+              className={`absolute top-1/2 h-6 w-2.5 -translate-y-1/2 -translate-x-1/2 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all duration-200 ${isDraggingUI ? 'scale-125 cursor-grabbing' : 'hover:scale-110 cursor-grab'}`}
+              style={{ left: `${progressPercent}%` }}
+            />
+          </div>
         </div>
       </div>
 
@@ -162,6 +164,6 @@ export function TimelineTrack({ events, currentTick, maxTick, playbackTick, onSc
           onClose={() => setSelectedEvent(null)} 
         />
       )}
-    </div>
+    </>
   );
 }

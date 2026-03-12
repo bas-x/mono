@@ -31,6 +31,7 @@ export function TimelineEventNode({ event, isSelected, onClick }: TimelineEventN
     <button
       type="button"
       onClick={onClick}
+      onPointerDown={(e) => e.stopPropagation()}
       className="group relative flex flex-col items-center justify-center p-2 focus:outline-none"
     >
       <div
