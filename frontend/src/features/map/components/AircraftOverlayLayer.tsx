@@ -27,15 +27,13 @@ export function AircraftOverlayLayer({
           key={aircraft.tailNumber}
           className="absolute flex items-center justify-center text-primary"
           style={{
-            transform: `translate3d(${aircraft.x}px, ${aircraft.y}px, 0) rotate(${aircraft.rotation}deg)`,
+            left: `calc(${aircraft.x}% - 12px)`,
+            top: `calc(${aircraft.y}% - 12px)`,
+            transform: `rotate(${aircraft.rotation}deg)`,
             transformOrigin: 'center',
-            willChange: 'transform',
-            marginLeft: '-12px',
-            marginTop: '-12px',
+            willChange: 'left, top, transform',
             width: 24,
             height: 24,
-            left: 0,
-            top: 0,
           }}
         >
           <IoMdJet className="h-6 w-6 text-blue-500 drop-shadow-md" />

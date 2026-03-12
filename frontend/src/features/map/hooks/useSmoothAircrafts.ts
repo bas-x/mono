@@ -36,8 +36,10 @@ export function useSmoothAircrafts(
 
   const rafRef = useRef<number>();
 
+  const wasEmptyRef = useRef(true);
+
   useEffect(() => {
-    if (!aircraftPositions || containerSize.width <= 0 || containerSize.height <= 0) {
+    if (!aircraftPositions) {
       return;
     }
 
@@ -50,19 +52,21 @@ export function useSmoothAircrafts(
       const percent = projectPointToPercent(ac.position, viewBox, containerSize);
       if (!percent) return;
 
-      const pxX = (percent.x / 100) * containerSize.width;
-      const pxY = (percent.y / 100) * containerSize.height;
+      const ptX = percent.x;
+      const ptY = percent.y;
 
       if (!state[ac.tailNumber]) {
         state[ac.tailNumber] = {
-          current: { x: pxX, y: pxY, rotation: 0 },
-          target: { x: pxX, y: pxY, rotation: 0 },
+          current: { x: ptX, y: ptY, rotation: 0 },
+          target: { x: ptX, y: ptY, rotation: 0 },
         };
       } else {
         const prevTarget = state[ac.tailNumber].target;
         
-        const dx = pxX - prevTarget.x;
-        const dy = pxY - prevTarget.y;
+        const wScale = containerSize.width > 0 ? containerSize.width / 100 : 1;
+        const hScale = containerSize.height > 0 ? containerSize.height / 100 : 1;
+        const dx = (ptX - prevTarget.x) * wScale;
+        const dy = (ptY - prevTarget.y) * hScale;
         
         let newRotation = prevTarget.rotation;
         if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
@@ -70,7 +74,7 @@ export function useSmoothAircrafts(
           newRotation = headingDeg - 60;
         }
 
-        state[ac.tailNumber].target = { x: pxX, y: pxY, rotation: newRotation };
+        state[ac.tailNumber].target = { x: ptX, y: ptY, rotation: newRotation };
       }
     });
 
@@ -82,26 +86,40 @@ export function useSmoothAircrafts(
   }, [aircraftPositions, containerSize, viewBox]);
 
   useEffect(() => {
-    let lastTime = performance.now();
+    let lastTime: number | null = null;
+    let frameId: number;
 
     const loop = (time: number) => {
-      const dt = time - lastTime;
+      frameId = requestAnimationFrame(loop);
+
+      if (lastTime === null) {
+        lastTime = time;
+        return;
+      }
+
+      const dt = Math.max(0, time - lastTime);
       lastTime = time;
       
       const state = stateRef.current;
       const keys = Object.keys(state);
 
       if (keys.length > 0) {
-        const alpha = Math.min(1.0, 0.15 * (dt / 16.66));
+        wasEmptyRef.current = false;
+        
+        const rawAlpha = 0.15 * (dt / 16.66);
+        const alpha = Number.isNaN(rawAlpha) ? 1.0 : Math.min(1.0, rawAlpha);
+        
         const updatedList: RenderedAircraft[] = [];
 
         keys.forEach((tailNumber) => {
           const acState = state[tailNumber];
+          if (!acState) return;
+
           const { current, target } = acState;
 
-          current.x = lerp(current.x, target.x, alpha);
-          current.y = lerp(current.y, target.y, alpha);
-          current.rotation = lerpAngle(current.rotation, target.rotation, alpha);
+          current.x = Number.isNaN(target.x) ? 0 : lerp(current.x, target.x, alpha);
+          current.y = Number.isNaN(target.y) ? 0 : lerp(current.y, target.y, alpha);
+          current.rotation = Number.isNaN(target.rotation) ? 0 : lerpAngle(current.rotation, target.rotation, alpha);
 
           updatedList.push({
             tailNumber,
@@ -111,20 +129,19 @@ export function useSmoothAircrafts(
           });
         });
 
-        setRenderedAircrafts(updatedList);
+        console.log("RAF updatedList length:", updatedList.length, updatedList[0]); setRenderedAircrafts(updatedList);
       } else {
-        setRenderedAircrafts([]);
+        if (!wasEmptyRef.current) {
+          wasEmptyRef.current = true;
+          setRenderedAircrafts([]);
+        }
       }
-
-      rafRef.current = requestAnimationFrame(loop);
     };
 
-    rafRef.current = requestAnimationFrame(loop);
+    frameId = requestAnimationFrame(loop);
 
     return () => {
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
-      }
+      cancelAnimationFrame(frameId);
     };
   }, []);
 
