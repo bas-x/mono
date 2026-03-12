@@ -80,6 +80,7 @@ export function MapPanel() {
     useState<SelectedAirbaseDetailsState>({ status: 'idle' });
   const {
     state: simulationState,
+    setPlaybackTick,
     simulations,
     loadSimulation,
     createSimulation,
@@ -305,6 +306,7 @@ export function MapPanel() {
             selectedAirbaseId={selectedAirbaseId}
             viewBox={mapViewBox}
             onSelectAirbase={handleSelectAirbase}
+            aircraftPositions={simulationState.status === 'running' ? simulationState.aircraftPositions : undefined}
           />
         </div>
 
@@ -350,7 +352,11 @@ export function MapPanel() {
       {viewMode === 'simulate' && simulationState.status === 'running' && (
         <>
           <SimulationInfoCard simulationState={simulationState} simulations={simulations} />
-          <SimulationTimeline simulationId={simulationState.simulationId} />
+          <SimulationTimeline 
+            simulationId={simulationState.simulationId} 
+            simulationState={simulationState}
+            setPlaybackTick={setPlaybackTick}
+          />
         </>
       )}
 

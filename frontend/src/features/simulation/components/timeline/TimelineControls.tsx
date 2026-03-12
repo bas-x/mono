@@ -28,6 +28,28 @@ function FilterToggle({ label, isActive, onClick, colorClass }: FilterToggleProp
   );
 }
 
+type ZoomToggleProps = {
+  label: string;
+  isActive: boolean;
+  onClick: () => void;
+};
+
+function ZoomToggle({ label, isActive, onClick }: ZoomToggleProps) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded px-1.5 py-0.5 text-[10px] font-bold transition-all ${
+        isActive 
+          ? 'bg-amber-500/20 text-amber-500' 
+          : 'text-white/40 hover:bg-white/10 hover:text-white/80'
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
 type TimelineControlsProps = {
   status: SimulationStatus;
   isLoading: boolean;
@@ -36,9 +58,11 @@ type TimelineControlsProps = {
   onResume: () => void;
   filters: Record<string, boolean>;
   onToggleFilter: (type: string) => void;
+  zoom: number;
+  onZoomChange: (z: number) => void;
 };
 
-export function TimelineControls({ status, isLoading, onStart, onPause, onResume, filters, onToggleFilter }: TimelineControlsProps) {
+export function TimelineControls({ status, isLoading, onStart, onPause, onResume, filters, onToggleFilter, zoom, onZoomChange }: TimelineControlsProps) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
@@ -126,11 +150,14 @@ export function TimelineControls({ status, isLoading, onStart, onPause, onResume
           </span>
         </button>
       </div>
-      <div className="flex items-center justify-end gap-2 w-[120px]">
-        <span className={`flex h-2 w-2 rounded-full ${status === 'running' ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse' : 'bg-white/30'}`} />
-        <span className="text-xs font-medium text-white/50 uppercase tracking-widest">
-          {status === 'running' ? 'Live' : status}
-        </span>
+      <div className="flex items-center justify-end flex-1">
+        <div className="flex items-center gap-1 rounded-lg bg-white/5 p-1">
+          <ZoomToggle label="1x" isActive={zoom === 1} onClick={() => onZoomChange(1)} />
+          <ZoomToggle label="2x" isActive={zoom === 2} onClick={() => onZoomChange(2)} />
+          <ZoomToggle label="3x" isActive={zoom === 3} onClick={() => onZoomChange(3)} />
+          <ZoomToggle label="5x" isActive={zoom === 5} onClick={() => onZoomChange(5)} />
+          <ZoomToggle label="10x" isActive={zoom === 10} onClick={() => onZoomChange(10)} />
+        </div>
       </div>
     </div>
   );

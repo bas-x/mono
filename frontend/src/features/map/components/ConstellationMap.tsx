@@ -9,6 +9,7 @@ import {
 } from '@/features/map/components/AirbaseOverlayLayer';
 import { AirbaseTooltip } from '@/features/map/components/AirbaseTooltip';
 import { SwedenMap3DLayer } from '@/features/map/components/SwedenMap3DLayer';
+import { AircraftOverlayLayer } from '@/features/map/components/AircraftOverlayLayer';
 import { useAirbaseDetails } from '@/features/map/hooks/useAirbaseDetails';
 import { useAirbases } from '@/features/map/hooks/useAirbases';
 import {
@@ -26,6 +27,7 @@ import {
   type MapMode,
   type MapViewBox,
 } from '@/features/map/types';
+import type { AircraftPosition } from '@/features/simulation/hooks/useSimulation';
 
 function mergeClassNames(...parts: Array<string | undefined>) {
   return parts.filter(Boolean).join(' ');
@@ -46,6 +48,7 @@ type ConstellationMapProps = {
   showDebugOverlay?: boolean;
   viewBox?: MapViewBox;
   placementSources?: AirbasePlacementSource[];
+  aircraftPositions?: AircraftPosition[];
 };
 
 const AIRBASE_CAPACITY_SEQUENCE = ['small', 'medium', 'large'] as const;
@@ -110,6 +113,7 @@ export function ConstellationMap({
   showDebugOverlay = false,
   viewBox = DEFAULT_MAP_VIEW_BOX,
   placementSources: externalPlacementSources,
+  aircraftPositions,
 }: ConstellationMapProps) {
   const { clients } = useApi();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -341,6 +345,12 @@ export function ConstellationMap({
         viewBox={viewBox}
         onHoverChange={handleHoverChange}
         onSelect={(airbaseId) => handleSelect(airbaseId)}
+      />
+
+      <AircraftOverlayLayer
+        aircraftPositions={aircraftPositions}
+        containerSize={containerSize}
+        viewBox={viewBox}
       />
 
       {hoveredAirbase && hoveredPointPercent ? (
