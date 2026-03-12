@@ -1,12 +1,12 @@
 import { parseApiConfigFromEnv, SIMULATION_WS_PATH } from '@/lib/api/config';
 import { createWebSocketClient } from '@/lib/api/realtime/socket';
-import type { ApiConfig, SimulationEventEnvelope, SimulationStreamClient } from '@/lib/api/types';
+import type { ApiConfig, SimulationEvent, SimulationStreamClient } from '@/lib/api/types';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function parseSimulationEvent(rawData: string): SimulationEventEnvelope | null {
+function parseSimulationEvent(rawData: string): SimulationEvent | null {
   const parsed = JSON.parse(rawData) as unknown;
 
   if (!isRecord(parsed)) {
@@ -15,20 +15,13 @@ function parseSimulationEvent(rawData: string): SimulationEventEnvelope | null {
 
   if (
     typeof parsed.type !== 'string' ||
-    typeof parsed.runId !== 'string' ||
-    typeof parsed.sequence !== 'number' ||
+    typeof parsed.simulationId !== 'string' ||
     typeof parsed.timestamp !== 'string'
   ) {
     return null;
   }
 
-  return {
-    type: parsed.type,
-    runId: parsed.runId,
-    sequence: parsed.sequence,
-    timestamp: parsed.timestamp,
-    payload: parsed.payload,
-  };
+  return parsed as SimulationEvent;
 }
 
 export function createSimulationStreamClient(overrides?: Partial<ApiConfig>): SimulationStreamClient {

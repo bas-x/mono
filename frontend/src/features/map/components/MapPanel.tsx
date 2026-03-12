@@ -6,10 +6,7 @@ import { MapSidebar, type ViewMode } from '@/features/map/components/MapSidebar'
 import type { SelectedAirbaseDetailsState } from '@/features/map/components/SelectionDrawer';
 import { useAirbases } from '@/features/map/hooks/useAirbases';
 import { createFocusedViewBox } from '@/features/map/lib/geometry';
-import {
-  getPlacementBounds,
-  resolveActivePlacementSources,
-} from '@/features/map/lib/placement';
+import { getPlacementBounds, resolveActivePlacementSources } from '@/features/map/lib/placement';
 import { SimulationSetupSheet } from '@/features/simulation/components/SimulationSetupSheet';
 import { useSimulation } from '@/features/simulation/hooks/useSimulation';
 import {
@@ -25,6 +22,8 @@ import {
   type MapViewBox,
 } from '@/features/map/types';
 import { useApi } from '@/lib/api';
+
+import { SimulationInfoCard } from '@/features/simulation/components/SimulationInfoCard';
 
 type ThemeStyle = CSSProperties & {
   '--color-map-surface': string;
@@ -78,12 +77,23 @@ export function MapPanel() {
   );
   const [selectedAirbaseDetailsState, setSelectedAirbaseDetailsState] =
     useState<SelectedAirbaseDetailsState>({ status: 'idle' });
-  const { state: simulationState, createSimulation, reset: resetSimulation } = useSimulation();
+  const {
+    state: simulationState,
+    simulations,
+    loadSimulation,
+    createSimulation,
+    reset: resetSimulation,
+    triggerReset,
+  } = useSimulation();
   const detailsCacheRef = useRef(new Map<string, AirbaseDetails>());
   const requestSequenceRef = useRef(0);
   const activeAbortControllerRef = useRef<AbortController | null>(null);
   const airbaseState = useAirbases({ mapClient: clients.map, dataSource });
   const activePlacementSources = useMemo<AirbasePlacementSource[]>(() => {
+    if (viewMode === 'simulate' && simulationState.status !== 'running') {
+      return [];
+    }
+
     return resolveActivePlacementSources({
       viewMode,
       liveAirbases: airbaseState.airbases,
@@ -268,10 +278,12 @@ export function MapPanel() {
   }, []);
 
   const handleSubmitSimulationSetup = useCallback(
-    (values: SimulationSetupFormValues) => {
+    async (values: SimulationSetupFormValues) => {
       setSimulationSetupValues(values);
-      setIsSimulationSheetOpen(false);
-      createSimulation(values.seedHex);
+      const success = await createSimulation(values.seedHex);
+      if (success) {
+        setIsSimulationSheetOpen(false);
+      }
     },
     [createSimulation],
   );
@@ -288,11 +300,7 @@ export function MapPanel() {
             className="h-full min-h-full rounded-none border-0"
             dataSource={viewMode === 'simulate' ? 'api' : dataSource}
             mode={viewMode === 'live' ? 'live' : 'static'}
-            placementSources={
-              viewMode === 'simulate' && simulationState.status === 'running'
-                ? activePlacementSources
-                : undefined
-            }
+            placementSources={activePlacementSources}
             selectedAirbaseId={selectedAirbaseId}
             viewBox={mapViewBox}
             onSelectAirbase={handleSelectAirbase}
@@ -300,12 +308,26 @@ export function MapPanel() {
         </div>
 
         <MapSidebar
-          airbases={viewMode === 'simulate' && simulationState.status === 'running' ? activeRenderableAirbases : airbaseState.airbases}
-          airbaseStatus={viewMode === 'simulate' ? (simulationState.status === 'running' ? 'success' : 'loading') : airbaseState.status}
+          airbases={
+            viewMode === 'simulate' && simulationState.status === 'running'
+              ? activeRenderableAirbases
+              : airbaseState.airbases
+          }
+          airbaseStatus={
+            viewMode === 'simulate'
+              ? simulationState.status === 'running'
+                ? 'success'
+                : 'loading'
+              : airbaseState.status
+          }
           airbaseMessage={
             viewMode === 'simulate'
-              ? (simulationState.status === 'error' ? simulationState.message : undefined)
-              : (airbaseState.status === 'error' ? airbaseState.message : undefined)
+              ? simulationState.status === 'error'
+                ? simulationState.message
+                : undefined
+              : airbaseState.status === 'error'
+                ? airbaseState.message
+                : undefined
           }
           viewMode={viewMode}
           isAirbaseListOpen={isAirbaseListOpen}
@@ -317,8 +339,16 @@ export function MapPanel() {
           onToggleAirbaseList={handleToggleAirbaseList}
           onSelectAirbaseFromList={handleSelectAirbaseFromList}
           onOpenSimulationSheet={handleOpenSimulationSheet}
+          onResetSimulation={triggerReset}
+          isSimulationRunning={simulationState.status === 'running'}
+          simulations={simulations}
+          onLoadSimulation={loadSimulation}
         />
       </section>
+
+      {viewMode === 'simulate' && simulationState.status === 'running' && (
+        <SimulationInfoCard simulationState={simulationState} simulations={simulations} />
+      )}
 
       <SimulationSetupSheet
         isOpen={viewMode === 'simulate' && isSimulationSheetOpen}

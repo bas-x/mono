@@ -1,6 +1,6 @@
 import type {
   ConnectionState,
-  SimulationEventEnvelope,
+  SimulationEvent,
   SimulationStreamClient,
   Unsubscribe,
 } from '@/lib/api/types';
@@ -8,22 +8,18 @@ import type {
 const MOCK_RUN_ID = 'mock-run-001';
 const STEP_INTERVAL_MS = 1_500;
 
-const SCRIPTED_EVENTS: Array<Omit<SimulationEventEnvelope, 'runId' | 'sequence' | 'timestamp'>> = [
+const SCRIPTED_EVENTS: Array<Omit<SimulationEvent, 'simulationId' | 'timestamp'>> = [
   {
-    type: 'simulation.started',
-    payload: { aircraftInQueue: 3 },
+    type: 'simulation_step',
+    tick: 1,
   },
   {
-    type: 'simulation.progress',
-    payload: { completedTasks: 2, activeResources: 4 },
+    type: 'simulation_step',
+    tick: 2,
   },
   {
-    type: 'simulation.progress',
-    payload: { completedTasks: 5, activeResources: 3 },
-  },
-  {
-    type: 'simulation.completed',
-    payload: { turnaroundMinutesSaved: 18 },
+    type: 'simulation_step',
+    tick: 3,
   },
 ];
 
@@ -31,10 +27,9 @@ export function createMockSimulationStreamClient(): SimulationStreamClient {
   let connectionState: ConnectionState = 'idle';
   let connectTimer: ReturnType<typeof setTimeout> | null = null;
   let intervalTimer: ReturnType<typeof setInterval> | null = null;
-  let sequence = 0;
   let scriptIndex = 0;
 
-  const eventSubscribers = new Set<(event: SimulationEventEnvelope) => void>();
+  const eventSubscribers = new Set<(event: SimulationEvent) => void>();
   const stateSubscribers = new Set<(state: ConnectionState) => void>();
 
   function emitState(nextState: ConnectionState) {
@@ -58,13 +53,11 @@ export function createMockSimulationStreamClient(): SimulationStreamClient {
 
   function emitNextEvent() {
     const scriptedEvent = SCRIPTED_EVENTS[scriptIndex];
-    sequence += 1;
 
-    const event: SimulationEventEnvelope = {
+    const event: SimulationEvent = {
       ...scriptedEvent,
-      runId: MOCK_RUN_ID,
-      sequence,
-      timestamp: new Date(1704067200000 + sequence * 60_000).toISOString(),
+      simulationId: MOCK_RUN_ID,
+      timestamp: new Date().toISOString(),
     };
 
     eventSubscribers.forEach((handler) => {
@@ -95,7 +88,7 @@ export function createMockSimulationStreamClient(): SimulationStreamClient {
     emitState('closed');
   }
 
-  function subscribe(handler: (event: SimulationEventEnvelope) => void): Unsubscribe {
+  function subscribe(handler: (event: SimulationEvent) => void): Unsubscribe {
     eventSubscribers.add(handler);
     return () => {
       eventSubscribers.delete(handler);

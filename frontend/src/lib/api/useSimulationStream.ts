@@ -3,13 +3,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useApi } from '@/lib/api/useApi';
 import { createMockSimulationStreamClient } from '@/lib/api/mock/realtime';
 import { createSimulationStreamClient } from '@/lib/api/realtime/simulationStream';
-import type { ApiConfig, ConnectionState, SimulationEventEnvelope, SimulationStreamClient } from '@/lib/api/types';
+import type { ApiConfig, ConnectionState, SimulationEvent, SimulationStreamClient } from '@/lib/api/types';
 
 export type UseSimulationStreamResult = {
   state: ConnectionState;
   connect(simulationId: string): void;
   disconnect(code?: number, reason?: string): void;
-  subscribe(handler: (event: SimulationEventEnvelope) => void): () => void;
+  subscribe(handler: (event: SimulationEvent) => void): () => void;
 };
 
 function createStreamClient(config: ApiConfig): SimulationStreamClient {
@@ -53,7 +53,7 @@ export function useSimulationStream(simulationId?: string): UseSimulationStreamR
   );
 
   const subscribe = useCallback(
-    (handler: (event: SimulationEventEnvelope) => void) => {
+    (handler: (event: SimulationEvent) => void) => {
       return streamClient.subscribe(handler);
     },
     [streamClient],

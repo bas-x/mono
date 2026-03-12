@@ -58,6 +58,10 @@ export function createMockSimulationServiceClient(): SimulationServiceClient {
       console.log('Mock: Starting simulation', simulationId);
     },
 
+    async resetSimulation(simulationId: string) {
+      console.log('Mock: Resetting simulation', simulationId);
+    },
+
     async getAirbases(simulationId: string) {
       console.log('Mock: Getting airbases for simulation', simulationId);
       return MOCK_AIRBASES;
