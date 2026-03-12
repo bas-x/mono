@@ -280,10 +280,12 @@ export function MapPanel() {
   }, []);
 
   const handleSubmitSimulationSetup = useCallback(
-    (values: SimulationSetupFormValues) => {
+    async (values: SimulationSetupFormValues) => {
       setSimulationSetupValues(values);
-      setIsSimulationSheetOpen(false);
-      createSimulation(values.seedHex);
+      const success = await createSimulation(values.seedHex);
+      if (success) {
+        setIsSimulationSheetOpen(false);
+      }
     },
     [createSimulation],
   );

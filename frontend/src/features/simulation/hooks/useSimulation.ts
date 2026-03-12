@@ -58,13 +58,14 @@ export function useSimulation() {
     }
   }, [clients.simulation]);
 
-  const createSimulation = useCallback(async (seed: string) => {
+  const createSimulation = useCallback(async (seed: string): Promise<boolean> => {
     setState({ status: 'creating' });
     try {
       const { id } = await clients.simulation.createBaseSimulation(seed);
       toast.success('Simulation created successfully');
       await fetchSimulations();
       await loadSimulation(id);
+      return true;
     } catch (error: unknown) {
       const errorMessage = extractErrorMessage(error);
       const statusCode = getErrorStatus(error);
@@ -78,6 +79,7 @@ export function useSimulation() {
       if (statusCode === 409) {
         await fetchSimulations();
       }
+      return false;
     }
   }, [clients.simulation, fetchSimulations, loadSimulation]);
 
