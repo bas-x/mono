@@ -70,6 +70,7 @@ func (f *Fleet) Init(env *Environment, opts *FleetOptions) error {
 		state := normalized.StateFactory(rng)
 		assert.NotNil(state, "fleet state factory result")
 		aircraft := NewAircraft(tail, state, needs)
+		aircraft.Speed = aircraftSpeed(tail)
 		aircrafts = append(aircrafts, aircraft)
 	}
 
@@ -212,4 +213,14 @@ func generateNeeds(rng *rand.Rand, opts FleetOptions) []Need {
 		})
 	}
 	return needs
+}
+
+// aircraftSpeed returns a deterministic per-aircraft speed in [1.5, 3.4] units/sim-second.
+// Derived from tail number hash — no RNG call at runtime.
+func aircraftSpeed(tail TailNumber) float64 {
+	h := int64(binary.BigEndian.Uint64(tail[:]))
+	if h < 0 {
+		h = -h
+	}
+	return 1.5 + float64(h%20)*0.1
 }

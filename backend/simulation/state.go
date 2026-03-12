@@ -1,10 +1,41 @@
 package simulation
 
-import "time"
+import (
+	"math"
+	"time"
+
+	"github.com/bas-x/basex/assets"
+	"github.com/bas-x/basex/geometry"
+)
+
+const (
+	EngagementRange        = 25.0
+	LandingRange           = 15.0
+	OrbitRadius            = 20.0
+	OrbitAngleDeltaPerTick = 0.314
+)
+
+func threatRegionCentroid(regionName string) geometry.Point {
+	for _, region := range assets.Regions {
+		if region.Name == regionName {
+			if len(region.Areas) == 0 || len(region.Areas[0]) == 0 {
+				return geometry.Point{}
+			}
+			pts := make([]geometry.Point, len(region.Areas[0]))
+			for i, p := range region.Areas[0] {
+				pts[i] = geometry.Point{X: p.X, Y: p.Y}
+			}
+			return geometry.PolygonCentroid(pts)
+		}
+	}
+	return geometry.Point{}
+}
 
 type FlightContext struct {
 	Clock                 *TimeSim
 	Dispatcher            *Dispatcher
+	Airbases              []Airbase
+	Lifecycle             LifecycleModel
 	Threats               *ThreatSet
 	OnAircraftStateChange func(AircraftStateChangeEvent)
 	OnThreatClaimed       func(ThreatClaimedEvent)
@@ -15,16 +46,6 @@ type AircraftState interface {
 	Step(aircraft *Aircraft, ctx FlightContext) AircraftState
 	Clone() AircraftState
 }
-
-const (
-	outboundDuration       = 5 * time.Second
-	engagedDuration        = 5 * time.Second
-	inboundDecisionDelay   = 3 * time.Second
-	commitApproachDuration = 4 * time.Second
-	servicingDuration      = 6 * time.Second
-	needChangePerSecond    = 5
-	needsReturnThreshold   = 80
-)
 
 type ReadyState struct {
 	entered   bool
@@ -37,10 +58,18 @@ func (r *ReadyState) Step(a *Aircraft, ctx FlightContext) AircraftState {
 	if !r.entered {
 		r.entered = true
 		r.enteredAt = ctx.Clock.Now()
+		if a.HasAssignment {
+			if base, ok := findAssignedAirbase(ctx.Airbases, a.AssignedBase); ok && a.Position == (geometry.Point{}) {
+				a.Position = base.Location
+			}
+		}
 	}
 	if ctx.Threats != nil {
 		if threat, ok := ctx.Threats.ClaimNext(); ok {
 			a.HasAssignment = false
+			a.ClaimedThreat = &threat
+			a.ThreatCentroid = threatRegionCentroid(threat.Region)
+			a.ResetNeedRemainders()
 			if ctx.OnThreatClaimed != nil {
 				ctx.OnThreatClaimed(ThreatClaimedEvent{Threat: threat, TailNumber: a.TailNumber, Timestamp: ctx.Clock.Now()})
 			}
@@ -75,11 +104,27 @@ func (o *OutboundState) Step(a *Aircraft, ctx FlightContext) AircraftState {
 		o.lastNeedUpdateAt = now
 		return o
 	}
-	a.DegradeNeeds(o.consumeNeedChange(now))
-	if NeedsThresholdReached(a.Needs, needsReturnThreshold) {
+	if a.Speed > 0 {
+		target := a.ThreatCentroid
+		dist := geometry.Distance(a.Position, target)
+		if dist > 0 {
+			step := a.Speed * ctx.Clock.Resolution.Seconds()
+			if step >= dist {
+				a.Position = target
+			} else {
+				dir := target.Sub(a.Position).Scale(1.0 / dist)
+				a.Position = a.Position.Add(dir.Scale(step))
+			}
+		}
+		if geometry.Distance(a.Position, a.ThreatCentroid) <= EngagementRange {
+			return &EngagedState{}
+		}
+	}
+	a.ApplyNeedPhase(o.consumeElapsed(now), NeedPhaseOutbound, ctx.Lifecycle, nil)
+	if NeedsThresholdReached(a.Needs, ctx.Lifecycle.ReturnThreshold) {
 		return &InboundState{}
 	}
-	if now.Sub(o.enteredAt) >= outboundDuration {
+	if now.Sub(o.enteredAt) >= ctx.Lifecycle.Durations.Outbound {
 		return &EngagedState{}
 	}
 	return o
@@ -110,11 +155,16 @@ func (e *EngagedState) Step(a *Aircraft, ctx FlightContext) AircraftState {
 		e.lastNeedUpdateAt = now
 		return e
 	}
-	a.DegradeNeeds(e.consumeNeedChange(now))
-	if NeedsThresholdReached(a.Needs, needsReturnThreshold) {
+	a.OrbitAngle += OrbitAngleDeltaPerTick
+	a.Position = geometry.Point{
+		X: a.ThreatCentroid.X + OrbitRadius*math.Cos(a.OrbitAngle),
+		Y: a.ThreatCentroid.Y + OrbitRadius*math.Sin(a.OrbitAngle),
+	}
+	a.ApplyNeedPhase(e.consumeElapsed(now), NeedPhaseEngaged, ctx.Lifecycle, nil)
+	if NeedsThresholdReached(a.Needs, ctx.Lifecycle.ReturnThreshold) {
 		return &InboundState{}
 	}
-	if now.Sub(e.enteredAt) >= engagedDuration {
+	if now.Sub(e.enteredAt) >= ctx.Lifecycle.Durations.Engaged {
 		return &InboundState{}
 	}
 	return e
@@ -154,7 +204,21 @@ func (i *InboundState) Step(a *Aircraft, ctx FlightContext) AircraftState {
 		i.assigned = true
 		i.assignment = assignment
 	}
-	if i.assigned && now.Sub(i.enteredAt) >= inboundDecisionDelay {
+	if i.assigned {
+		if base, ok := findAssignedAirbase(ctx.Airbases, i.assignment.Base); ok {
+			dist := geometry.Distance(a.Position, base.Location)
+			if dist > 0 && a.Speed > 0 {
+				step := a.Speed * ctx.Clock.Resolution.Seconds()
+				if step >= dist {
+					a.Position = base.Location
+				} else {
+					dir := base.Location.Sub(a.Position).Scale(1.0 / dist)
+					a.Position = a.Position.Add(dir.Scale(step))
+				}
+			}
+		}
+	}
+	if i.assigned && now.Sub(i.enteredAt) >= ctx.Lifecycle.Durations.InboundDecision {
 		ctx.Dispatcher.RemoveInbound(a.TailNumber)
 		a.AssignedBase = i.assignment.Base
 		a.HasAssignment = true
@@ -184,7 +248,22 @@ func (c *CommittedState) Step(a *Aircraft, ctx FlightContext) AircraftState {
 		c.entered = true
 		c.enteredAt = now
 	}
-	if now.Sub(c.enteredAt) >= commitApproachDuration {
+	if base, ok := findAssignedAirbase(ctx.Airbases, a.AssignedBase); ok {
+		dist := geometry.Distance(a.Position, base.Location)
+		if dist > 0 && a.Speed > 0 {
+			step := a.Speed * ctx.Clock.Resolution.Seconds()
+			if step >= dist {
+				a.Position = base.Location
+			} else {
+				dir := base.Location.Sub(a.Position).Scale(1.0 / dist)
+				a.Position = a.Position.Add(dir.Scale(step))
+			}
+		}
+		if geometry.Distance(a.Position, base.Location) <= LandingRange {
+			return &ServicingState{}
+		}
+	}
+	if now.Sub(c.enteredAt) >= ctx.Lifecycle.Durations.CommitApproach {
 		return &ServicingState{}
 	}
 	return c
@@ -199,9 +278,9 @@ func (c *CommittedState) Clone() AircraftState {
 }
 
 type ServicingState struct {
-	entered       bool
-	enteredAt     time.Time
-	startingNeeds []Need
+	entered          bool
+	enteredAt        time.Time
+	lastNeedUpdateAt time.Time
 }
 
 func (s *ServicingState) Name() string { return "Servicing" }
@@ -211,12 +290,20 @@ func (s *ServicingState) Step(a *Aircraft, ctx FlightContext) AircraftState {
 	if !s.entered {
 		s.entered = true
 		s.enteredAt = now
-		s.startingNeeds = cloneNeeds(a.Needs)
+		s.lastNeedUpdateAt = now
+		if base, ok := findAssignedAirbase(ctx.Airbases, a.AssignedBase); ok {
+			a.Position = base.Location
+		}
 		return s
 	}
-	s.restoreAircraftNeeds(a, now)
-	if now.Sub(s.enteredAt) >= servicingDuration {
+	if base, ok := findAssignedAirbase(ctx.Airbases, a.AssignedBase); ok {
+		a.ApplyNeedPhase(s.consumeElapsed(now), NeedPhaseServicing, ctx.Lifecycle, &base)
+	} else {
+		a.ApplyNeedPhase(s.consumeElapsed(now), NeedPhaseServicing, ctx.Lifecycle, nil)
+	}
+	if now.Sub(s.enteredAt) >= ctx.Lifecycle.Durations.Servicing {
 		a.ResetNeeds()
+		a.ResetNeedRemainders()
 		return &ReadyState{}
 	}
 	return s
@@ -227,19 +314,23 @@ func (s *ServicingState) Clone() AircraftState {
 		return &ServicingState{}
 	}
 	clone := *s
-	clone.startingNeeds = cloneNeeds(s.startingNeeds)
 	return &clone
 }
 
-func (o *OutboundState) consumeNeedChange(now time.Time) int {
-	return consumeNeedChange(&o.lastNeedUpdateAt, &o.needUpdateRemainder, now)
+func (o *OutboundState) consumeElapsed(now time.Time) time.Duration {
+	return consumeElapsed(&o.lastNeedUpdateAt, &o.needUpdateRemainder, now)
 }
 
-func (e *EngagedState) consumeNeedChange(now time.Time) int {
-	return consumeNeedChange(&e.lastNeedUpdateAt, &e.needUpdateRemainder, now)
+func (e *EngagedState) consumeElapsed(now time.Time) time.Duration {
+	return consumeElapsed(&e.lastNeedUpdateAt, &e.needUpdateRemainder, now)
 }
 
-func consumeNeedChange(lastUpdatedAt *time.Time, remainder *time.Duration, now time.Time) int {
+func (s *ServicingState) consumeElapsed(now time.Time) time.Duration {
+	var remainder time.Duration
+	return consumeElapsed(&s.lastNeedUpdateAt, &remainder, now)
+}
+
+func consumeElapsed(lastUpdatedAt *time.Time, remainder *time.Duration, now time.Time) time.Duration {
 	if lastUpdatedAt.IsZero() {
 		*lastUpdatedAt = now
 		return 0
@@ -248,51 +339,16 @@ func consumeNeedChange(lastUpdatedAt *time.Time, remainder *time.Duration, now t
 	if elapsed <= 0 {
 		return 0
 	}
-	changeInterval := time.Second / needChangePerSecond
-	amount := int(elapsed / changeInterval)
-	if amount == 0 {
-		*remainder = elapsed
-		*lastUpdatedAt = now
-		return 0
-	}
-	consumed := time.Duration(amount) * changeInterval
-	*remainder = elapsed - consumed
+	*remainder = 0
 	*lastUpdatedAt = now
-	return amount
+	return elapsed
 }
 
-func (s *ServicingState) restoreAircraftNeeds(a *Aircraft, now time.Time) {
-	if len(s.startingNeeds) == 0 {
-		return
-	}
-	elapsed := now.Sub(s.enteredAt)
-	if elapsed < 0 {
-		elapsed = 0
-	}
-	if elapsed > servicingDuration {
-		elapsed = servicingDuration
-	}
-	for i := range a.Needs {
-		if i >= len(s.startingNeeds) {
-			a.Needs[i].Severity = 0
-			continue
+func findAssignedAirbase(airbases []Airbase, id BaseID) (Airbase, bool) {
+	for _, airbase := range airbases {
+		if airbase.ID == id {
+			return airbase, true
 		}
-		startingSeverity := s.startingNeeds[i].Severity
-		remaining := startingSeverity - int((int64(startingSeverity)*elapsed.Nanoseconds())/servicingDuration.Nanoseconds())
-		if remaining < 0 {
-			remaining = 0
-		}
-		a.Needs[i].Severity = remaining
 	}
-}
-
-func cloneNeeds(needs []Need) []Need {
-	if len(needs) == 0 {
-		return nil
-	}
-	cloned := make([]Need, len(needs))
-	for i := range needs {
-		cloned[i] = needs[i].Clone()
-	}
-	return cloned
+	return Airbase{}, false
 }
