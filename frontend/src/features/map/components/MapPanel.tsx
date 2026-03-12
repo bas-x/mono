@@ -331,6 +331,7 @@ export function MapPanel() {
           isSimulationRunning={simulationState.status === 'running'}
           simulations={simulations}
           onLoadSimulation={loadSimulation}
+          simulationState={simulationState}
         />
       </section>
 

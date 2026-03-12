@@ -7,6 +7,7 @@ import {
   type SelectedAirbaseDetailsState,
 } from '@/features/map/components/SelectionDrawer';
 import type { Airbase } from '@/features/map/types';
+import type { SimulationState } from '@/features/simulation/hooks/useSimulation';
 
 export type ViewMode = 'live' | 'simulate';
 
@@ -28,6 +29,7 @@ type MapSidebarProps = {
   isSimulationRunning?: boolean;
   simulations?: Array<{ id: string }>;
   onLoadSimulation?: (id: string) => void;
+  simulationState?: SimulationState;
 };
 
 type SectionProps = {
@@ -156,6 +158,9 @@ type SimulateActionsSectionProps = Pick<
   | 'isSimulationRunning'
   | 'simulations'
   | 'onLoadSimulation'
+  | 'simulationState'
+  | 'onSelectAirbaseFromList'
+  | 'selectedAirbaseId'
 >;
 
 function SimulateActionsSection({
@@ -164,8 +169,12 @@ function SimulateActionsSection({
   isSimulationRunning,
   simulations = [],
   onLoadSimulation,
+  simulationState,
+  onSelectAirbaseFromList,
+  selectedAirbaseId,
 }: SimulateActionsSectionProps) {
   const [isConfirmingReset, setIsConfirmingReset] = useState(false);
+  const [selectedAircraftId, setSelectedAircraftId] = useState<string | null>(null);
   const resetTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -244,6 +253,61 @@ function SimulateActionsSection({
       >
         {isConfirmingReset ? 'Confirm reset' : 'Reset'}
       </button>
+
+      {simulationState?.status === 'running' && (
+        <div className="mt-6 flex flex-col gap-4">
+          <div className="flex flex-col gap-1">
+            <h3 className="text-sm font-semibold shell-text-primary">Simulation</h3>
+            <div className="text-xs shell-text-muted">
+              Status: Running | Tick: {simulationState.tick ?? 0}
+            </div>
+            <div className="text-xs shell-text-muted">
+              Time: {simulationState.time ? new Date(simulationState.time).toLocaleString() : 'n/a'}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <h3 className="text-sm font-semibold shell-text-primary">
+              Airbases ({simulationState.airbases.length})
+            </h3>
+            <div className="flex flex-col gap-1 max-h-32 overflow-y-auto pr-1">
+              {simulationState.airbases.map((base) => (
+                <button
+                  key={base.id}
+                  type="button"
+                  onClick={() => onSelectAirbaseFromList && onSelectAirbaseFromList(base.id)}
+                  className={`cursor-pointer rounded-sm border px-2 py-1 text-left text-xs font-medium transition-colors w-full truncate ${
+                    selectedAirbaseId === base.id ? 'shell-button-active' : 'shell-button'
+                  }`}
+                >
+                  {base.region}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <h3 className="text-sm font-semibold shell-text-primary">
+              Aircraft ({simulationState.aircrafts.length})
+            </h3>
+            <div className="flex flex-col gap-1 max-h-48 overflow-y-auto pr-1">
+              {simulationState.aircrafts.map((ac) => (
+                <button
+                  key={ac.tailNumber}
+                  type="button"
+                  onClick={() => setSelectedAircraftId(ac.tailNumber === selectedAircraftId ? null : ac.tailNumber)}
+                  className={`cursor-pointer rounded-sm border px-2 py-1 text-left text-xs font-medium transition-colors w-full truncate flex justify-between ${
+                    selectedAircraftId === ac.tailNumber ? 'shell-button-active' : 'shell-button'
+                  }`}
+                >
+                  <span>{ac.tailNumber.substring(0, 8)}</span>
+                  <span className="opacity-70">{ac.state}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </SidebarInsetSection>
   );
 }
@@ -276,6 +340,9 @@ export function MapSidebar(props: MapSidebarProps) {
             isSimulationRunning={props.isSimulationRunning}
             simulations={props.simulations}
             onLoadSimulation={props.onLoadSimulation}
+            simulationState={props.simulationState}
+            onSelectAirbaseFromList={props.onSelectAirbaseFromList}
+            selectedAirbaseId={props.selectedAirbaseId}
           />
         )}
       </div>
