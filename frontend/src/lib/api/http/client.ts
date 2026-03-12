@@ -79,7 +79,12 @@ export function createHttpClient(config: Pick<ApiConfig, 'apiBaseUrl'>): HttpCli
       });
 
       await ensureOk(response, path);
-      return (await response.json()) as TResponse;
+      
+      const text = await response.text();
+      if (!text) {
+        return {} as TResponse;
+      }
+      return JSON.parse(text) as TResponse;
     },
 
     async requestText(path: string, options?: RequestOptions) {
