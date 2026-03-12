@@ -11,10 +11,13 @@ import (
 )
 
 var (
-	ErrBaseAlreadyExists  = errors.New("simulation service: base already exists")
-	ErrBaseNotFound       = errors.New("simulation service: base not found")
-	ErrSimulationRunning  = errors.New("simulation service: simulation already running")
-	ErrSimulationNotFound = errors.New("simulation service: simulation not found")
+	ErrBaseAlreadyExists    = errors.New("simulation service: base already exists")
+	ErrBaseNotFound         = errors.New("simulation service: base not found")
+	ErrSimulationRunning    = errors.New("simulation service: simulation already running")
+	ErrSimulationNotRunning = errors.New("simulation service: simulation not running")
+	ErrSimulationPaused     = errors.New("simulation service: simulation already paused")
+	ErrSimulationNotPaused  = errors.New("simulation service: simulation not paused")
+	ErrSimulationNotFound   = errors.New("simulation service: simulation not found")
 )
 
 const BaseSimulationID = "base"
@@ -37,6 +40,7 @@ type managedSimulation struct {
 	runner  *simulation.ControlledRunner
 	cancel  context.CancelFunc
 	running bool
+	paused  bool
 }
 
 type BaseSimulationConfig struct {
@@ -45,8 +49,11 @@ type BaseSimulationConfig struct {
 }
 
 type SimulationInfo struct {
-	ID      string `json:"id"`
-	Running bool   `json:"running"`
+	ID        string    `json:"id"`
+	Running   bool      `json:"running"`
+	Paused    bool      `json:"paused"`
+	Tick      uint64    `json:"tick"`
+	Timestamp time.Time `json:"timestamp"`
 }
 
 func NewSimulationService(cfg SimulationServiceConfig) *SimulationService {
@@ -104,6 +111,7 @@ func (s *SimulationService) StartSimulation(simulationID string) error {
 	managed.runner = runner
 	managed.cancel = cancel
 	managed.running = true
+	managed.paused = false
 	sim := managed.sim
 	s.mu.Unlock()
 
@@ -117,8 +125,55 @@ func (s *SimulationService) StartSimulation(simulationID string) error {
 		managed.runner = nil
 		managed.cancel = nil
 		managed.running = false
+		managed.paused = false
 	}()
 
+	return nil
+}
+
+func (s *SimulationService) PauseSimulation(simulationID string) error {
+	s.mu.Lock()
+	managed, err := s.managedSimulationByIDLocked(simulationID)
+	if err != nil {
+		s.mu.Unlock()
+		return err
+	}
+	if !managed.running || managed.runner == nil {
+		s.mu.Unlock()
+		return ErrSimulationNotRunning
+	}
+	if managed.paused {
+		s.mu.Unlock()
+		return ErrSimulationPaused
+	}
+	runner := managed.runner
+	managed.paused = true
+	s.mu.Unlock()
+
+	runner.Pause()
+	return nil
+}
+
+func (s *SimulationService) ResumeSimulation(simulationID string) error {
+	s.mu.Lock()
+	managed, err := s.managedSimulationByIDLocked(simulationID)
+	if err != nil {
+		s.mu.Unlock()
+		return err
+	}
+	if !managed.running || managed.runner == nil {
+		s.mu.Unlock()
+		return ErrSimulationNotRunning
+	}
+	if !managed.paused {
+		s.mu.Unlock()
+		return ErrSimulationNotPaused
+	}
+	runner := managed.runner
+	managed.paused = false
+	s.mu.Unlock()
+
+	runner.Unpause()
 	return nil
 }
 
@@ -182,13 +237,27 @@ func (s *SimulationService) Aircrafts(simulationID string) ([]Aircraft, error) {
 	return aircrafts, nil
 }
 
+func (s *SimulationService) Threats(simulationID string) ([]Threat, error) {
+	sim, err := s.simulationByID(simulationID)
+	if err != nil {
+		return nil, err
+	}
+
+	raw := sim.Threats()
+	threats := make([]Threat, len(raw))
+	for i, threat := range raw {
+		threats[i] = mapThreat(threat)
+	}
+	return threats, nil
+}
+
 func (s *SimulationService) Simulations() []SimulationInfo {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	result := make([]SimulationInfo, 0, 1)
 	if s.base != nil {
-		result = append(result, SimulationInfo{ID: BaseSimulationID, Running: s.base.running})
+		result = append(result, simulationInfoFromManaged(BaseSimulationID, s.base))
 	}
 
 	return result
@@ -199,7 +268,21 @@ func (s *SimulationService) Simulation(simulationID string) (SimulationInfo, err
 	if err != nil {
 		return SimulationInfo{}, err
 	}
-	return SimulationInfo{ID: simulationID, Running: managed.running}, nil
+	return simulationInfoFromManaged(simulationID, managed), nil
+}
+
+func simulationInfoFromManaged(id string, managed *managedSimulation) SimulationInfo {
+	info := SimulationInfo{ID: id}
+	if managed == nil {
+		return info
+	}
+	info.Running = managed.running
+	info.Paused = managed.paused
+	if managed.sim != nil {
+		info.Tick = managed.sim.Tick()
+		info.Timestamp = managed.sim.Now()
+	}
+	return info
 }
 
 func (s *SimulationService) simulationByID(simulationID string) (*simulation.Simulation, error) {
@@ -261,6 +344,25 @@ func (s *SimulationService) registerHooks(simulationID string, sim *simulation.S
 			Type:         EventTypeSimulationStep,
 			SimulationID: simulationID,
 			Tick:         event.Tick,
+			Timestamp:    event.Timestamp,
+		})
+	})
+
+	sim.AddThreatSpawnedHook(func(event simulation.ThreatSpawnedEvent) {
+		s.broadcaster.Emit(ThreatSpawnedEvent{
+			Type:         EventTypeThreatSpawned,
+			SimulationID: simulationID,
+			Threat:       mapThreat(event.Threat),
+			Timestamp:    event.Timestamp,
+		})
+	})
+
+	sim.AddThreatClaimedHook(func(event simulation.ThreatClaimedEvent) {
+		s.broadcaster.Emit(ThreatClaimedEvent{
+			Type:         EventTypeThreatClaimed,
+			SimulationID: simulationID,
+			Threat:       mapThreat(event.Threat),
+			TailNumber:   hex.EncodeToString(event.TailNumber[:]),
 			Timestamp:    event.Timestamp,
 		})
 	})

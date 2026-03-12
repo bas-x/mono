@@ -3,6 +3,7 @@ package services
 import (
 	"encoding/hex"
 	"maps"
+	"time"
 
 	"github.com/bas-x/basex/simulation"
 )
@@ -32,6 +33,14 @@ type Aircraft struct {
 	Needs      []Need  `json:"needs"`
 	State      string  `json:"state"`
 	AssignedTo *string `json:"assignedTo,omitempty"`
+}
+
+type Threat struct {
+	ID          string    `json:"id"`
+	RegionID    string    `json:"regionId"`
+	Region      string    `json:"region"`
+	CreatedAt   time.Time `json:"createdAt"`
+	CreatedTick uint64    `json:"createdTick"`
 }
 
 func mapAirbase(input simulation.Airbase) Airbase {
@@ -72,5 +81,15 @@ func mapAircraft(input simulation.Aircraft) Aircraft {
 		Needs:      needs,
 		State:      input.State.Name(),
 		AssignedTo: assignedTo,
+	}
+}
+
+func mapThreat(input simulation.Threat) Threat {
+	return Threat{
+		ID:          hex.EncodeToString(input.ID[:]),
+		RegionID:    input.RegionID,
+		Region:      input.Region,
+		CreatedAt:   input.CreatedAt,
+		CreatedTick: input.CreatedTick,
 	}
 }

@@ -103,6 +103,37 @@ func TestSimulationService_SimulationsReflectRunningState(t *testing.T) {
 	}, time.Second, 10*time.Millisecond)
 }
 
+func TestSimulationService_PauseResume(t *testing.T) {
+	t.Parallel()
+
+	svc := NewSimulationService(SimulationServiceConfig{RunnerConfig: simulation.ControlledRunnerConfig{TicksPerSecond: 128}})
+	_, err := svc.CreateBaseSimulation(BaseSimulationConfig{Options: testSimulationOptions(1, 1)})
+	require.NoError(t, err)
+
+	_, eventCh := svc.Broadcaster().Subscribe()
+	require.NoError(t, svc.StartSimulation(BaseSimulationID))
+
+	firstTick := waitForStepEvent(t, eventCh, time.Second)
+	require.Greater(t, firstTick.Tick, uint64(0))
+
+	require.NoError(t, svc.PauseSimulation(BaseSimulationID))
+	info, err := svc.Simulation(BaseSimulationID)
+	require.NoError(t, err)
+	require.True(t, info.Running)
+	require.True(t, info.Paused)
+
+	ensureNoStepEvent(t, eventCh, 150*time.Millisecond)
+
+	require.NoError(t, svc.ResumeSimulation(BaseSimulationID))
+	info, err = svc.Simulation(BaseSimulationID)
+	require.NoError(t, err)
+	require.True(t, info.Running)
+	require.False(t, info.Paused)
+
+	nextTick := waitForStepEvent(t, eventCh, time.Second)
+	require.Greater(t, nextTick.Tick, firstTick.Tick)
+}
+
 func TestSimulationService_Simulation(t *testing.T) {
 	t.Parallel()
 
@@ -120,6 +151,33 @@ func TestSimulationService_Simulation(t *testing.T) {
 
 	_, err = svc.Simulation("branch-1")
 	require.ErrorIs(t, err, ErrSimulationNotFound)
+}
+
+func TestSimulationService_Threats(t *testing.T) {
+	t.Parallel()
+
+	svc := NewSimulationService(SimulationServiceConfig{})
+	_, err := svc.CreateBaseSimulation(BaseSimulationConfig{Options: &simulation.SimulationOptions{
+		ConstellationOpts: simulation.ConstellationOptions{
+			IncludeRegions:    []string{"Blekinge"},
+			MinPerRegion:      1,
+			MaxPerRegion:      1,
+			MaxTotal:          1,
+			RegionProbability: prng.New(1, 1),
+		},
+		ThreatOpts: simulation.ThreatOptions{SpawnChance: prng.New(1, 1), MaxActive: 2},
+	}})
+	require.NoError(t, err)
+
+	base, ok := svc.Base()
+	require.True(t, ok)
+	base.Step()
+
+	threats, err := svc.Threats(BaseSimulationID)
+	require.NoError(t, err)
+	require.NotEmpty(t, threats)
+	require.NotEmpty(t, threats[0].Region)
+	require.NotEmpty(t, threats[0].RegionID)
 }
 
 func TestSimulationService_ResetClearsSimulationAndStopsRunner(t *testing.T) {
@@ -186,5 +244,37 @@ func testSimulationOptions(numBases, numAircraft uint) *simulation.SimulationOpt
 			NeedsMin:    1,
 			NeedsMax:    2,
 		},
+	}
+}
+
+func waitForStepEvent(t *testing.T, ch <-chan Event, timeout time.Duration) SimulationStepEvent {
+	t.Helper()
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	for {
+		select {
+		case event := <-ch:
+			if step, ok := event.(SimulationStepEvent); ok {
+				return step
+			}
+		case <-timer.C:
+			t.Fatal("timed out waiting for simulation step event")
+		}
+	}
+}
+
+func ensureNoStepEvent(t *testing.T, ch <-chan Event, duration time.Duration) {
+	t.Helper()
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+	for {
+		select {
+		case event := <-ch:
+			if _, ok := event.(SimulationStepEvent); ok {
+				t.Fatalf("unexpected simulation step event while paused: %#v", event)
+			}
+		case <-timer.C:
+			return
+		}
 	}
 }

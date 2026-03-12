@@ -6,6 +6,8 @@ const (
 	EventTypeAircraftStateChange = "aircraft_state_change"
 	EventTypeLandingAssignment   = "landing_assignment"
 	EventTypeSimulationStep      = "simulation_step"
+	EventTypeThreatSpawned       = "threat_spawned"
+	EventTypeThreatClaimed       = "threat_claimed"
 )
 
 type Event interface {
@@ -60,5 +62,36 @@ func (e SimulationStepEvent) EventType() string {
 }
 
 func (e SimulationStepEvent) EventSimulationID() string {
+	return e.SimulationID
+}
+
+type ThreatSpawnedEvent struct {
+	Type         string    `json:"type"`
+	SimulationID string    `json:"simulationId"`
+	Threat       Threat    `json:"threat"`
+	Timestamp    time.Time `json:"timestamp"`
+}
+
+func (e ThreatSpawnedEvent) EventType() string {
+	return e.Type
+}
+
+func (e ThreatSpawnedEvent) EventSimulationID() string {
+	return e.SimulationID
+}
+
+type ThreatClaimedEvent struct {
+	Type         string    `json:"type"`
+	SimulationID string    `json:"simulationId"`
+	Threat       Threat    `json:"threat"`
+	TailNumber   string    `json:"tailNumber"`
+	Timestamp    time.Time `json:"timestamp"`
+}
+
+func (e ThreatClaimedEvent) EventType() string {
+	return e.Type
+}
+
+func (e ThreatClaimedEvent) EventSimulationID() string {
 	return e.SimulationID
 }
