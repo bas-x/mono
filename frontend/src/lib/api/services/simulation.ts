@@ -50,6 +50,16 @@ export function createSimulationServiceClient(
       );
     },
 
+    async resetSimulation(simulationId: string, signal?: AbortSignal) {
+      return httpClient.requestJson<void>(
+        `/simulations/${encodeURIComponent(simulationId)}/reset`,
+        {
+          method: 'POST',
+          signal,
+        },
+      );
+    },
+
     async getAirbases(simulationId: string, signal?: AbortSignal) {
       const response = await httpClient.requestJson<GetAirbasesResponse>(
         `/simulations/${encodeURIComponent(simulationId)}/airbases`,

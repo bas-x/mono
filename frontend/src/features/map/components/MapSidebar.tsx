@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { AirbaseList } from '@/features/map/components/AirbaseList';
+import { ErrorMessage } from '@/features/ui/components/ErrorMessage';
 import {
   SelectionDrawer,
   type SelectedAirbaseDetailsState,
@@ -23,6 +24,10 @@ type MapSidebarProps = {
   onToggleAirbaseList: () => void;
   onSelectAirbaseFromList: (airbaseId: string) => void;
   onOpenSimulationSheet: () => void;
+  onResetSimulation?: () => void;
+  isSimulationRunning?: boolean;
+  simulations?: Array<{ id: string }>;
+  onLoadSimulation?: (id: string) => void;
 };
 
 type SectionProps = {
@@ -144,18 +149,76 @@ function LiveActionsSection({
   );
 }
 
-type SimulateActionsSectionProps = Pick<MapSidebarProps, 'onOpenSimulationSheet'>;
+type SimulateActionsSectionProps = Pick<
+  MapSidebarProps,
+  'onOpenSimulationSheet' | 'onResetSimulation' | 'isSimulationRunning' | 'simulations' | 'onLoadSimulation' | 'airbaseStatus' | 'airbaseMessage'
+>;
 
-function SimulateActionsSection({ onOpenSimulationSheet }: SimulateActionsSectionProps) {
+function SimulateActionsSection({
+  onOpenSimulationSheet,
+  onResetSimulation,
+  isSimulationRunning,
+  simulations = [],
+  onLoadSimulation,
+  airbaseStatus,
+  airbaseMessage,
+}: SimulateActionsSectionProps) {
   return (
     <SidebarInsetSection className="shell-divider border-t pt-4">
       <button
         type="button"
         onClick={onOpenSimulationSheet}
-        className="shell-button cursor-pointer rounded-sm border px-3 py-2 text-sm font-medium transition-colors"
+        className="shell-button cursor-pointer rounded-sm border px-3 py-2 text-sm font-medium transition-colors w-full"
       >
         Create
       </button>
+
+      {airbaseStatus === 'error' && airbaseMessage && (
+        <div className="mt-4">
+          <ErrorMessage message={airbaseMessage} />
+        </div>
+      )}
+
+      <div className="mt-4 flex flex-col gap-2">
+        <label htmlFor="simulation-select" className="text-xs font-medium shell-text-muted">
+          Current Simulations
+        </label>
+        {simulations.length === 0 ? (
+          <div className="text-xs shell-text-muted italic px-1">
+            No simulations found
+          </div>
+        ) : (
+          <select
+            id="simulation-select"
+            className="shell-input w-full rounded-sm border px-2 py-1.5 text-sm"
+            defaultValue=""
+            onChange={(e) => {
+              if (e.target.value && onLoadSimulation) {
+                onLoadSimulation(e.target.value);
+              }
+            }}
+          >
+            <option value="" disabled>
+              Select a simulation...
+            </option>
+            {simulations.map((sim) => (
+              <option key={sim.id} value={sim.id}>
+                {sim.id}
+              </option>
+            ))}
+          </select>
+        )}
+      </div>
+
+      {isSimulationRunning && onResetSimulation && (
+        <button
+          type="button"
+          onClick={onResetSimulation}
+          className="shell-button cursor-pointer rounded-sm border px-3 py-2 text-sm font-medium transition-colors w-full mt-4"
+        >
+          Reset
+        </button>
+      )}
     </SidebarInsetSection>
   );
 }
@@ -182,7 +245,15 @@ export function MapSidebar(props: MapSidebarProps) {
             onSelectAirbaseFromList={props.onSelectAirbaseFromList}
           />
         ) : (
-          <SimulateActionsSection onOpenSimulationSheet={props.onOpenSimulationSheet} />
+          <SimulateActionsSection
+            onOpenSimulationSheet={props.onOpenSimulationSheet}
+            onResetSimulation={props.onResetSimulation}
+            isSimulationRunning={props.isSimulationRunning}
+            simulations={props.simulations}
+            onLoadSimulation={props.onLoadSimulation}
+            airbaseStatus={props.airbaseStatus}
+            airbaseMessage={props.airbaseMessage}
+          />
         )}
       </div>
 

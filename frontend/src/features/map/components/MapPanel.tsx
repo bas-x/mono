@@ -78,7 +78,15 @@ export function MapPanel() {
   );
   const [selectedAirbaseDetailsState, setSelectedAirbaseDetailsState] =
     useState<SelectedAirbaseDetailsState>({ status: 'idle' });
-  const { state: simulationState, createSimulation, reset: resetSimulation } = useSimulation();
+  const { 
+    state: simulationState, 
+    simulations,
+    isLoadingSimulations,
+    loadSimulation,
+    createSimulation, 
+    reset: resetSimulation, 
+    triggerReset 
+  } = useSimulation();
   const detailsCacheRef = useRef(new Map<string, AirbaseDetails>());
   const requestSequenceRef = useRef(0);
   const activeAbortControllerRef = useRef<AbortController | null>(null);
@@ -317,6 +325,10 @@ export function MapPanel() {
           onToggleAirbaseList={handleToggleAirbaseList}
           onSelectAirbaseFromList={handleSelectAirbaseFromList}
           onOpenSimulationSheet={handleOpenSimulationSheet}
+          onResetSimulation={triggerReset}
+          isSimulationRunning={simulationState.status === 'running'}
+          simulations={simulations}
+          onLoadSimulation={loadSimulation}
         />
       </section>
 

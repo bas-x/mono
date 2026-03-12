@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 
 import { useApi } from '@/lib/api';
 import type { SimulationAirbase, SimulationAircraft } from '@/lib/api/types';
@@ -12,12 +12,28 @@ export type SimulationState =
 export function useSimulation() {
   const { clients } = useApi();
   const [state, setState] = useState<SimulationState>({ status: 'idle' });
+  const [simulations, setSimulations] = useState<Array<{ id: string }>>([]);
+  const [isLoadingSimulations, setIsLoadingSimulations] = useState(false);
 
-  const createSimulation = useCallback(async (seed: string) => {
+  const fetchSimulations = useCallback(async () => {
+    setIsLoadingSimulations(true);
+    try {
+      const list = await clients.simulation.getSimulations();
+      setSimulations(list);
+    } catch (error) {
+      console.error('Failed to fetch simulations', error);
+    } finally {
+      setIsLoadingSimulations(false);
+    }
+  }, [clients.simulation]);
+
+  useEffect(() => {
+    fetchSimulations().catch(() => {});
+  }, [fetchSimulations]);
+
+  const loadSimulation = useCallback(async (id: string) => {
     setState({ status: 'creating' });
     try {
-      const { id } = await clients.simulation.createBaseSimulation(seed);
-      
       const [airbases, aircrafts] = await Promise.all([
         clients.simulation.getAirbases(id),
         clients.simulation.getAircrafts(id),
@@ -32,10 +48,32 @@ export function useSimulation() {
     } catch (error) {
       setState({
         status: 'error',
-        message: error instanceof Error ? error.message : 'Failed to create simulation',
+        message: error instanceof Error ? error.message : 'Failed to load simulation',
       });
     }
   }, [clients.simulation]);
+
+  const createSimulation = useCallback(async (seed: string) => {
+    setState({ status: 'creating' });
+    try {
+      const { id } = await clients.simulation.createBaseSimulation(seed);
+      await fetchSimulations();
+      await loadSimulation(id);
+    } catch (error: any) {
+      if (error?.status === 409 || error?.response?.status === 409 || error?.message?.includes('already exists')) {
+        setState({
+          status: 'error',
+          message: 'base simulation already exists',
+        });
+        await fetchSimulations();
+      } else {
+        setState({
+          status: 'error',
+          message: error instanceof Error ? error.message : 'Failed to create simulation',
+        });
+      }
+    }
+  }, [clients.simulation, fetchSimulations, loadSimulation]);
 
   const refreshData = useCallback(async () => {
     if (state.status !== 'running') return;
@@ -63,10 +101,24 @@ export function useSimulation() {
     setState({ status: 'idle' });
   }, []);
 
+  const triggerReset = useCallback(async () => {
+    if (state.status !== 'running') return;
+    try {
+      await clients.simulation.resetSimulation(state.simulationId);
+      await refreshData();
+    } catch (error) {
+      console.error('Failed to reset simulation', error);
+    }
+  }, [clients.simulation, state, refreshData]);
+
   return {
     state,
+    simulations,
+    isLoadingSimulations,
+    loadSimulation,
     createSimulation,
     refreshData,
+    triggerReset,
     reset,
   };
 }
