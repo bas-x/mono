@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 
 import { useApi } from '@/lib/api';
 import type { SimulationAirbase, SimulationAircraft } from '@/lib/api/types';
@@ -8,6 +9,36 @@ export type SimulationState =
   | { status: 'creating' }
   | { status: 'running'; simulationId: string; airbases: SimulationAirbase[]; aircrafts: SimulationAircraft[] }
   | { status: 'error'; message: string };
+
+function extractErrorMessage(error: unknown): string {
+  if (typeof error === 'object' && error !== null && 'status' in error && 'body' in error) {
+    const status = (error as any).status as number;
+    const bodyStr = (error as any).body as string;
+    let backendMsg = bodyStr;
+    try {
+      const parsed = JSON.parse(bodyStr);
+      if (parsed && typeof parsed.message === 'string') {
+        backendMsg = parsed.message;
+      }
+    } catch {
+      backendMsg = bodyStr;
+    }
+    return `Error ${status}: ${backendMsg}`;
+  }
+  
+  if (error instanceof Error) {
+    return error.message;
+  }
+  
+  return 'An unknown error occurred';
+}
+
+function getErrorStatus(error: unknown): number | undefined {
+  if (typeof error === 'object' && error !== null && 'status' in error) {
+    return (error as any).status as number;
+  }
+  return undefined;
+}
 
 export function useSimulation() {
   const { clients } = useApi();
@@ -46,9 +77,11 @@ export function useSimulation() {
         aircrafts,
       });
     } catch (error) {
+      const errorMessage = extractErrorMessage(error);
+      toast.error(errorMessage);
       setState({
         status: 'error',
-        message: error instanceof Error ? error.message : 'Failed to load simulation',
+        message: errorMessage,
       });
     }
   }, [clients.simulation]);
@@ -59,18 +92,18 @@ export function useSimulation() {
       const { id } = await clients.simulation.createBaseSimulation(seed);
       await fetchSimulations();
       await loadSimulation(id);
-    } catch (error: any) {
-      if (error?.status === 409 || error?.response?.status === 409 || error?.message?.includes('already exists')) {
-        setState({
-          status: 'error',
-          message: 'base simulation already exists',
-        });
+    } catch (error: unknown) {
+      const errorMessage = extractErrorMessage(error);
+      const statusCode = getErrorStatus(error);
+      
+      toast.error(errorMessage);
+      setState({
+        status: 'error',
+        message: errorMessage,
+      });
+      
+      if (statusCode === 409) {
         await fetchSimulations();
-      } else {
-        setState({
-          status: 'error',
-          message: error instanceof Error ? error.message : 'Failed to create simulation',
-        });
       }
     }
   }, [clients.simulation, fetchSimulations, loadSimulation]);
@@ -107,7 +140,8 @@ export function useSimulation() {
       await clients.simulation.resetSimulation(state.simulationId);
       await refreshData();
     } catch (error) {
-      console.error('Failed to reset simulation', error);
+      const errorMessage = extractErrorMessage(error);
+      toast.error(errorMessage);
     }
   }, [clients.simulation, state, refreshData]);
 

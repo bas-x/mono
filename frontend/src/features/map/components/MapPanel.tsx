@@ -329,7 +329,6 @@ export function MapPanel() {
           isSimulationRunning={simulationState.status === 'running'}
           simulations={simulations}
           onLoadSimulation={loadSimulation}
-          simulationError={simulationState.status === 'error' ? simulationState.message : undefined}
         />
       </section>
 

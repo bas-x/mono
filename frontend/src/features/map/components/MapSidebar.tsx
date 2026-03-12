@@ -2,7 +2,6 @@ import { useState, useRef, useEffect } from 'react';
 import type { ReactNode } from 'react';
 
 import { AirbaseList } from '@/features/map/components/AirbaseList';
-import { ErrorMessage } from '@/features/ui/components/ErrorMessage';
 import {
   SelectionDrawer,
   type SelectedAirbaseDetailsState,
@@ -29,7 +28,6 @@ type MapSidebarProps = {
   isSimulationRunning?: boolean;
   simulations?: Array<{ id: string }>;
   onLoadSimulation?: (id: string) => void;
-  simulationError?: string;
 };
 
 type SectionProps = {
@@ -158,7 +156,6 @@ type SimulateActionsSectionProps = Pick<
   | 'isSimulationRunning'
   | 'simulations'
   | 'onLoadSimulation'
-  | 'simulationError'
 >;
 
 function SimulateActionsSection({
@@ -167,7 +164,6 @@ function SimulateActionsSection({
   isSimulationRunning,
   simulations = [],
   onLoadSimulation,
-  simulationError,
 }: SimulateActionsSectionProps) {
   const [isConfirmingReset, setIsConfirmingReset] = useState(false);
   const resetTimeoutRef = useRef<number | null>(null);
@@ -206,12 +202,6 @@ function SimulateActionsSection({
       >
         Create
       </button>
-
-      {simulationError && (
-        <div className="mt-4">
-          <ErrorMessage message={simulationError} />
-        </div>
-      )}
 
       <div className="mt-4 flex flex-col gap-2">
         <label htmlFor="simulation-select" className="text-xs font-medium shell-text-muted">
@@ -288,7 +278,6 @@ export function MapSidebar(props: MapSidebarProps) {
             isSimulationRunning={props.isSimulationRunning}
             simulations={props.simulations}
             onLoadSimulation={props.onLoadSimulation}
-            simulationError={props.simulationError}
           />
         )}
       </div>
