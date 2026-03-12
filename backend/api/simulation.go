@@ -211,6 +211,12 @@ func defaultBaseSimulationOptions() *simulation.SimulationOptions {
 			AircraftMax: 4,
 			NeedsMin:    1,
 			NeedsMax:    3,
+			SeverityMin: 60,
+			SeverityMax: 90,
+		},
+		ThreatOpts: simulation.ThreatOptions{
+			SpawnChance: prng.New(1, 4),
+			MaxActive:   3,
 		},
 	}
 }
