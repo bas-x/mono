@@ -16,13 +16,14 @@ export function TimelineTrack({ events, currentTick, maxTick, playbackTick, onSc
   const scrollRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const [selectedEvent, setSelectedEvent] = useState<SimulationEvent | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
+  const dragRef = useRef({ isDown: false, isDragging: false, startX: 0 });
+  const [isDraggingUI, setIsDraggingUI] = useState(false);
 
   useEffect(() => {
-    if (scrollRef.current && !selectedEvent && playbackTick === null && !isDragging) {
+    if (scrollRef.current && !selectedEvent && playbackTick === null && !isDraggingUI) {
       scrollRef.current.scrollLeft = scrollRef.current.scrollWidth;
     }
-  }, [events.length, selectedEvent, playbackTick, isDragging, zoom]);
+  }, [events.length, selectedEvent, playbackTick, isDraggingUI, zoom]);
 
   const updateScrubberPosition = useCallback((clientX: number) => {
     if (!trackRef.current || maxTick === 0) return;
@@ -41,19 +42,39 @@ export function TimelineTrack({ events, currentTick, maxTick, playbackTick, onSc
   }, [maxTick, onScrub]);
 
   const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    setIsDragging(true);
+    dragRef.current = {
+      isDown: true,
+      isDragging: false,
+      startX: e.clientX,
+    };
     e.currentTarget.setPointerCapture(e.pointerId);
-    updateScrubberPosition(e.clientX);
   };
 
   const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDragging) return;
-    updateScrubberPosition(e.clientX);
+    if (!dragRef.current.isDown) return;
+    
+    if (!dragRef.current.isDragging) {
+      if (Math.abs(e.clientX - dragRef.current.startX) > 5) {
+        dragRef.current.isDragging = true;
+        setIsDraggingUI(true);
+      }
+    }
+
+    if (dragRef.current.isDragging) {
+      updateScrubberPosition(e.clientX);
+    }
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDragging) return;
-    setIsDragging(false);
+    if (!dragRef.current.isDown) return;
+    
+    if (!dragRef.current.isDragging) {
+      updateScrubberPosition(e.clientX);
+    }
+
+    dragRef.current.isDown = false;
+    dragRef.current.isDragging = false;
+    setIsDraggingUI(false);
     e.currentTarget.releasePointerCapture(e.pointerId);
   };
 
@@ -115,8 +136,10 @@ export function TimelineTrack({ events, currentTick, maxTick, playbackTick, onSc
                   isSelected={selectedEvent === evt}
                   onClick={(e) => {
                     e.stopPropagation();
-                    setSelectedEvent(evt === selectedEvent ? null : evt);
-                    onScrub(evtTick);
+                    if (!dragRef.current.isDragging) {
+                      setSelectedEvent(evt === selectedEvent ? null : evt);
+                      onScrub(evtTick);
+                    }
                   }}
                 />
               </div>
@@ -124,7 +147,7 @@ export function TimelineTrack({ events, currentTick, maxTick, playbackTick, onSc
           })}
 
           <div 
-            className={`absolute top-1/2 h-6 w-2.5 -translate-y-1/2 -translate-x-1/2 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all duration-200 ${isDragging ? 'scale-125 cursor-grabbing' : 'hover:scale-110 cursor-grab'}`}
+            className={`absolute top-1/2 h-6 w-2.5 -translate-y-1/2 -translate-x-1/2 rounded-full bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)] transition-all duration-200 ${isDraggingUI ? 'scale-125 cursor-grabbing' : 'hover:scale-110 cursor-grab'}`}
             style={{ left: `${progressPercent}%` }}
           />
         </div>
