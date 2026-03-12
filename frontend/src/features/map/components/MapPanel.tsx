@@ -24,6 +24,7 @@ import {
 import { useApi } from '@/lib/api';
 
 import { SimulationInfoCard } from '@/features/simulation/components/SimulationInfoCard';
+import { SimulationTimeline } from '@/features/simulation/components/timeline/SimulationTimeline';
 
 type ThemeStyle = CSSProperties & {
   '--color-map-surface': string;
@@ -347,7 +348,10 @@ export function MapPanel() {
       </section>
 
       {viewMode === 'simulate' && simulationState.status === 'running' && (
-        <SimulationInfoCard simulationState={simulationState} simulations={simulations} />
+        <>
+          <SimulationInfoCard simulationState={simulationState} simulations={simulations} />
+          <SimulationTimeline simulationId={simulationState.simulationId} />
+        </>
       )}
 
       <SimulationSetupSheet
