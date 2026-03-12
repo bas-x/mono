@@ -3,12 +3,20 @@ import { toast } from 'sonner';
 
 import { useApi } from '@/lib/api';
 import { extractErrorMessage, getErrorStatus } from '@/lib/api/errors';
-import type { SimulationAirbase, SimulationAircraft } from '@/lib/api/types';
+import { useSimulationStream } from '@/lib/api/useSimulationStream';
+import type { SimulationAirbase, SimulationAircraft, SimulationEvent } from '@/lib/api/types';
 
 export type SimulationState =
   | { status: 'idle' }
   | { status: 'creating' }
-  | { status: 'running'; simulationId: string; airbases: SimulationAirbase[]; aircrafts: SimulationAircraft[] }
+  | { 
+      status: 'running'; 
+      simulationId: string; 
+      airbases: SimulationAirbase[]; 
+      aircrafts: SimulationAircraft[];
+      tick?: number;
+      time?: string;
+    }
   | { status: 'error'; message: string };
 
 export function useSimulation() {
@@ -16,6 +24,43 @@ export function useSimulation() {
   const [state, setState] = useState<SimulationState>({ status: 'idle' });
   const [simulations, setSimulations] = useState<Array<{ id: string }>>([]);
   const [isLoadingSimulations, setIsLoadingSimulations] = useState(false);
+  
+  const stream = useSimulationStream(state.status === 'running' ? state.simulationId : undefined);
+
+  useEffect(() => {
+    if (state.status !== 'running') {
+      return;
+    }
+
+    return stream.subscribe((event: SimulationEvent) => {
+      if (event.type === 'simulation_step') {
+        setState((current) => {
+          if (current.status !== 'running') return current;
+          return {
+            ...current,
+            tick: event.tick as number,
+            time: event.timestamp,
+          };
+        });
+      } else if (event.type === 'aircraft_state_change') {
+        setState((current) => {
+          if (current.status !== 'running') return current;
+          const updatedAircrafts = current.aircrafts.map((a) =>
+            a.tailNumber === event.tailNumber ? { ...a, ...event.aircraft } : a
+          );
+          return { ...current, aircrafts: updatedAircrafts };
+        });
+      } else if (event.type === 'landing_assignment') {
+        setState((current) => {
+          if (current.status !== 'running') return current;
+          const updatedAircrafts = current.aircrafts.map((a) =>
+            a.tailNumber === event.tailNumber ? { ...a, assignedTo: event.baseId } : a
+          );
+          return { ...current, aircrafts: updatedAircrafts };
+        });
+      }
+    });
+  }, [stream, state.status]);
 
   const fetchSimulations = useCallback(async () => {
     setIsLoadingSimulations(true);
