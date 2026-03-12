@@ -30,7 +30,7 @@ export function useSmoothAircrafts(
   const stateRef = useRef<{
     [tailNumber: string]: {
       current: { x: number; y: number; rotation: number };
-      target: { x: number; y: number; rotation: number };
+      target: { x: number; y: number; rotation: number; rawX: number; rawY: number };
     };
   }>({});
 
@@ -58,23 +58,21 @@ export function useSmoothAircrafts(
       if (!state[ac.tailNumber]) {
         state[ac.tailNumber] = {
           current: { x: ptX, y: ptY, rotation: 0 },
-          target: { x: ptX, y: ptY, rotation: 0 },
+          target: { x: ptX, y: ptY, rotation: 0, rawX: ac.position.x, rawY: ac.position.y },
         };
       } else {
         const prevTarget = state[ac.tailNumber].target;
         
-        const wScale = containerSize.width > 0 ? containerSize.width / 100 : 1;
-        const hScale = containerSize.height > 0 ? containerSize.height / 100 : 1;
-        const dx = (ptX - prevTarget.x) * wScale;
-        const dy = (ptY - prevTarget.y) * hScale;
+        const dx = ac.position.x - prevTarget.rawX;
+        const dy = ac.position.y - prevTarget.rawY;
         
         let newRotation = prevTarget.rotation;
-        if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+        if (Math.abs(dx) > 0.001 || Math.abs(dy) > 0.001) {
           const headingDeg = Math.atan2(dy, dx) * (180 / Math.PI);
-          newRotation = headingDeg - 60;
+          newRotation = headingDeg + 45;
         }
 
-        state[ac.tailNumber].target = { x: ptX, y: ptY, rotation: newRotation };
+        state[ac.tailNumber].target = { x: ptX, y: ptY, rotation: newRotation, rawX: ac.position.x, rawY: ac.position.y };
       }
     });
 
