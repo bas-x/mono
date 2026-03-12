@@ -3,14 +3,24 @@ module github.com/bas-x/basex
 go 1.26.0
 
 require (
+	github.com/gorilla/websocket v1.5.3
+	github.com/hajimehoshi/ebiten/v2 v2.9.9
 	github.com/joho/godotenv v1.5.1
 	github.com/stretchr/testify v1.11.1
+	golang.org/x/image v0.37.0
 )
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/gorilla/websocket v1.5.3 // indirect
+	github.com/ebitengine/gomobile v0.0.0-20250923094054-ea854a63cce1 // indirect
+	github.com/ebitengine/hideconsole v1.0.0 // indirect
+	github.com/ebitengine/purego v0.9.0 // indirect
+	github.com/ebitenui/ebitenui v0.7.2 // indirect
+	github.com/frustra/bbcode v0.0.0-20201127003707-6ef347fbe1c8 // indirect
+	github.com/go-text/typesetting v0.3.0 // indirect
+	github.com/jezek/xgb v1.1.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	golang.org/x/sync v0.20.0 // indirect
 )
 
 require (
@@ -51,10 +61,10 @@ require (
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
 	golang.org/x/crypto v0.38.0 // indirect
-	golang.org/x/exp v0.0.0-20231006140011-7918f672742d // indirect
+	golang.org/x/exp v0.0.0-20250305212735-054e65f0b394 // indirect
 	golang.org/x/net v0.40.0 // indirect
-	golang.org/x/sys v0.33.0 // indirect
-	golang.org/x/text v0.25.0 // indirect
+	golang.org/x/sys v0.36.0 // indirect
+	golang.org/x/text v0.35.0 // indirect
 	golang.org/x/time v0.11.0
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
