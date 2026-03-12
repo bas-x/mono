@@ -134,6 +134,15 @@ func (s *State) ApplyEvent(event services.Event) {
 			}
 		}
 		s.Threats = append([]services.Threat(nil), filtered...)
+	case services.AllAircraftPositionsEvent:
+		for _, snap := range e.Positions {
+			for i := range s.Aircraft {
+				if s.Aircraft[i].TailNumber == snap.TailNumber {
+					s.Aircraft[i].Position = snap.Position
+					break
+				}
+			}
+		}
 	default:
 		s.addEvent(eventSummary(event), true)
 	}

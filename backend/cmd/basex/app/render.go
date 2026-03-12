@@ -94,12 +94,16 @@ func (r *Runtime) drawMap(img *image.RGBA, rect image.Rectangle) {
 		drawThreatLabel(mapSurface, pt, threat.Region)
 	}
 
-	for i, aircraft := range r.state.Aircraft {
-		anchor := image.Pt(12+(i%6)*12, 12+(i/6)*12)
+	for _, aircraft := range r.state.Aircraft {
+		if aircraft.Position.X == 0 && aircraft.Position.Y == 0 {
+			continue
+		}
+		pt := proj.projectServicePoint(aircraft.Position)
 		if aircraft.TailNumber == r.state.SelectedAircraft {
-			drawCircle(mapSurface, anchor.X, anchor.Y, 5, airbaseSelected)
+			drawCircle(mapSurface, pt.X, pt.Y, 5, airbaseSelected)
+			drawText(mapSurface, pt.X+7, pt.Y+4, textSecondary, aircraft.TailNumber[:8])
 		} else {
-			drawCircle(mapSurface, anchor.X, anchor.Y, 4, aircraftMarker)
+			drawCircle(mapSurface, pt.X, pt.Y, 4, aircraftMarker)
 		}
 	}
 

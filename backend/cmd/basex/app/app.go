@@ -438,12 +438,14 @@ func (r *Runtime) selectMapEntityAt(screenX, screenY int) bool {
 	surfacePoint := image.Pt(screenX-mapRect.Min.X, screenY-mapRect.Min.Y)
 	proj := newProjection(image.Rect(0, 0, max(mapRect.Dx(), 1), max(mapRect.Dy(), 1)), r.viewport)
 	for i, aircraft := range r.state.Aircraft {
-		anchor := image.Pt(12+(i%6)*12, 12+(i/6)*12)
-		if distanceSquared(surfacePoint, anchor) <= 64 {
+		if aircraft.Position.X == 0 && aircraft.Position.Y == 0 {
+			continue
+		}
+		pt := proj.projectServicePoint(aircraft.Position)
+		if distanceSquared(surfacePoint, pt) <= 64 {
 			r.selectAircraft(i)
 			return true
 		}
-		_ = aircraft
 	}
 	for i, base := range r.state.Airbases {
 		pt := proj.projectServicePoint(base.Location)
