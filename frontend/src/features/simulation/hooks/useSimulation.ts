@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useApi } from '@/lib/api';
+import { extractErrorMessage, getErrorStatus } from '@/lib/api/errors';
 import type { SimulationAirbase, SimulationAircraft } from '@/lib/api/types';
 
 export type SimulationState =
@@ -9,36 +10,6 @@ export type SimulationState =
   | { status: 'creating' }
   | { status: 'running'; simulationId: string; airbases: SimulationAirbase[]; aircrafts: SimulationAircraft[] }
   | { status: 'error'; message: string };
-
-function extractErrorMessage(error: unknown): string {
-  if (typeof error === 'object' && error !== null && 'status' in error && 'body' in error) {
-    const status = (error as any).status as number;
-    const bodyStr = (error as any).body as string;
-    let backendMsg = bodyStr;
-    try {
-      const parsed = JSON.parse(bodyStr);
-      if (parsed && typeof parsed.message === 'string') {
-        backendMsg = parsed.message;
-      }
-    } catch {
-      backendMsg = bodyStr;
-    }
-    return `Error ${status}: ${backendMsg}`;
-  }
-  
-  if (error instanceof Error) {
-    return error.message;
-  }
-  
-  return 'An unknown error occurred';
-}
-
-function getErrorStatus(error: unknown): number | undefined {
-  if (typeof error === 'object' && error !== null && 'status' in error) {
-    return (error as any).status as number;
-  }
-  return undefined;
-}
 
 export function useSimulation() {
   const { clients } = useApi();
@@ -76,6 +47,7 @@ export function useSimulation() {
         airbases,
         aircrafts,
       });
+      toast.success('Simulation loaded successfully');
     } catch (error) {
       const errorMessage = extractErrorMessage(error);
       toast.error(errorMessage);
@@ -90,6 +62,7 @@ export function useSimulation() {
     setState({ status: 'creating' });
     try {
       const { id } = await clients.simulation.createBaseSimulation(seed);
+      toast.success('Simulation created successfully');
       await fetchSimulations();
       await loadSimulation(id);
     } catch (error: unknown) {
@@ -139,6 +112,12 @@ export function useSimulation() {
     try {
       await clients.simulation.resetSimulation(state.simulationId);
       await refreshData();
+      toast.success('Simulation reset successfully', {
+        action: {
+          label: 'Undo',
+          onClick: () => console.log('Undo reset not yet implemented on backend'),
+        },
+      });
     } catch (error) {
       const errorMessage = extractErrorMessage(error);
       toast.error(errorMessage);

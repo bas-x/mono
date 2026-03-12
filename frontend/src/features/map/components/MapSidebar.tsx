@@ -208,9 +208,7 @@ function SimulateActionsSection({
           Current Simulations
         </label>
         {simulations.length === 0 ? (
-          <div className="text-xs shell-text-muted italic px-1">
-            No simulations found
-          </div>
+          <div className="text-xs shell-text-muted italic px-1">No simulations found</div>
         ) : (
           <select
             id="simulation-select"
@@ -223,7 +221,7 @@ function SimulateActionsSection({
             }}
           >
             <option value="" disabled>
-              Select a simulation...
+              Select
             </option>
             {simulations.map((sim) => (
               <option key={sim.id} value={sim.id}>
