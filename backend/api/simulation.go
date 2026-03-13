@@ -5,6 +5,7 @@ import (
 	"math/rand/v2"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/charmbracelet/log"
 	"github.com/labstack/echo/v4"
@@ -14,9 +15,72 @@ import (
 	"github.com/bas-x/basex/simulation"
 )
 
+type ratioRequest struct {
+	Numerator   uint64 `json:"numerator"`
+	Denominator uint64 `json:"denominator"`
+}
+
+type constellationOptionsRequest struct {
+	IncludeRegions        []string      `json:"includeRegions"`
+	ExcludeRegions        []string      `json:"excludeRegions"`
+	MinPerRegion          uint          `json:"minPerRegion"`
+	MaxPerRegion          uint          `json:"maxPerRegion"`
+	MaxTotal              uint          `json:"maxTotal"`
+	RegionProbability     *ratioRequest `json:"regionProbability"`
+	MaxAttemptsPerAirbase uint          `json:"maxAttemptsPerAirbase"`
+}
+
+type fleetOptionsRequest struct {
+	AircraftMin    uint          `json:"aircraftMin"`
+	AircraftMax    uint          `json:"aircraftMax"`
+	NeedsMin       uint          `json:"needsMin"`
+	NeedsMax       uint          `json:"needsMax"`
+	NeedsPool      []string      `json:"needsPool"`
+	SeverityMin    uint          `json:"severityMin"`
+	SeverityMax    uint          `json:"severityMax"`
+	BlockingChance *ratioRequest `json:"blockingChance"`
+}
+
+type threatOptionsRequest struct {
+	SpawnChance    *ratioRequest `json:"spawnChance"`
+	MaxActive      uint          `json:"maxActive"`
+	MaxActiveTicks uint64        `json:"maxActiveTicks"`
+}
+
+type phaseDurationsRequest struct {
+	Outbound        time.Duration `json:"outbound"`
+	Engaged         time.Duration `json:"engaged"`
+	InboundDecision time.Duration `json:"inboundDecision"`
+	CommitApproach  time.Duration `json:"commitApproach"`
+	Servicing       time.Duration `json:"servicing"`
+	Ready           time.Duration `json:"ready"`
+}
+
+type needRateModelRequest struct {
+	OutboundMilliPerHour  int64 `json:"outboundMilliPerHour"`
+	EngagedMilliPerHour   int64 `json:"engagedMilliPerHour"`
+	ServicingMilliPerHour int64 `json:"servicingMilliPerHour"`
+	VariancePermille      int64 `json:"variancePermille"`
+}
+
+type lifecycleOptionsRequest struct {
+	Durations       *phaseDurationsRequest          `json:"durations"`
+	ReturnThreshold int                             `json:"returnThreshold"`
+	NeedRates       map[string]needRateModelRequest `json:"needRates"`
+}
+
+type simulationOptionsRequest struct {
+	ConstellationOpts *constellationOptionsRequest `json:"constellationOpts"`
+	FleetOpts         *fleetOptionsRequest         `json:"fleetOpts"`
+	ThreatOpts        *threatOptionsRequest        `json:"threatOpts"`
+	LifecycleOpts     *lifecycleOptionsRequest     `json:"lifecycleOpts"`
+}
+
 func PostCreateBaseSimulation(logger *log.Logger, deps *ServerDependencies) echo.HandlerFunc {
 	type request struct {
-		Seed string `json:"seed"`
+		Seed              string                    `json:"seed"`
+		UntilTick         int64                     `json:"untilTick"`
+		SimulationOptions *simulationOptionsRequest `json:"simulationOptions"`
 	}
 	type response struct {
 		ID string `json:"id"`
@@ -33,7 +97,19 @@ func PostCreateBaseSimulation(logger *log.Logger, deps *ServerDependencies) echo
 			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
 		}
 
-		cfg := services.BaseSimulationConfig{Seed: seed, Options: defaultBaseSimulationOptions()}
+		options, err := mapSimulationOptionsRequest(req.SimulationOptions)
+		if err != nil {
+			logger.Warn("invalid simulation options", "err", err)
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+		if options == nil {
+			options = defaultBaseSimulationOptions()
+		}
+		cfg := services.BaseSimulationConfig{
+			Seed:      seed,
+			UntilTick: req.UntilTick,
+			Options:   options,
+		}
 		_, err = deps.SimulationService.CreateBaseSimulation(cfg)
 		if err != nil {
 			if errors.Is(err, services.ErrBaseAlreadyExists) {
@@ -277,6 +353,136 @@ func parseSeed(raw string) ([32]byte, error) {
 	}
 	copy(out[:], []byte(trimmed))
 	return out, nil
+}
+
+func mapSimulationOptionsRequest(req *simulationOptionsRequest) (*simulation.SimulationOptions, error) {
+	if req == nil {
+		return nil, nil
+	}
+	options := &simulation.SimulationOptions{}
+	if req.ConstellationOpts != nil {
+		options.ConstellationOpts = simulation.ConstellationOptions{
+			IncludeRegions:        req.ConstellationOpts.IncludeRegions,
+			ExcludeRegions:        req.ConstellationOpts.ExcludeRegions,
+			MinPerRegion:          req.ConstellationOpts.MinPerRegion,
+			MaxPerRegion:          req.ConstellationOpts.MaxPerRegion,
+			MaxTotal:              req.ConstellationOpts.MaxTotal,
+			MaxAttemptsPerAirbase: req.ConstellationOpts.MaxAttemptsPerAirbase,
+		}
+		if req.ConstellationOpts.RegionProbability != nil {
+			options.ConstellationOpts.RegionProbability = prng.New(req.ConstellationOpts.RegionProbability.Numerator, req.ConstellationOpts.RegionProbability.Denominator)
+		}
+	}
+	if req.FleetOpts != nil {
+		needsPool, err := mapNeedTypes(req.FleetOpts.NeedsPool)
+		if err != nil {
+			return nil, err
+		}
+		options.FleetOpts = simulation.FleetOptions{
+			AircraftMin: req.FleetOpts.AircraftMin,
+			AircraftMax: req.FleetOpts.AircraftMax,
+			NeedsMin:    req.FleetOpts.NeedsMin,
+			NeedsMax:    req.FleetOpts.NeedsMax,
+			NeedsPool:   needsPool,
+			SeverityMin: req.FleetOpts.SeverityMin,
+			SeverityMax: req.FleetOpts.SeverityMax,
+		}
+		if req.FleetOpts.BlockingChance != nil {
+			options.FleetOpts.BlockingChance = prng.New(req.FleetOpts.BlockingChance.Numerator, req.FleetOpts.BlockingChance.Denominator)
+		}
+	}
+	if req.ThreatOpts != nil {
+		options.ThreatOpts = simulation.ThreatOptions{
+			MaxActive:      req.ThreatOpts.MaxActive,
+			MaxActiveTicks: req.ThreatOpts.MaxActiveTicks,
+		}
+		if req.ThreatOpts.SpawnChance != nil {
+			options.ThreatOpts.SpawnChance = prng.New(req.ThreatOpts.SpawnChance.Numerator, req.ThreatOpts.SpawnChance.Denominator)
+		}
+	}
+	if req.LifecycleOpts != nil {
+		lifecycle := simulation.DefaultLifecycleModel()
+		if req.LifecycleOpts.Durations != nil {
+			lifecycle.Durations = simulation.PhaseDurations{
+				Outbound:        req.LifecycleOpts.Durations.Outbound,
+				Engaged:         req.LifecycleOpts.Durations.Engaged,
+				InboundDecision: req.LifecycleOpts.Durations.InboundDecision,
+				CommitApproach:  req.LifecycleOpts.Durations.CommitApproach,
+				Servicing:       req.LifecycleOpts.Durations.Servicing,
+				Ready:           req.LifecycleOpts.Durations.Ready,
+			}
+		}
+		if req.LifecycleOpts.ReturnThreshold != 0 {
+			lifecycle.ReturnThreshold = req.LifecycleOpts.ReturnThreshold
+		}
+		if len(req.LifecycleOpts.NeedRates) > 0 {
+			needRates := make(map[simulation.NeedType]simulation.NeedRateModel, len(req.LifecycleOpts.NeedRates))
+			for key, value := range req.LifecycleOpts.NeedRates {
+				needType, err := mapNeedType(key)
+				if err != nil {
+					return nil, err
+				}
+				needRates[needType] = simulation.NeedRateModel{
+					OutboundMilliPerHour:  value.OutboundMilliPerHour,
+					EngagedMilliPerHour:   value.EngagedMilliPerHour,
+					ServicingMilliPerHour: value.ServicingMilliPerHour,
+					VariancePermille:      value.VariancePermille,
+				}
+			}
+			lifecycle.NeedRates = needRates
+		}
+		options.LifecycleOpts = &lifecycle
+	}
+	return options, nil
+}
+
+func mapNeedTypes(values []string) ([]simulation.NeedType, error) {
+	if len(values) == 0 {
+		return nil, nil
+	}
+	result := make([]simulation.NeedType, 0, len(values))
+	for _, value := range values {
+		needType, err := mapNeedType(value)
+		if err != nil {
+			if strings.TrimSpace(value) == "" {
+				continue
+			}
+			return nil, err
+		}
+		result = append(result, needType)
+	}
+	return result, nil
+}
+
+func mapNeedType(value string) (simulation.NeedType, error) {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "fuel":
+		return simulation.NeedFuel, nil
+	case "charge":
+		return simulation.NeedCharge, nil
+	case "munitions":
+		return simulation.NeedMunitions, nil
+	case "repairs":
+		return simulation.NeedRepairs, nil
+	case "maintenance":
+		return simulation.NeedMaintenance, nil
+	case "missionconfiguration", "mission_configuration", "mission-configuration":
+		return simulation.NeedMissionConfiguration, nil
+	case "crewsupport", "crew_support", "crew-support":
+		return simulation.NeedCrewSupport, nil
+	case "emergency":
+		return simulation.NeedEmergency, nil
+	case "weatherconstraint", "weather_constraint", "weather-constraint":
+		return simulation.NeedWeatherConstraint, nil
+	case "groundsupport", "ground_support", "ground-support":
+		return simulation.NeedGroundSupport, nil
+	case "protection":
+		return simulation.NeedProtection, nil
+	case "":
+		return "", errors.New("empty need type")
+	default:
+		return "", errors.New("invalid need type: " + value)
+	}
 }
 
 func defaultBaseSimulationOptions() *simulation.SimulationOptions {

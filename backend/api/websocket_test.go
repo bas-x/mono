@@ -459,13 +459,12 @@ func TestSimulationEndedEventOverWebSocket(t *testing.T) {
 	deps := initDeps(config)
 	deps.SimulationService = services.NewSimulationService(services.SimulationServiceConfig{
 		RunnerConfig: simulation.ControlledRunnerConfig{TicksPerSecond: 128},
-		RunUntilTick: 3,
 	})
 	server := newServer(logger, config, deps)
 	httpServer := httptest.NewServer(server.Handler)
 	defer httpServer.Close()
 
-	_, err := deps.SimulationService.CreateBaseSimulation(services.BaseSimulationConfig{Options: websocketSafeOptions()})
+	_, err := deps.SimulationService.CreateBaseSimulation(services.BaseSimulationConfig{Options: websocketSafeOptions(), UntilTick: 3})
 	require.NoError(t, err)
 
 	wsURL := "ws" + strings.TrimPrefix(httpServer.URL, "http") + "/ws/simulations/base/events"
@@ -524,6 +523,177 @@ func TestCreateBaseSimulationProvidesGeneratedAircrafts(t *testing.T) {
 		require.NotEmpty(t, aircraft.State)
 		require.NotEmpty(t, aircraft.Needs)
 	}
+}
+
+func TestCreateBaseSimulationAcceptsUntilTickAndSimulationOptions(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	deps.SimulationService = services.NewSimulationService(services.SimulationServiceConfig{
+		RunnerConfig: simulation.ControlledRunnerConfig{TicksPerSecond: 128},
+	})
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	body := `{
+		"seed": "demo-seed",
+		"untilTick": 3,
+		"simulationOptions": {
+			"constellationOpts": {
+				"includeRegions": ["Blekinge"],
+				"minPerRegion": 1,
+				"maxPerRegion": 1,
+				"maxTotal": 1,
+				"regionProbability": {"numerator": 1, "denominator": 1}
+			},
+			"fleetOpts": {
+				"aircraftMin": 1,
+				"aircraftMax": 1,
+				"needsMin": 0,
+				"needsMax": 0
+			},
+			"threatOpts": {
+				"spawnChance": {"numerator": 1, "denominator": 1},
+				"maxActive": 1
+			}
+		}
+	}`
+
+	resp, err := http.Post(httpServer.URL+"/simulations/base", "application/json", bytes.NewBufferString(body))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	startReq, err := http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/start", nil)
+	require.NoError(t, err)
+	startResp, err := http.DefaultClient.Do(startReq)
+	require.NoError(t, err)
+	startResp.Body.Close()
+	require.Equal(t, http.StatusAccepted, startResp.StatusCode)
+
+	require.Eventually(t, func() bool {
+		info, err := deps.SimulationService.Simulation(services.BaseSimulationID)
+		if err != nil {
+			return false
+		}
+		return !info.Running && info.Tick == 3
+	}, 2*time.Second, 10*time.Millisecond)
+
+	resp, err = http.Get(httpServer.URL + "/simulations/base/aircrafts")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var payload struct {
+		Aircrafts []services.Aircraft `json:"aircrafts"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&payload))
+	require.Len(t, payload.Aircrafts, 1)
+}
+
+func TestCreateBaseSimulationAcceptsLifecycleOptions(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	body := `{
+		"simulationOptions": {
+			"constellationOpts": {
+				"includeRegions": ["Blekinge"],
+				"minPerRegion": 1,
+				"maxPerRegion": 1,
+				"maxTotal": 1,
+				"regionProbability": {"numerator": 1, "denominator": 1}
+			},
+			"fleetOpts": {
+				"aircraftMin": 1,
+				"aircraftMax": 1,
+				"needsMin": 1,
+				"needsMax": 1,
+				"needsPool": ["fuel"],
+				"severityMin": 2,
+				"severityMax": 2
+			},
+			"threatOpts": {
+				"spawnChance": {"numerator": 1, "denominator": 1},
+				"maxActive": 1
+			},
+			"lifecycleOpts": {
+				"durations": {
+					"outbound": 3600000000000,
+					"engaged": 1000000000,
+					"inboundDecision": 1000000000,
+					"commitApproach": 1000000000,
+					"servicing": 1000000000,
+					"ready": 0
+				},
+				"returnThreshold": 1,
+				"needRates": {
+					"fuel": {
+						"outboundMilliPerHour": 9000,
+						"engagedMilliPerHour": 9000,
+						"servicingMilliPerHour": 9000,
+						"variancePermille": 0
+					}
+				}
+			}
+		}
+	}`
+
+	resp, err := http.Post(httpServer.URL+"/simulations/base", "application/json", bytes.NewBufferString(body))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	base, ok := deps.SimulationService.Base()
+	require.True(t, ok)
+	require.NotNil(t, base)
+
+	for i := 0; i < 3; i++ {
+		base.Step()
+	}
+	aircrafts := base.Aircrafts()
+	require.Len(t, aircrafts, 1)
+	require.Equal(t, "Inbound", aircrafts[0].State.Name())
+}
+
+func TestCreateBaseSimulationRejectsInvalidLifecycleNeedRateKey(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	body := `{
+		"simulationOptions": {
+			"lifecycleOpts": {
+				"needRates": {
+					"bad-key": {
+						"outboundMilliPerHour": 1,
+						"engagedMilliPerHour": 1,
+						"servicingMilliPerHour": 1,
+						"variancePermille": 1
+					}
+				}
+			}
+		}
+	}`
+
+	resp, err := http.Post(httpServer.URL+"/simulations/base", "application/json", bytes.NewBufferString(body))
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
 }
 
 func websocketSafeOptions() *simulation.SimulationOptions {
