@@ -284,6 +284,14 @@ func TestSimulationService_RunnerStopsWhenUntilTickReached(t *testing.T) {
 		listed := svc.Simulations()
 		return len(listed) == 1 && !listed[0].Running
 	}, 2*time.Second, 10*time.Millisecond)
+
+	listed := svc.Simulations()
+	require.Len(t, listed, 1)
+	require.Equal(t, int64(3), listed[0].UntilTick)
+
+	info, err := svc.Simulation(BaseSimulationID)
+	require.NoError(t, err)
+	require.Equal(t, int64(3), info.UntilTick)
 }
 
 func TestSimulationServiceOverrideAssignmentBeforeCommit(t *testing.T) {

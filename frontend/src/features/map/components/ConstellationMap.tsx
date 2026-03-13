@@ -93,6 +93,7 @@ function asRenderableAirbase(
     infoUrl:
       'infoUrl' in source && typeof source.infoUrl === 'string' ? source.infoUrl : undefined,
     centroid: transformedAnchor,
+    regionId: 'regionId' in source ? source.regionId : undefined,
     markerSizePx: resolveMarkerSizePx(capacity),
     ariaLabel: `${toAriaLabel(source)} ${capacity} capacity (${Math.round(bounds.maxX - bounds.minX)}x${Math.round(bounds.maxY - bounds.minY)})`,
   };
@@ -358,6 +359,8 @@ export function ConstellationMap({
           airbaseId={hoveredAirbase.id}
           leftPercent={hoveredPointPercent.x}
           topPercent={hoveredPointPercent.y}
+          regionId={hoveredAirbase.regionId}
+          coordinates={hoveredAirbase.centroid}
           detailsState={detailsState}
         />
       ) : null}

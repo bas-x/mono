@@ -16,6 +16,7 @@ export type RenderableAirbase = {
   id: string;
   infoUrl?: string;
   centroid: AirbasePoint;
+  regionId?: string;
   ariaLabel: string;
   markerSizePx: number;
 };

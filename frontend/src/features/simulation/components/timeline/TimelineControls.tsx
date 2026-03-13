@@ -60,9 +60,10 @@ type TimelineControlsProps = {
   onToggleFilter: (type: string) => void;
   zoom: number;
   onZoomChange: (z: number) => void;
+  durationLabel?: string | null;
 };
 
-export function TimelineControls({ status, isLoading, onStart, onPause, onResume, filters, onToggleFilter, zoom, onZoomChange }: TimelineControlsProps) {
+export function TimelineControls({ status, isLoading, onStart, onPause, onResume, filters, onToggleFilter, zoom, onZoomChange, durationLabel }: TimelineControlsProps) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
@@ -161,6 +162,11 @@ export function TimelineControls({ status, isLoading, onStart, onPause, onResume
         </button>
       </div>
       <div className="flex items-center justify-end flex-1 gap-4">
+        {durationLabel ? (
+          <div className="hidden xl:flex items-center rounded-lg border border-[color:var(--color-shell-button-border)] bg-[color:var(--color-shell-button-bg)] px-2.5 py-1 text-[10px] uppercase tracking-wider text-[color:var(--color-shell-text-muted)]">
+            End {durationLabel}
+          </div>
+        ) : null}
         <div className="hidden lg:flex items-center gap-1.5 text-[10px] text-white/40">
           <div className="flex gap-0.5 items-center">
             <span className="flex h-4 min-w-[16px] items-center justify-center rounded border border-white/10 bg-white/5 px-1 font-sans text-[10px]">←</span>

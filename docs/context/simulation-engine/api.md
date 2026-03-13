@@ -9,6 +9,7 @@
 
 ## Request Shaping
 - `seed` remains top-level and is optional; an empty frontend seed should be omitted so the backend can apply its default seed handling.
+- The simulation setup UI accepts duration in seconds and converts it to `untilTick` using the backend's default `64` ticks/second runner rate before submitting `POST /simulations/base`.
 - Current frontend controls map into `simulationOptions.constellationOpts` and `simulationOptions.fleetOpts`.
 - Region filters are sent as trimmed string arrays in `includeRegions` and `excludeRegions`.
 - Percent-based UI controls are sent as ratio objects with `{ numerator, denominator }` using denominator `100`.

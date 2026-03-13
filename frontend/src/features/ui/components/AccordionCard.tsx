@@ -27,7 +27,7 @@ export function AccordionCard({
         </h2>
         <button
           onClick={onToggle}
-          className="cursor-pointer text-xs font-medium uppercase tracking-wider text-white transition-all duration-200 ease-out hover:text-white/70 active:scale-95"
+          className="cursor-pointer text-xs font-medium uppercase tracking-wider text-[color:var(--color-shell-text-muted)] transition-all duration-200 ease-out hover:text-[color:var(--color-primary)] active:scale-95"
         >
           {isOpen ? 'HIDE DETAILS' : 'SEE DETAILS'}
         </button>

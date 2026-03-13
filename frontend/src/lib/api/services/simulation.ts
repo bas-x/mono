@@ -52,33 +52,27 @@ export function createSimulationServiceClient(
     },
 
     async startSimulation(simulationId: string, signal?: AbortSignal) {
-      return httpClient.requestJson<void>(
-        `/simulations/${encodeURIComponent(simulationId)}/start`,
-        {
-          method: 'POST',
-          signal,
-        },
-      );
+      void simulationId;
+      return httpClient.requestJson<void>('/simulations/start', {
+        method: 'POST',
+        signal,
+      });
     },
 
     async pauseSimulation(simulationId: string, signal?: AbortSignal) {
-      return httpClient.requestJson<void>(
-        `/simulations/${encodeURIComponent(simulationId)}/pause`,
-        {
-          method: 'POST',
-          signal,
-        },
-      );
+      void simulationId;
+      return httpClient.requestJson<void>('/simulations/pause', {
+        method: 'POST',
+        signal,
+      });
     },
 
     async resumeSimulation(simulationId: string, signal?: AbortSignal) {
-      return httpClient.requestJson<void>(
-        `/simulations/${encodeURIComponent(simulationId)}/resume`,
-        {
-          method: 'POST',
-          signal,
-        },
-      );
+      void simulationId;
+      return httpClient.requestJson<void>('/simulations/resume', {
+        method: 'POST',
+        signal,
+      });
     },
 
     async resetSimulation(simulationId: string, signal?: AbortSignal) {

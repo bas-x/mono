@@ -22,8 +22,9 @@ function resolveMarkerVisual(variant: AirbaseMarkerVariant): MarkerVisual {
         Icon: PiTriangleFill,
         color: 'var(--color-airbase-selected-fill)',
         haloStyle: {
-          backgroundColor: 'rgba(255, 255, 255, 0.12)',
-          boxShadow: 'inset 0 0 0 2px var(--color-airbase-selected-border)',
+          backgroundColor: 'color-mix(in srgb, var(--color-airbase-selected-fill) 22%, transparent)',
+          boxShadow:
+            '0 0 18px color-mix(in srgb, var(--color-airbase-selected-fill) 42%, transparent), inset 0 0 0 2px var(--color-airbase-selected-border)',
         },
       };
     case 'hovered':
@@ -31,14 +32,21 @@ function resolveMarkerVisual(variant: AirbaseMarkerVariant): MarkerVisual {
         Icon: PiTriangleDuotone,
         color: 'var(--color-airbase-hover)',
         haloStyle: {
-          backgroundColor: 'rgba(255, 255, 255, 0.08)',
-          boxShadow: 'inset 0 0 0 1px var(--color-airbase-hover)',
+          backgroundColor: 'color-mix(in srgb, var(--color-airbase-hover) 18%, transparent)',
+          boxShadow:
+            '0 0 16px color-mix(in srgb, var(--color-airbase-hover) 28%, transparent), inset 0 0 0 1px color-mix(in srgb, var(--color-airbase-hover) 70%, var(--color-airbase-default-stroke) 30%)',
         },
       };
     default:
       return {
         Icon: PiTriangleDuotone,
         color: 'var(--color-airbase-default-fill)',
+        haloStyle: {
+          backgroundColor:
+            'color-mix(in srgb, var(--color-airbase-default-fill) 10%, transparent)',
+          boxShadow:
+            'inset 0 0 0 1px color-mix(in srgb, var(--color-airbase-default-stroke) 55%, transparent)',
+        },
       };
   }
 }
@@ -67,6 +75,10 @@ function AirbaseMarkerIconComponent({
         className="relative shrink-0"
         style={{
           color,
+          filter:
+            variant === 'selected'
+              ? 'drop-shadow(0 0 8px color-mix(in srgb, var(--color-airbase-selected-fill) 40%, transparent))'
+              : 'drop-shadow(0 0 6px color-mix(in srgb, var(--color-airbase-default-stroke) 28%, transparent))',
         }}
       />
     </>

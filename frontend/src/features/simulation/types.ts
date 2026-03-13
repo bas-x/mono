@@ -1,3 +1,5 @@
+import { SIMULATION_TICKS_PER_SECOND } from '@/lib/api/types';
+
 export const SIMULATION_NEED_TYPE_OPTIONS = [
   { value: 'fuel', label: 'Fuel', description: 'Refuel and energy turnaround.' },
   { value: 'charge', label: 'Charge', description: 'Battery or power replenishment.' },
@@ -32,6 +34,7 @@ export type SimulationNeedType = (typeof SIMULATION_NEED_TYPE_OPTIONS)[number]['
 
 export type SimulationSetupFormValues = {
   seedHex: string;
+  durationSeconds: number;
   includeRegions: string;
   excludeRegions: string;
   minPerRegion: number;
@@ -51,6 +54,7 @@ export type SimulationSetupFormValues = {
 
 export const DEFAULT_SIMULATION_SETUP_FORM_VALUES: SimulationSetupFormValues = {
   seedHex: '',
+  durationSeconds: 100,
   includeRegions: '',
   excludeRegions: '',
   minPerRegion: 1,
@@ -67,3 +71,11 @@ export const DEFAULT_SIMULATION_SETUP_FORM_VALUES: SimulationSetupFormValues = {
   blockingChancePercent: 25,
   notes: '',
 };
+
+export function durationSecondsToTicks(durationSeconds: number): number {
+  return Math.max(1, Math.round(durationSeconds * SIMULATION_TICKS_PER_SECOND));
+}
+
+export function ticksToDurationSeconds(ticks: number): number {
+  return ticks / SIMULATION_TICKS_PER_SECOND;
+}

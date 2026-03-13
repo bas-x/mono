@@ -27,6 +27,7 @@ function normalizeSimulationSetupValues(
 ): SimulationSetupFormValues {
   return {
     ...values,
+    durationSeconds: Math.max(1, values.durationSeconds),
     regionProbabilityPercent: clampPercent(values.regionProbabilityPercent),
     blockingChancePercent: clampPercent(values.blockingChancePercent),
     maxPerRegion: Math.max(values.maxPerRegion, values.minPerRegion),

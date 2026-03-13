@@ -583,6 +583,15 @@ func TestCreateBaseSimulationAcceptsUntilTickAndSimulationOptions(t *testing.T) 
 		return !info.Running && info.Tick == 3
 	}, 2*time.Second, 10*time.Millisecond)
 
+	resp, err = http.Get(httpServer.URL + "/simulations/base")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var infoPayload services.SimulationInfo
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&infoPayload))
+	require.Equal(t, int64(3), infoPayload.UntilTick)
+
 	resp, err = http.Get(httpServer.URL + "/simulations/base/aircrafts")
 	require.NoError(t, err)
 	defer resp.Body.Close()

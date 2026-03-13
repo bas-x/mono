@@ -1,3 +1,4 @@
+import { SIMULATION_TICKS_PER_SECOND } from '@/lib/api/types';
 import type {
   CreateBaseSimulationRequest,
   SimulationAirbase,
@@ -355,7 +356,7 @@ function shouldUseLightScenario(request: CreateBaseSimulationRequest): boolean {
   const aircraftMax = request.simulationOptions?.fleetOpts?.aircraftMax ?? 0;
   const untilTick = request.untilTick ?? 0;
 
-  return untilTick > 0 && untilTick <= 10 && constellationMax <= 4 && aircraftMax <= 4;
+  return untilTick > 0 && untilTick <= 10 * SIMULATION_TICKS_PER_SECOND && constellationMax <= 4 && aircraftMax <= 4;
 }
 
 export function resolveMockScenarioTemplateId(request?: CreateBaseSimulationRequest): string {

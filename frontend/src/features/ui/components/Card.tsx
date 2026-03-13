@@ -19,7 +19,7 @@ export function Card({ title, className, ariaLabel, children }: CardProps) {
       )}
       aria-label={ariaLabel}
     >
-      <h2 className="m-0 text-base font-semibold text-text-muted dark:text-text-muted">{title}</h2>
+      <h2 className="m-0 text-base font-semibold text-[color:var(--color-shell-text)]">{title}</h2>
       {children}
     </section>
   );

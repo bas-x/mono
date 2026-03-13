@@ -42,6 +42,7 @@ export function normalizeSimulationAirbase(
   return {
     id: airbase.id,
     point: airbase.location,
+    regionId: airbase.regionId,
   };
 }
 
