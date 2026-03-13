@@ -99,6 +99,8 @@ export type SimulationState =
   | {
       status: 'running';
       simulationId: string;
+      isRunnerActive: boolean;
+      isRunnerPaused: boolean;
       airbases: SimulationAirbase[];
       aircrafts: SimulationAircraft[];
       tick?: number;
@@ -195,6 +197,8 @@ export function useSimulation() {
           const boundedMaxTick = Math.max(endedTick, current.untilTick ?? 0, current.maxTick ?? 0);
           return {
             ...current,
+            isRunnerActive: false,
+            isRunnerPaused: false,
             tick: endedTick,
             maxTick: boundedMaxTick,
             time: event.timestamp,
@@ -234,6 +238,8 @@ export function useSimulation() {
       setState({
         status: 'running',
         simulationId: id,
+        isRunnerActive: simulationInfo.running,
+        isRunnerPaused: simulationInfo.paused,
         airbases,
         aircrafts,
         tick: simulationInfo.tick,
@@ -295,6 +301,8 @@ export function useSimulation() {
         if (current.status !== 'running') return current;
         return {
           ...current,
+          isRunnerActive: simulationInfo.running,
+          isRunnerPaused: simulationInfo.paused,
           airbases,
           aircrafts,
           tick: simulationInfo.tick,
