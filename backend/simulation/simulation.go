@@ -192,6 +192,19 @@ func (s *Simulation) Clone() *Simulation {
 	return clone
 }
 
+func (s *Simulation) ResetHooksForClone() {
+	if s == nil {
+		return
+	}
+	s.aircraftStateChangeHooks = nil
+	s.landingAssignmentHooks = nil
+	s.simulationStepHooks = nil
+	s.threatSpawnedHooks = nil
+	s.threatClaimedHooks = nil
+	s.allAircraftPositionsHooks = nil
+	s.bindInternalHooks()
+}
+
 // Airbases returns a shallow copy of the generated airbases slice.
 func (s *Simulation) Airbases() []Airbase {
 	if s.constellation == nil {
