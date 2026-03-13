@@ -34,10 +34,15 @@ export function TimelineTrack({ events, currentTick, maxTick, playbackTick, onSc
     
     const clickedTick = Math.max(0, Math.round(percentage * maxTick));
     
-    if (clickedTick >= maxTick) {
+    let finalTick = clickedTick;
+    if (dragRef.current.isDragging) {
+      finalTick = Math.round(clickedTick / 5) * 5;
+    }
+    
+    if (finalTick >= maxTick) {
       onScrub(null);
     } else {
-      onScrub(clickedTick);
+      onScrub(finalTick);
     }
   }, [maxTick, onScrub]);
 

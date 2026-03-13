@@ -35,7 +35,7 @@ export function SimulationTimeline({
       if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         e.preventDefault();
         
-        const step = e.shiftKey ? 10 : 1;
+        const step = e.shiftKey ? 50 : 5;
         const startTick = playbackTick !== null ? playbackTick : currentTick;
         let newTick;
 
@@ -71,7 +71,18 @@ export function SimulationTimeline({
     setFilters((prev) => ({ ...prev, [type]: !prev[type] }));
   };
 
-  const filteredEvents = events.filter((e) => filters[e.type] !== false);
+  const filteredEvents = events.filter((e) => {
+    if (filters[e.type] === false) return false;
+
+    if (e.type === 'all_aircraft_positions' || e.type === 'simulation_step') {
+      const t = e.tick as number;
+      if (t !== undefined && t % 5 !== 0) {
+        return false;
+      }
+    }
+
+    return true;
+  });
 
   const getStatusColors = () => {
     switch (status) {
