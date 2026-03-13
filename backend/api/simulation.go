@@ -395,7 +395,12 @@ func mapSimulationOptionsRequest(req *simulationOptionsRequest) (*simulation.Sim
 	if req == nil {
 		return nil, nil
 	}
+	defaults := defaultBaseSimulationOptions()
 	options := &simulation.SimulationOptions{}
+	if defaults != nil {
+		copied := *defaults
+		options = &copied
+	}
 	if req.ConstellationOpts != nil {
 		options.ConstellationOpts = simulation.ConstellationOptions{
 			IncludeRegions:        req.ConstellationOpts.IncludeRegions,
