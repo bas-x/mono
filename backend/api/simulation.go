@@ -342,6 +342,42 @@ func GetSimulationThreats(logger *log.Logger, deps *ServerDependencies) echo.Han
 	}
 }
 
+func PostOverrideAssignment(logger *log.Logger, deps *ServerDependencies) echo.HandlerFunc {
+	type request struct {
+		SimulationID string `param:"simulationId"`
+		TailNumber   string `param:"tailNumber"`
+		BaseID       string `json:"baseId"`
+	}
+	type response struct {
+		Aircraft   services.Aircraft   `json:"aircraft"`
+		Assignment services.Assignment `json:"assignment"`
+	}
+
+	return func(c echo.Context) error {
+		req, err := bindAndValidate[request](c)
+		if err != nil {
+			return err
+		}
+
+		aircraft, assignment, err := deps.SimulationService.OverrideAssignment(req.SimulationID, req.TailNumber, req.BaseID)
+		if err != nil {
+			switch {
+			case errors.Is(err, services.ErrBaseNotFound), errors.Is(err, services.ErrSimulationNotFound), errors.Is(err, services.ErrAircraftNotFound):
+				return echo.NewHTTPError(http.StatusNotFound, "simulation or aircraft not found")
+			case errors.Is(err, services.ErrInvalidTailNumber), errors.Is(err, services.ErrInvalidBaseID), errors.Is(err, simulation.ErrAirbaseNotFound):
+				return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+			case errors.Is(err, services.ErrAssignmentTooLate):
+				return echo.NewHTTPError(http.StatusConflict, "assignment override too late")
+			default:
+				logger.Error("override assignment", "simulationId", req.SimulationID, "tailNumber", req.TailNumber, "baseId", req.BaseID, "err", err)
+				return echo.NewHTTPError(http.StatusInternalServerError, "failed to override assignment")
+			}
+		}
+
+		return c.JSON(http.StatusOK, response{Aircraft: aircraft, Assignment: assignment})
+	}
+}
+
 func parseSeed(raw string) ([32]byte, error) {
 	var out [32]byte
 	trimmed := strings.TrimSpace(raw)

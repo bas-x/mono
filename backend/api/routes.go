@@ -39,6 +39,7 @@ func registerRoutes(
 	e.POST("/simulations/:simulationId/reset", PostResetSimulation(logger, deps))
 	e.GET("/simulations/:simulationId/airbases", GetSimulationAirbases(logger, deps))
 	e.GET("/simulations/:simulationId/aircrafts", GetSimulationAircrafts(logger, deps))
+	e.POST("/simulations/:simulationId/aircraft/:tailNumber/assignment-override", PostOverrideAssignment(logger, deps))
 	e.GET("/simulations/:simulationId/threats", GetSimulationThreats(logger, deps))
 	e.GET("/ws/simulations/:simulationId/events", GetSimulationEventsWS(logger, deps))
 }

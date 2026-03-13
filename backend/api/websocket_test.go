@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
+	"math/rand/v2"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -694,6 +695,455 @@ func TestCreateBaseSimulationRejectsInvalidLifecycleNeedRateKey(t *testing.T) {
 	require.NoError(t, err)
 	defer resp.Body.Close()
 	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+func TestOverrideAssignmentEndpointReturnsAircraftAndAssignment(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	_, err := deps.SimulationService.CreateBaseSimulation(services.BaseSimulationConfig{Options: &simulation.SimulationOptions{
+		ConstellationOpts: simulation.ConstellationOptions{
+			IncludeRegions:    []string{"Blekinge"},
+			MinPerRegion:      2,
+			MaxPerRegion:      2,
+			MaxTotal:          2,
+			RegionProbability: prng.New(1, 1),
+		},
+		FleetOpts: simulation.FleetOptions{AircraftMin: 1, AircraftMax: 1, NeedsMin: 0, NeedsMax: 0},
+	}})
+	require.NoError(t, err)
+
+	bases, err := deps.SimulationService.Airbases(services.BaseSimulationID)
+	require.NoError(t, err)
+	require.Len(t, bases, 2)
+
+	aircrafts, err := deps.SimulationService.Aircrafts(services.BaseSimulationID)
+	require.NoError(t, err)
+	require.NotEmpty(t, aircrafts)
+	tailNumber := aircrafts[0].TailNumber
+	targetBase := bases[1].ID
+
+	body := bytes.NewBufferString(`{"baseId":"` + targetBase + `"}`)
+	req, err := http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/aircraft/"+tailNumber+"/assignment-override", body)
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var payload struct {
+		Aircraft struct {
+			TailNumber string  `json:"tailNumber"`
+			AssignedTo *string `json:"assignedTo"`
+		} `json:"aircraft"`
+		Assignment struct {
+			Base   string `json:"base"`
+			Source string `json:"source"`
+		} `json:"assignment"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&payload))
+	require.Equal(t, tailNumber, payload.Aircraft.TailNumber)
+	require.NotNil(t, payload.Aircraft.AssignedTo)
+	require.Equal(t, targetBase, *payload.Aircraft.AssignedTo)
+	require.Equal(t, targetBase, payload.Assignment.Base)
+	require.Equal(t, "human", payload.Assignment.Source)
+}
+
+func TestOverrideAssignmentEndpointRejectsLateOverride(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	_, err := deps.SimulationService.CreateBaseSimulation(services.BaseSimulationConfig{Options: &simulation.SimulationOptions{
+		ConstellationOpts: simulation.ConstellationOptions{
+			IncludeRegions:    []string{"Blekinge"},
+			MinPerRegion:      2,
+			MaxPerRegion:      2,
+			MaxTotal:          2,
+			RegionProbability: prng.New(1, 1),
+		},
+		FleetOpts: simulation.FleetOptions{
+			AircraftMin: 1,
+			AircraftMax: 1,
+			NeedsMin:    0,
+			NeedsMax:    0,
+			StateFactory: func(_ *rand.Rand) simulation.AircraftState {
+				return &simulation.InboundState{}
+			},
+		},
+		LifecycleOpts: &simulation.LifecycleModel{
+			Durations: simulation.PhaseDurations{
+				Outbound:        5 * time.Second,
+				Engaged:         5 * time.Second,
+				InboundDecision: 3 * time.Second,
+				CommitApproach:  4 * time.Second,
+				Servicing:       6 * time.Second,
+				Ready:           2 * time.Second,
+			},
+			ReturnThreshold: 80,
+			NeedRates: map[simulation.NeedType]simulation.NeedRateModel{
+				simulation.NeedFuel:      {OutboundMilliPerHour: 18000000, EngagedMilliPerHour: 18000000, ServicingMilliPerHour: 28800000, VariancePermille: 0},
+				simulation.NeedMunitions: {OutboundMilliPerHour: 18000000, EngagedMilliPerHour: 18000000, ServicingMilliPerHour: 18000000, VariancePermille: 0},
+			},
+		},
+	}})
+	require.NoError(t, err)
+
+	for i := 0; i < 2; i++ {
+		require.NoError(t, deps.SimulationService.StepSimulation(services.BaseSimulationID))
+	}
+
+	bases, err := deps.SimulationService.Airbases(services.BaseSimulationID)
+	require.NoError(t, err)
+	require.Len(t, bases, 2)
+
+	aircrafts, err := deps.SimulationService.Aircrafts(services.BaseSimulationID)
+	require.NoError(t, err)
+	require.NotEmpty(t, aircrafts)
+	tailNumber := aircrafts[0].TailNumber
+	targetBase := bases[1].ID
+
+	body := bytes.NewBufferString(`{"baseId":"` + targetBase + `"}`)
+	req, err := http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/aircraft/"+tailNumber+"/assignment-override", body)
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusConflict, resp.StatusCode)
+}
+
+func TestAssignmentOverrideEventOverWebSocket(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	_, err := deps.SimulationService.CreateBaseSimulation(services.BaseSimulationConfig{Options: &simulation.SimulationOptions{
+		ConstellationOpts: simulation.ConstellationOptions{
+			IncludeRegions:    []string{"Blekinge"},
+			MinPerRegion:      2,
+			MaxPerRegion:      2,
+			MaxTotal:          2,
+			RegionProbability: prng.New(1, 1),
+		},
+		FleetOpts: simulation.FleetOptions{AircraftMin: 1, AircraftMax: 1, NeedsMin: 0, NeedsMax: 0},
+	}})
+	require.NoError(t, err)
+
+	bases, err := deps.SimulationService.Airbases(services.BaseSimulationID)
+	require.NoError(t, err)
+	require.Len(t, bases, 2)
+
+	aircrafts, err := deps.SimulationService.Aircrafts(services.BaseSimulationID)
+	require.NoError(t, err)
+	require.NotEmpty(t, aircrafts)
+	tailNumber := aircrafts[0].TailNumber
+	targetBase := bases[1].ID
+
+	wsURL := "ws" + strings.TrimPrefix(httpServer.URL, "http") + "/ws/simulations/base/events"
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	body := bytes.NewBufferString(`{"baseId":"` + targetBase + `"}`)
+	req, err := http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/aircraft/"+tailNumber+"/assignment-override", body)
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	require.NoError(t, conn.SetReadDeadline(time.Now().Add(2*time.Second)))
+	for {
+		var payload map[string]any
+		err := conn.ReadJSON(&payload)
+		require.NoError(t, err)
+		if payload["type"] != services.EventTypeLandingAssignment {
+			continue
+		}
+		require.Equal(t, services.BaseSimulationID, payload["simulationId"])
+		tail, ok := payload["tailNumber"].(string)
+		require.True(t, ok)
+		if tail != tailNumber {
+			continue
+		}
+		source, ok := payload["source"].(string)
+		require.True(t, ok)
+		if source != "human" {
+			continue
+		}
+		require.Equal(t, targetBase, payload["baseId"])
+		require.Equal(t, "human", source)
+		break
+	}
+}
+
+func TestOverrideAssignmentEndpointRejectsInvalidTailNumber(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	_, err := deps.SimulationService.CreateBaseSimulation(services.BaseSimulationConfig{Options: &simulation.SimulationOptions{
+		ConstellationOpts: simulation.ConstellationOptions{
+			IncludeRegions:    []string{"Blekinge"},
+			MinPerRegion:      2,
+			MaxPerRegion:      2,
+			MaxTotal:          2,
+			RegionProbability: prng.New(1, 1),
+		},
+		FleetOpts: simulation.FleetOptions{AircraftMin: 1, AircraftMax: 1, NeedsMin: 0, NeedsMax: 0},
+	}})
+	require.NoError(t, err)
+
+	bases, err := deps.SimulationService.Airbases(services.BaseSimulationID)
+	require.NoError(t, err)
+	require.Len(t, bases, 2)
+
+	body := bytes.NewBufferString(`{"baseId":"` + bases[1].ID + `"}`)
+	req, err := http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/aircraft/not-hex/assignment-override", body)
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+func TestOverrideAssignmentEndpointRejectsInvalidBaseID(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	_, err := deps.SimulationService.CreateBaseSimulation(services.BaseSimulationConfig{Options: &simulation.SimulationOptions{
+		ConstellationOpts: simulation.ConstellationOptions{
+			IncludeRegions:    []string{"Blekinge"},
+			MinPerRegion:      2,
+			MaxPerRegion:      2,
+			MaxTotal:          2,
+			RegionProbability: prng.New(1, 1),
+		},
+		FleetOpts: simulation.FleetOptions{AircraftMin: 1, AircraftMax: 1, NeedsMin: 0, NeedsMax: 0},
+	}})
+	require.NoError(t, err)
+
+	aircrafts, err := deps.SimulationService.Aircrafts(services.BaseSimulationID)
+	require.NoError(t, err)
+	require.NotEmpty(t, aircrafts)
+
+	body := bytes.NewBufferString(`{"baseId":"not-hex"}`)
+	req, err := http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/aircraft/"+aircrafts[0].TailNumber+"/assignment-override", body)
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+func TestOverrideAssignmentEndpointRejectsUnknownAircraft(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	_, err := deps.SimulationService.CreateBaseSimulation(services.BaseSimulationConfig{Options: &simulation.SimulationOptions{
+		ConstellationOpts: simulation.ConstellationOptions{
+			IncludeRegions:    []string{"Blekinge"},
+			MinPerRegion:      2,
+			MaxPerRegion:      2,
+			MaxTotal:          2,
+			RegionProbability: prng.New(1, 1),
+		},
+		FleetOpts: simulation.FleetOptions{AircraftMin: 1, AircraftMax: 1, NeedsMin: 0, NeedsMax: 0},
+	}})
+	require.NoError(t, err)
+
+	bases, err := deps.SimulationService.Airbases(services.BaseSimulationID)
+	require.NoError(t, err)
+	require.Len(t, bases, 2)
+
+	body := bytes.NewBufferString(`{"baseId":"` + bases[1].ID + `"}`)
+	req, err := http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/aircraft/ffffffffffffffff/assignment-override", body)
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusNotFound, resp.StatusCode)
+}
+
+func TestOverrideAssignmentEndpointRejectsUnknownBase(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	_, err := deps.SimulationService.CreateBaseSimulation(services.BaseSimulationConfig{Options: &simulation.SimulationOptions{
+		ConstellationOpts: simulation.ConstellationOptions{
+			IncludeRegions:    []string{"Blekinge"},
+			MinPerRegion:      2,
+			MaxPerRegion:      2,
+			MaxTotal:          2,
+			RegionProbability: prng.New(1, 1),
+		},
+		FleetOpts: simulation.FleetOptions{AircraftMin: 1, AircraftMax: 1, NeedsMin: 0, NeedsMax: 0},
+	}})
+	require.NoError(t, err)
+
+	aircrafts, err := deps.SimulationService.Aircrafts(services.BaseSimulationID)
+	require.NoError(t, err)
+	require.NotEmpty(t, aircrafts)
+
+	body := bytes.NewBufferString(`{"baseId":"ffffffffffffffff"}`)
+	req, err := http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/aircraft/"+aircrafts[0].TailNumber+"/assignment-override", body)
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+}
+
+func TestOverrideAssignmentEndpointRejectsUnknownSimulation(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	body := bytes.NewBufferString(`{"baseId":"ffffffffffffffff"}`)
+	req, err := http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/missing/aircraft/ffffffffffffffff/assignment-override", body)
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusNotFound, resp.StatusCode)
+}
+
+func TestAssignmentOverrideEventOverWebSocketEmitsHumanEventForEachRepeatedOverride(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	_, err := deps.SimulationService.CreateBaseSimulation(services.BaseSimulationConfig{Options: &simulation.SimulationOptions{
+		ConstellationOpts: simulation.ConstellationOptions{
+			IncludeRegions:    []string{"Blekinge"},
+			MinPerRegion:      2,
+			MaxPerRegion:      2,
+			MaxTotal:          2,
+			RegionProbability: prng.New(1, 1),
+		},
+		FleetOpts: simulation.FleetOptions{AircraftMin: 1, AircraftMax: 1, NeedsMin: 0, NeedsMax: 0},
+	}})
+	require.NoError(t, err)
+
+	bases, err := deps.SimulationService.Airbases(services.BaseSimulationID)
+	require.NoError(t, err)
+	require.Len(t, bases, 2)
+
+	aircrafts, err := deps.SimulationService.Aircrafts(services.BaseSimulationID)
+	require.NoError(t, err)
+	require.NotEmpty(t, aircrafts)
+	tailNumber := aircrafts[0].TailNumber
+
+	wsURL := "ws" + strings.TrimPrefix(httpServer.URL, "http") + "/ws/simulations/base/events"
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	postOverride := func(baseID string) {
+		body := bytes.NewBufferString(`{"baseId":"` + baseID + `"}`)
+		req, err := http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/aircraft/"+tailNumber+"/assignment-override", body)
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		resp.Body.Close()
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+	}
+
+	postOverride(bases[1].ID)
+	postOverride(bases[0].ID)
+
+	require.NoError(t, conn.SetReadDeadline(time.Now().Add(2*time.Second)))
+	humanEvents := make([]string, 0, 2)
+	for len(humanEvents) < 2 {
+		var payload map[string]any
+		err := conn.ReadJSON(&payload)
+		require.NoError(t, err)
+		if payload["type"] != services.EventTypeLandingAssignment {
+			continue
+		}
+		tail, ok := payload["tailNumber"].(string)
+		require.True(t, ok)
+		if tail != tailNumber {
+			continue
+		}
+		source, ok := payload["source"].(string)
+		require.True(t, ok)
+		if source != "human" {
+			continue
+		}
+		baseID, ok := payload["baseId"].(string)
+		require.True(t, ok)
+		humanEvents = append(humanEvents, baseID)
+	}
+
+	require.Equal(t, []string{bases[1].ID, bases[0].ID}, humanEvents)
 }
 
 func websocketSafeOptions() *simulation.SimulationOptions {
