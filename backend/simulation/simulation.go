@@ -202,7 +202,8 @@ func (s *Simulation) ResetHooksForClone() {
 	s.landingAssignmentHooks = nil
 	s.simulationStepHooks = nil
 	s.threatSpawnedHooks = nil
-	s.threatClaimedHooks = nil
+	s.threatTargetedHooks = nil
+	s.threatDespawnedHooks = nil
 	s.allAircraftPositionsHooks = nil
 	s.bindInternalHooks()
 }
