@@ -112,6 +112,8 @@ These endpoints are useful for initial page hydration before live updates arrive
 
 The socket emits **all** event types for the selected simulation.
 
+For the base stream, this now includes `branch_created` when a new V1 branch is created from `base`. The event stays on `/ws/simulations/base/events` because websocket routing filters by `simulationId` and the payload keeps `simulationId="base"`.
+
 Current event types:
 
 - `simulation_step`
@@ -119,6 +121,7 @@ Current event types:
 - `aircraft_state_change`
 - `landing_assignment`
 - `all_aircraft_positions`
+- `branch_created` (base stream only)
 
 ## Event Shapes
 
@@ -212,6 +215,24 @@ Notes:
   - `human` = operator override applied through the API
 - It is valid to receive an `algorithm` assignment event before a `human` override event for the same aircraft if the backend registers inbound and then applies the override.
 
+### Branch created
+
+```json
+{
+  "type": "branch_created",
+  "simulationId": "base",
+  "branchId": "7f3c2d1a9b8e6f10",
+  "parentId": "base",
+  "splitTick": 42,
+  "splitTimestamp": "2026-03-12T03:15:05Z"
+}
+```
+
+Notes:
+
+- This is a base-stream event carrying branch lineage summary metadata for the newly created branch.
+- V1 still supports branching from `base` only.
+
 ## Frontend State Strategy
 
 Recommended state model:
@@ -229,6 +250,9 @@ Suggested reducer behavior:
 - `landing_assignment`
   - update the aircraft assignment if the aircraft already exists in local state
   - optionally annotate the selected base in UI
+- `branch_created`
+  - treat it as a base-stream metadata event, not as an event on the new branch stream
+  - add/update branch summary state from `branchId`, `parentId`, `splitTick`, and `splitTimestamp`
 - `simulation_step`
   - update current tick / time cursor
 - `simulation_ended`
@@ -240,8 +264,8 @@ Suggested reducer behavior:
 - the simulation package itself does **not** know about `simulationId`; the service injects it into outgoing events
 - slow websocket clients are disconnected by the backend rather than allowed to block simulation progress
 - branch creation is available via `POST /simulations/:simulationId/branch`
-- branch lineage metadata (`parentId`, `splitTick`, `splitTimestamp`) comes from REST simulation reads and the branch creation response
-- websocket event payloads are unchanged and do not include lineage fields
+- branch lineage metadata (`parentId`, `splitTick`, `splitTimestamp`) comes from REST simulation reads, the branch creation response, and the base-stream `branch_created` event
+- `branch_created` is emitted only on `/ws/simulations/base/events`; branch streams continue to receive only events tagged with their own `simulationId`
 - first branch support is base simulation only; checkpoint-based branch creation and branch-from-branch workflows are not implemented
 - determinism guarantee: branch creation copies current simulation state and RNG state, so equivalent future advancement keeps base and branch aligned until a later divergence decision is introduced
 - the local tester auto-creates the base simulation at startup, shows `Base` as the initial tab, and switches the full tester context when a branch tab is selected

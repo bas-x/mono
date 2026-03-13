@@ -134,6 +134,15 @@ func (s *SimulationService) BranchSimulation(simulationID string) (string, error
 		splitTimestamp: ptr(splitTimestamp),
 	}
 
+	s.broadcaster.Emit(BranchCreatedEvent{
+		Type:           EventTypeBranchCreated,
+		SimulationID:   BaseSimulationID,
+		BranchID:       branchID,
+		ParentID:       parentID,
+		SplitTick:      splitTick,
+		SplitTimestamp: splitTimestamp,
+	})
+
 	return branchID, nil
 }
 

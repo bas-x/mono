@@ -257,6 +257,152 @@ func TestSimulationServiceBranch_IdleBaseRemainsStartableAfterBranch(t *testing.
 	require.NoError(t, svc.StartSimulation(services.BaseSimulationID))
 }
 
+func TestSimulationServiceBranchCreatedEvent_IdleBaseEmitsExactLineagePayload(t *testing.T) {
+	t.Parallel()
+
+	svc := services.NewSimulationService(services.SimulationServiceConfig{Resolution: 10 * time.Minute})
+	_, err := svc.CreateBaseSimulation(services.BaseSimulationConfig{Options: safeSimulationOptions(1, 1)})
+	require.NoError(t, err)
+
+	clientID, events := svc.Broadcaster().Subscribe()
+	t.Cleanup(func() {
+		svc.Broadcaster().Unsubscribe(clientID)
+	})
+
+	branchID, err := svc.BranchSimulation(services.BaseSimulationID)
+	require.NoError(t, err)
+
+	event := requireNextBranchCreatedEvent(t, events, time.Second)
+	require.Equal(t, services.EventTypeBranchCreated, event.Type)
+	require.Equal(t, services.BaseSimulationID, event.SimulationID)
+	require.Equal(t, branchID, event.BranchID)
+	require.Equal(t, services.BaseSimulationID, event.ParentID)
+
+	branchInfo, err := svc.Simulation(branchID)
+	require.NoError(t, err)
+	require.NotNil(t, branchInfo.SplitTick)
+	require.NotNil(t, branchInfo.SplitTimestamp)
+	require.Equal(t, *branchInfo.SplitTick, event.SplitTick)
+	require.Equal(t, *branchInfo.SplitTimestamp, event.SplitTimestamp)
+
+	requireNoBranchCreatedEvent(t, events, 150*time.Millisecond)
+}
+
+func TestSimulationServiceBranchCreatedEvent_RunningBaseEmitsExactLineagePayload(t *testing.T) {
+	t.Parallel()
+
+	svc := services.NewSimulationService(services.SimulationServiceConfig{
+		RunnerConfig: simulation.ControlledRunnerConfig{TicksPerSecond: 128},
+	})
+	_, err := svc.CreateBaseSimulation(services.BaseSimulationConfig{Options: safeSimulationOptions(1, 1)})
+	require.NoError(t, err)
+	require.NoError(t, svc.StartSimulation(services.BaseSimulationID))
+
+	clientID, events := svc.Broadcaster().Subscribe()
+	t.Cleanup(func() {
+		svc.Broadcaster().Unsubscribe(clientID)
+	})
+
+	branchID, err := svc.BranchSimulation(services.BaseSimulationID)
+	require.NoError(t, err)
+
+	event := requireNextBranchCreatedEvent(t, events, time.Second)
+	require.Equal(t, services.EventTypeBranchCreated, event.Type)
+	require.Equal(t, services.BaseSimulationID, event.SimulationID)
+	require.Equal(t, branchID, event.BranchID)
+	require.Equal(t, services.BaseSimulationID, event.ParentID)
+
+	branchInfo, err := svc.Simulation(branchID)
+	require.NoError(t, err)
+	require.NotNil(t, branchInfo.SplitTick)
+	require.NotNil(t, branchInfo.SplitTimestamp)
+	require.Equal(t, *branchInfo.SplitTick, event.SplitTick)
+	require.Equal(t, *branchInfo.SplitTimestamp, event.SplitTimestamp)
+
+	requireNoBranchCreatedEvent(t, events, 150*time.Millisecond)
+}
+
+func TestSimulationServiceBranchCreatedEvent_MultipleSequentialBaseBranchesEmitSeparateEvents(t *testing.T) {
+	t.Parallel()
+
+	svc := services.NewSimulationService(services.SimulationServiceConfig{Resolution: 10 * time.Minute})
+	_, err := svc.CreateBaseSimulation(services.BaseSimulationConfig{Options: safeSimulationOptions(1, 1)})
+	require.NoError(t, err)
+
+	clientID, events := svc.Broadcaster().Subscribe()
+	t.Cleanup(func() {
+		svc.Broadcaster().Unsubscribe(clientID)
+	})
+
+	firstBranchID, err := svc.BranchSimulation(services.BaseSimulationID)
+	require.NoError(t, err)
+
+	firstEvent := requireNextBranchCreatedEvent(t, events, time.Second)
+	require.Equal(t, services.EventTypeBranchCreated, firstEvent.Type)
+	require.Equal(t, services.BaseSimulationID, firstEvent.SimulationID)
+	require.Equal(t, firstBranchID, firstEvent.BranchID)
+	require.Equal(t, services.BaseSimulationID, firstEvent.ParentID)
+
+	require.NoError(t, svc.StepSimulation(services.BaseSimulationID))
+
+	secondBranchID, err := svc.BranchSimulation(services.BaseSimulationID)
+	require.NoError(t, err)
+
+	secondEvent := requireNextBranchCreatedEvent(t, events, time.Second)
+	require.Equal(t, services.EventTypeBranchCreated, secondEvent.Type)
+	require.Equal(t, services.BaseSimulationID, secondEvent.SimulationID)
+	require.Equal(t, secondBranchID, secondEvent.BranchID)
+	require.Equal(t, services.BaseSimulationID, secondEvent.ParentID)
+
+	firstInfo, err := svc.Simulation(firstBranchID)
+	require.NoError(t, err)
+	require.NotNil(t, firstInfo.SplitTick)
+	require.NotNil(t, firstInfo.SplitTimestamp)
+	require.Equal(t, *firstInfo.SplitTick, firstEvent.SplitTick)
+	require.Equal(t, *firstInfo.SplitTimestamp, firstEvent.SplitTimestamp)
+
+	secondInfo, err := svc.Simulation(secondBranchID)
+	require.NoError(t, err)
+	require.NotNil(t, secondInfo.SplitTick)
+	require.NotNil(t, secondInfo.SplitTimestamp)
+	require.Equal(t, *secondInfo.SplitTick, secondEvent.SplitTick)
+	require.Equal(t, *secondInfo.SplitTimestamp, secondEvent.SplitTimestamp)
+
+	require.NotEqual(t, firstEvent.BranchID, secondEvent.BranchID)
+	requireNoBranchCreatedEvent(t, events, 150*time.Millisecond)
+}
+
+func TestSimulationServiceBranchNoEvent_MissingBaseBranchAttempt(t *testing.T) {
+	t.Parallel()
+
+	svc := services.NewSimulationService(services.SimulationServiceConfig{Resolution: 10 * time.Minute})
+	clientID, events := svc.Broadcaster().Subscribe()
+	t.Cleanup(func() {
+		svc.Broadcaster().Unsubscribe(clientID)
+	})
+
+	_, err := svc.BranchSimulation(services.BaseSimulationID)
+	require.ErrorIs(t, err, services.ErrBaseNotFound)
+	requireNoBranchCreatedEvent(t, events, 150*time.Millisecond)
+}
+
+func TestSimulationServiceBranchNoEvent_NonBaseBranchAttempt(t *testing.T) {
+	t.Parallel()
+
+	svc := services.NewSimulationService(services.SimulationServiceConfig{Resolution: 10 * time.Minute})
+	_, err := svc.CreateBaseSimulation(services.BaseSimulationConfig{Options: safeSimulationOptions(1, 1)})
+	require.NoError(t, err)
+
+	clientID, events := svc.Broadcaster().Subscribe()
+	t.Cleanup(func() {
+		svc.Broadcaster().Unsubscribe(clientID)
+	})
+
+	_, err = svc.BranchSimulation("branch-a")
+	require.ErrorIs(t, err, services.ErrSimulationNotFound)
+	requireNoBranchCreatedEvent(t, events, 150*time.Millisecond)
+}
+
 func TestSimulationServiceBranch_MissingBaseFails(t *testing.T) {
 	t.Parallel()
 
@@ -264,6 +410,40 @@ func TestSimulationServiceBranch_MissingBaseFails(t *testing.T) {
 
 	_, err := svc.BranchSimulation(services.BaseSimulationID)
 	require.ErrorIs(t, err, services.ErrBaseNotFound)
+}
+
+func requireNextBranchCreatedEvent(t *testing.T, events <-chan services.Event, timeout time.Duration) services.BranchCreatedEvent {
+	t.Helper()
+
+	deadline := time.After(timeout)
+	for {
+		select {
+		case raw := <-events:
+			event, ok := raw.(services.BranchCreatedEvent)
+			if !ok {
+				continue
+			}
+			return event
+		case <-deadline:
+			t.Fatal("expected branch created event")
+		}
+	}
+}
+
+func requireNoBranchCreatedEvent(t *testing.T, events <-chan services.Event, timeout time.Duration) {
+	t.Helper()
+
+	deadline := time.After(timeout)
+	for {
+		select {
+		case raw := <-events:
+			if event, ok := raw.(services.BranchCreatedEvent); ok {
+				t.Fatalf("unexpected branch created event: %+v", event)
+			}
+		case <-deadline:
+			return
+		}
+	}
 }
 
 func TestSimulationServiceBranch_NonBaseSimulationRejectedInV1(t *testing.T) {

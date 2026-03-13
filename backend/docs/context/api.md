@@ -286,6 +286,8 @@
 - **Transport**: WebSocket
 - **Behavior**:
   - Streams all event types for the requested simulation.
+  - Current event types: `simulation_step`, `simulation_ended`, `aircraft_state_change`, `landing_assignment`, `threat_spawned`, `threat_claimed`, `branch_created`.
+  - `branch_created` is emitted on `/ws/simulations/base/events` when a new V1 branch is created from the base simulation. It carries branch lineage summary fields for the new branch and stays on the base stream because the event `simulationId` is `base`.
   - Slow clients are disconnected instead of blocking simulation progress.
 
 - **Example payloads**:
@@ -384,11 +386,23 @@
 }
 ```
 
+```json
+{
+  "type": "branch_created",
+  "simulationId": "base",
+  "branchId": "7f3c2d1a9b8e6f10",
+  "parentId": "base",
+  "splitTick": 42,
+  "splitTimestamp": "2026-03-12T03:15:05Z"
+}
+```
+
 ## Notes
 
 - `simulationId` is part of the path for base and branch simulations.
 - Current implementation supports `simulationId=base` plus service-generated branch IDs created from the base simulation.
-- Branch creation is available over HTTP via `POST /simulations/:simulationId/branch`.
+- Branch creation is available over HTTP via `POST /simulations/:simulationId/branch`; successful base branch creation also emits `branch_created` on `/ws/simulations/base/events`.
+- Branch lineage metadata is available from the branch creation response, `GET /simulations/:simulationId`, and the base-stream `branch_created` event.
 - First branch support is base simulation only; checkpoint-based branch creation and branch-from-branch workflows are not implemented.
 - Determinism guarantee: branching copies the current simulation state and RNG state, so if base and branch advance equivalently after branching they produce the same future behavior.
 - The local tester now auto-creates the base simulation at startup, shows `Base` as the initial tab, and adds separate tabs for created branches.

@@ -4,6 +4,7 @@ import "time"
 
 const (
 	EventTypeAircraftStateChange  = "aircraft_state_change"
+	EventTypeBranchCreated        = "branch_created"
 	EventTypeLandingAssignment    = "landing_assignment"
 	EventTypeSimulationStep       = "simulation_step"
 	EventTypeSimulationEnded      = "simulation_ended"
@@ -50,6 +51,27 @@ func (e LandingAssignmentEvent) EventType() string {
 }
 
 func (e LandingAssignmentEvent) EventSimulationID() string {
+	return e.SimulationID
+}
+
+type BranchCreatedEvent struct {
+	Type           string    `json:"type"`
+	SimulationID   string    `json:"simulationId"`
+	BranchID       string    `json:"branchId"`
+	ParentID       string    `json:"parentId"`
+	SplitTick      uint64    `json:"splitTick"`
+	SplitTimestamp time.Time `json:"splitTimestamp"`
+}
+
+func (e BranchCreatedEvent) EventType() string {
+	if e.Type == "" {
+		return EventTypeBranchCreated
+	}
+
+	return e.Type
+}
+
+func (e BranchCreatedEvent) EventSimulationID() string {
 	return e.SimulationID
 }
 

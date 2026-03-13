@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"math/rand/v2"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -477,6 +478,124 @@ func TestBranchSimulationEventsWebSocketFiltersToBranch(t *testing.T) {
 			break
 		}
 	}
+}
+
+func TestBranchCreatedEventOverWebSocket(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	_, err := deps.SimulationService.CreateBaseSimulation(services.BaseSimulationConfig{Options: websocketSafeOptions()})
+	require.NoError(t, err)
+
+	wsURL := "ws" + strings.TrimPrefix(httpServer.URL, "http") + "/ws/simulations/base/events"
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	branchID, err := deps.SimulationService.BranchSimulation(services.BaseSimulationID)
+	require.NoError(t, err)
+
+	branchInfo, err := deps.SimulationService.Simulation(branchID)
+	require.NoError(t, err)
+	require.NotNil(t, branchInfo.ParentID)
+	require.NotNil(t, branchInfo.SplitTick)
+	require.NotNil(t, branchInfo.SplitTimestamp)
+
+	require.NoError(t, conn.SetReadDeadline(time.Now().Add(2*time.Second)))
+	for {
+		var payload map[string]any
+		err := conn.ReadJSON(&payload)
+		require.NoError(t, err)
+		if payload["type"] != services.EventTypeBranchCreated {
+			continue
+		}
+
+		require.Equal(t, services.EventTypeBranchCreated, payload["type"])
+		require.Equal(t, services.BaseSimulationID, payload["simulationId"])
+		require.Equal(t, branchID, payload["branchId"])
+		require.Equal(t, *branchInfo.ParentID, payload["parentId"])
+		require.Equal(t, float64(*branchInfo.SplitTick), payload["splitTick"])
+
+		splitTimestampRaw, ok := payload["splitTimestamp"].(string)
+		require.True(t, ok)
+		parsedSplitTimestamp, err := time.Parse(time.RFC3339Nano, splitTimestampRaw)
+		require.NoError(t, err)
+		require.Equal(t, *branchInfo.SplitTimestamp, parsedSplitTimestamp)
+		break
+	}
+}
+
+func TestBranchCreatedEventIsDeliveredOnlyToBaseStream(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	_, err := deps.SimulationService.CreateBaseSimulation(services.BaseSimulationConfig{Options: websocketSafeOptions()})
+	require.NoError(t, err)
+
+	branchStreamID, err := deps.SimulationService.BranchSimulation(services.BaseSimulationID)
+	require.NoError(t, err)
+
+	baseWSURL := "ws" + strings.TrimPrefix(httpServer.URL, "http") + "/ws/simulations/base/events"
+	baseConn, _, err := websocket.DefaultDialer.Dial(baseWSURL, nil)
+	require.NoError(t, err)
+	defer baseConn.Close()
+
+	branchWSURL := "ws" + strings.TrimPrefix(httpServer.URL, "http") + "/ws/simulations/" + branchStreamID + "/events"
+	branchConn, _, err := websocket.DefaultDialer.Dial(branchWSURL, nil)
+	require.NoError(t, err)
+	defer branchConn.Close()
+
+	newBranchID, err := deps.SimulationService.BranchSimulation(services.BaseSimulationID)
+	require.NoError(t, err)
+
+	newBranchInfo, err := deps.SimulationService.Simulation(newBranchID)
+	require.NoError(t, err)
+	require.NotNil(t, newBranchInfo.ParentID)
+	require.NotNil(t, newBranchInfo.SplitTick)
+	require.NotNil(t, newBranchInfo.SplitTimestamp)
+
+	require.NoError(t, baseConn.SetReadDeadline(time.Now().Add(2*time.Second)))
+	for {
+		var payload map[string]any
+		err := baseConn.ReadJSON(&payload)
+		require.NoError(t, err)
+		if payload["type"] != services.EventTypeBranchCreated {
+			continue
+		}
+
+		require.Equal(t, services.EventTypeBranchCreated, payload["type"])
+		require.Equal(t, services.BaseSimulationID, payload["simulationId"])
+		require.Equal(t, newBranchID, payload["branchId"])
+		require.Equal(t, *newBranchInfo.ParentID, payload["parentId"])
+		require.Equal(t, float64(*newBranchInfo.SplitTick), payload["splitTick"])
+
+		splitTimestampRaw, ok := payload["splitTimestamp"].(string)
+		require.True(t, ok)
+		parsedSplitTimestamp, err := time.Parse(time.RFC3339Nano, splitTimestampRaw)
+		require.NoError(t, err)
+		require.Equal(t, *newBranchInfo.SplitTimestamp, parsedSplitTimestamp)
+		break
+	}
+
+	require.NoError(t, branchConn.SetReadDeadline(time.Now().Add(300*time.Millisecond)))
+	var branchPayload map[string]any
+	err = branchConn.ReadJSON(&branchPayload)
+	require.Error(t, err)
+	netErr, ok := err.(net.Error)
+	require.True(t, ok)
+	require.True(t, netErr.Timeout())
 }
 
 func TestSimulationEndedEventOverWebSocket(t *testing.T) {
