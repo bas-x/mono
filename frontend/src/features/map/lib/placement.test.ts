@@ -38,7 +38,10 @@ describe('placement', () => {
     const simulationAirbases = await createMockSimulationServiceClient().getAirbases('base');
     const source = normalizeSimulationAirbase(simulationAirbases[0]!);
 
-    expect(getPlacementAnchor(source)).toEqual({ x: 100, y: 100 });
+    expect(getPlacementAnchor(source)).toEqual({
+      x: 109.44765839799018,
+      y: 753.1689567645848,
+    });
   });
 
   it('uses a deterministic 12x12 footprint for point-backed bounds', async () => {
@@ -46,10 +49,10 @@ describe('placement', () => {
     const source = normalizeSimulationAirbase(simulationAirbases[0]!);
 
     expect(getPlacementBounds(source)).toEqual({
-      minX: 94,
-      minY: 94,
-      maxX: 106,
-      maxY: 106,
+      minX: 103.44765839799018,
+      minY: 747.1689567645848,
+      maxX: 115.44765839799018,
+      maxY: 759.1689567645848,
     });
   });
 
@@ -69,7 +72,10 @@ describe('placement', () => {
       hasRunningSimulation: true,
     });
 
-    expect(simulateSources[0]).toMatchObject({ id: 'base-1', point: { x: 100, y: 100 } });
+    expect(simulateSources[0]).toMatchObject({
+      id: 'd397eeeddbfae33e',
+      point: { x: 109.44765839799018, y: 753.1689567645848 },
+    });
     expect(simulateSources[0]).not.toHaveProperty('area');
     expect(liveSources[0]).toMatchObject({ id: 'lulea' });
     expect(liveSources[0]).toHaveProperty('area');

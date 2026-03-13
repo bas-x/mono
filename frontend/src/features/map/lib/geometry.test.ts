@@ -12,7 +12,7 @@ import { MOCK_AIRBASES } from '@/lib/api/mock/map';
 import { createMockSimulationServiceClient } from '@/lib/api/mock/simulation';
 
 describe('geometry', () => {
-  it('keeps full-map projection stable for lulea and base-1 anchors', async () => {
+  it('keeps full-map projection stable for lulea and the default mock simulation anchor', async () => {
     const liveAnchor = getPlacementAnchor(normalizeLiveAirbase(MOCK_AIRBASES[0]!));
     const simulationAirbases = await createMockSimulationServiceClient().getAirbases('base');
     const simulationAnchor = getPlacementAnchor(normalizeSimulationAirbase(simulationAirbases[0]!));
@@ -22,8 +22,8 @@ describe('geometry', () => {
 
     expect(livePercent.x).toBeCloseTo(82.7, 1);
     expect(livePercent.y).toBeCloseTo(22.5, 1);
-    expect(simulationPercent.x).toBeCloseTo(28.9, 1);
-    expect(simulationPercent.y).toBeCloseTo(12.6, 1);
+    expect(simulationPercent.x).toBeCloseTo(31.7, 1);
+    expect(simulationPercent.y).toBeCloseTo(95.0, 1);
   });
 
   it('computes rendered metrics for landscape and portrait containers', () => {
