@@ -176,8 +176,11 @@ export type SimulationEvent = {
   type: string;
   simulationId: string;
   timestamp: string;
+  sequence?: number;
   [key: string]: any;
 };
+
+export type SimulationEventEnvelope = SimulationEvent;
 
 export type Unsubscribe = () => void;
 

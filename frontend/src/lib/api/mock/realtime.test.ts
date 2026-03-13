@@ -10,10 +10,12 @@ describe('createMockSimulationStreamClient', () => {
     const sequences: number[] = [];
 
     client.subscribe((event) => {
-      sequences.push(event.sequence);
+      if (typeof event.sequence === 'number') {
+        sequences.push(event.sequence);
+      }
     });
 
-    client.connect();
+    client.connect('base');
     vi.advanceTimersByTime(250);
     vi.advanceTimersByTime(1_500);
     vi.advanceTimersByTime(1_500);

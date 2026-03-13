@@ -8,7 +8,12 @@ import type {
 const MOCK_RUN_ID = 'mock-run-001';
 const STEP_INTERVAL_MS = 1_500;
 
-const SCRIPTED_EVENTS: Array<Omit<SimulationEvent, 'simulationId' | 'timestamp'>> = [
+type ScriptedSimulationEvent = {
+  type: string;
+  tick: number;
+};
+
+const SCRIPTED_EVENTS: ScriptedSimulationEvent[] = [
   {
     type: 'simulation_step',
     tick: 1,
@@ -53,11 +58,15 @@ export function createMockSimulationStreamClient(): SimulationStreamClient {
 
   function emitNextEvent() {
     const scriptedEvent = SCRIPTED_EVENTS[scriptIndex];
+    if (!scriptedEvent) {
+      return;
+    }
 
     const event: SimulationEvent = {
       ...scriptedEvent,
       simulationId: MOCK_RUN_ID,
       timestamp: new Date().toISOString(),
+      sequence: scriptIndex + 1,
     };
 
     eventSubscribers.forEach((handler) => {
