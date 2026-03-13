@@ -142,28 +142,28 @@ func TestSimulationServiceEndToEnd_StartSimulationAndStatus(t *testing.T) {
 	}
 }
 
-func TestSimulationServiceClone_BaseReturnsRandomNonBaseID(t *testing.T) {
+func TestSimulationServiceBranch_BaseReturnsRandomNonBaseID(t *testing.T) {
 	t.Parallel()
 
 	svc := services.NewSimulationService(services.SimulationServiceConfig{Resolution: 10 * time.Minute})
 	_, err := svc.CreateBaseSimulation(services.BaseSimulationConfig{Options: safeSimulationOptions(1, 1)})
 	require.NoError(t, err)
 
-	cloneID, err := svc.CloneSimulation(services.BaseSimulationID)
+	branchID, err := svc.BranchSimulation(services.BaseSimulationID)
 	require.NoError(t, err)
-	require.NotEmpty(t, cloneID)
-	require.NotEqual(t, services.BaseSimulationID, cloneID)
+	require.NotEmpty(t, branchID)
+	require.NotEqual(t, services.BaseSimulationID, branchID)
 
-	_, err = svc.Simulation(cloneID)
+	_, err = svc.Simulation(branchID)
 	require.NoError(t, err)
 
 	list := svc.Simulations()
 	require.Len(t, list, 2)
 	require.Equal(t, services.BaseSimulationID, list[0].ID)
-	require.Equal(t, cloneID, list[1].ID)
+	require.Equal(t, branchID, list[1].ID)
 }
 
-func TestSimulationServiceClone_PausesSourceAndClone(t *testing.T) {
+func TestSimulationServiceBranch_PausesSourceAndBranch(t *testing.T) {
 	t.Parallel()
 
 	svc := services.NewSimulationService(services.SimulationServiceConfig{
@@ -173,21 +173,21 @@ func TestSimulationServiceClone_PausesSourceAndClone(t *testing.T) {
 	require.NoError(t, err)
 	require.NoError(t, svc.StartSimulation(services.BaseSimulationID))
 
-	cloneID, err := svc.CloneSimulation(services.BaseSimulationID)
+	branchID, err := svc.BranchSimulation(services.BaseSimulationID)
 	require.NoError(t, err)
 
 	baseInfo, err := svc.Simulation(services.BaseSimulationID)
 	require.NoError(t, err)
-	cloneInfo, err := svc.Simulation(cloneID)
+	branchInfo, err := svc.Simulation(branchID)
 	require.NoError(t, err)
 
 	require.True(t, baseInfo.Paused)
-	require.True(t, cloneInfo.Paused)
+	require.True(t, branchInfo.Paused)
 	require.True(t, baseInfo.Running)
-	require.True(t, cloneInfo.Running)
+	require.True(t, branchInfo.Running)
 }
 
-func TestSimulationServiceClone_IdleBaseRemainsStartableAfterClone(t *testing.T) {
+func TestSimulationServiceBranch_IdleBaseRemainsStartableAfterBranch(t *testing.T) {
 	t.Parallel()
 
 	svc := services.NewSimulationService(services.SimulationServiceConfig{
@@ -196,66 +196,66 @@ func TestSimulationServiceClone_IdleBaseRemainsStartableAfterClone(t *testing.T)
 	_, err := svc.CreateBaseSimulation(services.BaseSimulationConfig{Options: safeSimulationOptions(1, 1)})
 	require.NoError(t, err)
 
-	cloneID, err := svc.CloneSimulation(services.BaseSimulationID)
+	branchID, err := svc.BranchSimulation(services.BaseSimulationID)
 	require.NoError(t, err)
-	require.NotEmpty(t, cloneID)
+	require.NotEmpty(t, branchID)
 
 	baseInfo, err := svc.Simulation(services.BaseSimulationID)
 	require.NoError(t, err)
-	cloneInfo, err := svc.Simulation(cloneID)
+	branchInfo, err := svc.Simulation(branchID)
 	require.NoError(t, err)
 	require.False(t, baseInfo.Running)
 	require.False(t, baseInfo.Paused)
-	require.False(t, cloneInfo.Running)
-	require.False(t, cloneInfo.Paused)
+	require.False(t, branchInfo.Running)
+	require.False(t, branchInfo.Paused)
 
 	require.NoError(t, svc.StartSimulation(services.BaseSimulationID))
 }
 
-func TestSimulationServiceClone_MissingBaseFails(t *testing.T) {
+func TestSimulationServiceBranch_MissingBaseFails(t *testing.T) {
 	t.Parallel()
 
 	svc := services.NewSimulationService(services.SimulationServiceConfig{Resolution: 10 * time.Minute})
 
-	_, err := svc.CloneSimulation(services.BaseSimulationID)
+	_, err := svc.BranchSimulation(services.BaseSimulationID)
 	require.ErrorIs(t, err, services.ErrBaseNotFound)
 }
 
-func TestSimulationServiceClone_NonBaseSimulationRejectedInV1(t *testing.T) {
+func TestSimulationServiceBranch_NonBaseSimulationRejectedInV1(t *testing.T) {
 	t.Parallel()
 
 	svc := services.NewSimulationService(services.SimulationServiceConfig{Resolution: 10 * time.Minute})
 	_, err := svc.CreateBaseSimulation(services.BaseSimulationConfig{Options: safeSimulationOptions(1, 1)})
 	require.NoError(t, err)
 
-	_, err = svc.CloneSimulation("branch-a")
+	_, err = svc.BranchSimulation("branch-a")
 	require.ErrorIs(t, err, services.ErrSimulationNotFound)
 }
 
-func TestSimulationServiceClone_ReadModelsAccessibleByCloneID(t *testing.T) {
+func TestSimulationServiceBranch_ReadModelsAccessibleByBranchID(t *testing.T) {
 	t.Parallel()
 
 	svc := services.NewSimulationService(services.SimulationServiceConfig{Resolution: 10 * time.Minute})
 	_, err := svc.CreateBaseSimulation(services.BaseSimulationConfig{Options: safeSimulationOptions(2, 2)})
 	require.NoError(t, err)
 
-	cloneID, err := svc.CloneSimulation(services.BaseSimulationID)
+	branchID, err := svc.BranchSimulation(services.BaseSimulationID)
 	require.NoError(t, err)
 
-	airbases, err := svc.Airbases(cloneID)
+	airbases, err := svc.Airbases(branchID)
 	require.NoError(t, err)
 	require.Len(t, airbases, 2)
 
-	aircrafts, err := svc.Aircrafts(cloneID)
+	aircrafts, err := svc.Aircrafts(branchID)
 	require.NoError(t, err)
 	require.Len(t, aircrafts, 2)
 
-	threats, err := svc.Threats(cloneID)
+	threats, err := svc.Threats(branchID)
 	require.NoError(t, err)
 	require.NotNil(t, threats)
 }
 
-func TestSimulationServiceClone_EmitsCloneScopedEventsOnly(t *testing.T) {
+func TestSimulationServiceBranch_EmitsBranchScopedEventsOnly(t *testing.T) {
 	t.Parallel()
 
 	svc := services.NewSimulationService(services.SimulationServiceConfig{Resolution: time.Second})
@@ -265,13 +265,13 @@ func TestSimulationServiceClone_EmitsCloneScopedEventsOnly(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	cloneID, err := svc.CloneSimulation(services.BaseSimulationID)
+	branchID, err := svc.BranchSimulation(services.BaseSimulationID)
 	require.NoError(t, err)
 
-	cloneInfo, err := svc.Simulation(cloneID)
+	branchInfo, err := svc.Simulation(branchID)
 	require.NoError(t, err)
-	require.False(t, cloneInfo.Paused)
-	require.False(t, cloneInfo.Running)
+	require.False(t, branchInfo.Paused)
+	require.False(t, branchInfo.Running)
 
 	clientID, rawEvents := svc.Broadcaster().Subscribe()
 	t.Cleanup(func() {
@@ -279,25 +279,25 @@ func TestSimulationServiceClone_EmitsCloneScopedEventsOnly(t *testing.T) {
 	})
 
 	deadline := time.After(2 * time.Second)
-	seenCloneStep := false
-	require.NoError(t, svc.StepSimulation(cloneID))
-	for !seenCloneStep {
+	seenBranchStep := false
+	require.NoError(t, svc.StepSimulation(branchID))
+	for !seenBranchStep {
 		select {
 		case raw := <-rawEvents:
 			step, ok := raw.(services.SimulationStepEvent)
 			if !ok {
 				continue
 			}
-			require.Equal(t, cloneID, step.SimulationID)
-			seenCloneStep = true
+			require.Equal(t, branchID, step.SimulationID)
+			seenBranchStep = true
 		case <-deadline:
-			t.Fatal("expected clone-scoped step event")
+			t.Fatal("expected branch-scoped step event")
 		}
 	}
 
 }
 
-func TestSimulationServiceClone_DeterministicParityAfterEquivalentAdvancement(t *testing.T) {
+func TestSimulationServiceBranch_DeterministicParityAfterEquivalentAdvancement(t *testing.T) {
 	t.Parallel()
 
 	svc := services.NewSimulationService(services.SimulationServiceConfig{Resolution: time.Second})
@@ -307,35 +307,35 @@ func TestSimulationServiceClone_DeterministicParityAfterEquivalentAdvancement(t 
 	})
 	require.NoError(t, err)
 
-	cloneID, err := svc.CloneSimulation(services.BaseSimulationID)
+	branchID, err := svc.BranchSimulation(services.BaseSimulationID)
 	require.NoError(t, err)
 
 	for range 5 {
 		require.NoError(t, svc.StepSimulation(services.BaseSimulationID))
-		require.NoError(t, svc.StepSimulation(cloneID))
+		require.NoError(t, svc.StepSimulation(branchID))
 	}
 
 	baseInfo, err := svc.Simulation(services.BaseSimulationID)
 	require.NoError(t, err)
-	cloneInfo, err := svc.Simulation(cloneID)
+	branchInfo, err := svc.Simulation(branchID)
 	require.NoError(t, err)
-	require.Equal(t, baseInfo.Tick, cloneInfo.Tick)
-	require.Equal(t, baseInfo.Timestamp, cloneInfo.Timestamp)
+	require.Equal(t, baseInfo.Tick, branchInfo.Tick)
+	require.Equal(t, baseInfo.Timestamp, branchInfo.Timestamp)
 
 	baseAircraft, err := svc.Aircrafts(services.BaseSimulationID)
 	require.NoError(t, err)
-	cloneAircraft, err := svc.Aircrafts(cloneID)
+	branchAircraft, err := svc.Aircrafts(branchID)
 	require.NoError(t, err)
-	require.Equal(t, baseAircraft, cloneAircraft)
+	require.Equal(t, baseAircraft, branchAircraft)
 
 	baseThreats, err := svc.Threats(services.BaseSimulationID)
 	require.NoError(t, err)
-	cloneThreats, err := svc.Threats(cloneID)
+	branchThreats, err := svc.Threats(branchID)
 	require.NoError(t, err)
-	require.Equal(t, baseThreats, cloneThreats)
+	require.Equal(t, baseThreats, branchThreats)
 }
 
-func TestSimulationServiceClone_DeterministicEventIDsDoNotDuplicateBaseID(t *testing.T) {
+func TestSimulationServiceBranch_DeterministicEventIDsDoNotDuplicateBaseID(t *testing.T) {
 	t.Parallel()
 
 	svc := services.NewSimulationService(services.SimulationServiceConfig{Resolution: time.Second})
@@ -345,7 +345,7 @@ func TestSimulationServiceClone_DeterministicEventIDsDoNotDuplicateBaseID(t *tes
 	})
 	require.NoError(t, err)
 
-	cloneID, err := svc.CloneSimulation(services.BaseSimulationID)
+	branchID, err := svc.BranchSimulation(services.BaseSimulationID)
 	require.NoError(t, err)
 
 	clientID, rawEvents := svc.Broadcaster().Subscribe()
@@ -353,11 +353,11 @@ func TestSimulationServiceClone_DeterministicEventIDsDoNotDuplicateBaseID(t *tes
 		svc.Broadcaster().Unsubscribe(clientID)
 	})
 
-	require.NoError(t, svc.StepSimulation(cloneID))
+	require.NoError(t, svc.StepSimulation(branchID))
 
 	deadline := time.After(time.Second)
-	cloneStepCount := 0
-	for cloneStepCount == 0 {
+	branchStepCount := 0
+	for branchStepCount == 0 {
 		select {
 		case raw := <-rawEvents:
 			step, ok := raw.(services.SimulationStepEvent)
@@ -365,13 +365,13 @@ func TestSimulationServiceClone_DeterministicEventIDsDoNotDuplicateBaseID(t *tes
 				continue
 			}
 			require.NotEqual(t, services.BaseSimulationID, step.SimulationID)
-			require.Equal(t, cloneID, step.SimulationID)
-			cloneStepCount++
+			require.Equal(t, branchID, step.SimulationID)
+			branchStepCount++
 		case <-deadline:
-			t.Fatal("expected clone step event without base simulation id")
+			t.Fatal("expected branch step event without base simulation id")
 		}
 	}
-	require.Equal(t, 1, cloneStepCount)
+	require.Equal(t, 1, branchStepCount)
 }
 
 func TestAllAircraftPositionsEventEmitted(t *testing.T) {

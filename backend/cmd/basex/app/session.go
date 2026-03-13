@@ -80,6 +80,14 @@ func (s *Session) Reset(simulationID string) error {
 	return s.service.ResetSimulation(simulationID)
 }
 
+func (s *Session) Branch(simulationID string) (services.SimulationInfo, []services.Airbase, []services.Aircraft, []services.Threat, error) {
+	branchID, err := s.service.BranchSimulation(simulationID)
+	if err != nil {
+		return services.SimulationInfo{}, nil, nil, nil, err
+	}
+	return s.Snapshot(branchID)
+}
+
 func (s *Session) DrainEvents() []services.Event {
 	if s == nil || s.events == nil {
 		return nil

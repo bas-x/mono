@@ -155,6 +155,7 @@ Suggested reducer behavior:
 - IDs are opaque lowercase hex strings
 - the simulation package itself does **not** know about `simulationId`; the service injects it into outgoing events
 - slow websocket clients are disconnected by the backend rather than allowed to block simulation progress
-- current implementation is still service-layer-first for branching: base cloning exists in the service, but no HTTP clone endpoint is documented yet
-- first clone support is base simulation only; checkpoint-based branch creation and branch-from-branch workflows are not implemented
-- determinism guarantee: clone creation copies current simulation state and RNG state, so equivalent future advancement keeps base and clone aligned until a later divergence decision is introduced
+- current implementation is still service-layer-first for branching: base branching exists in the service, but no HTTP branch endpoint is documented yet
+- first branch support is base simulation only; checkpoint-based branch creation and branch-from-branch workflows are not implemented
+- determinism guarantee: branch creation copies current simulation state and RNG state, so equivalent future advancement keeps base and branch aligned until a later divergence decision is introduced
+- the local tester auto-creates the base simulation at startup, shows `Base` as the initial tab, and switches the full tester context when a branch tab is selected

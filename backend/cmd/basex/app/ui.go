@@ -18,12 +18,42 @@ func buildSidebarUI(r *Runtime) (*ebitenui.UI, error) {
 		widget.ContainerOpts.Layout(widget.NewAnchorLayout()),
 	)
 
+	tabStrip := widget.NewContainer(
+		widget.ContainerOpts.WidgetOpts(
+			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
+				HorizontalPosition: widget.AnchorLayoutPositionStart,
+				VerticalPosition:   widget.AnchorLayoutPositionStart,
+				Padding:            &widget.Insets{Top: 12, Left: 12, Right: sidebarWidth + 24},
+			}),
+		),
+		widget.ContainerOpts.BackgroundImage(
+			ebitenuiimage.NewNineSliceColor(color.NRGBA{R: 23, G: 28, B: 39, A: 220}),
+		),
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionHorizontal),
+			widget.RowLayoutOpts.Spacing(6),
+			widget.RowLayoutOpts.Padding(&widget.Insets{Top: 6, Left: 6, Right: 6, Bottom: 6}),
+		)),
+	)
+	for _, tab := range r.tabs {
+		tabID := tab.SimulationID
+		selected := tabID == r.activeSimulationID
+		tabStrip.AddChild(newTabButton(r, tab.Label, selected, func(id string) func() {
+			return func() {
+				r.state.Error = ""
+				if err := r.setActiveTab(id); err != nil {
+					r.state.SetError(err)
+				}
+			}
+		}(tabID)))
+	}
+
 	toolbar := widget.NewContainer(
 		widget.ContainerOpts.WidgetOpts(
 			widget.WidgetOpts.LayoutData(widget.AnchorLayoutData{
 				HorizontalPosition: widget.AnchorLayoutPositionStart,
 				VerticalPosition:   widget.AnchorLayoutPositionStart,
-				Padding:            &widget.Insets{Top: 6, Left: 220, Right: sidebarWidth + 32},
+				Padding:            &widget.Insets{Top: 56, Left: 12, Right: sidebarWidth + 24},
 			}),
 		),
 		widget.ContainerOpts.Layout(widget.NewRowLayout(
@@ -31,9 +61,9 @@ func buildSidebarUI(r *Runtime) (*ebitenui.UI, error) {
 			widget.RowLayoutOpts.Spacing(8),
 		)),
 	)
-	toolbar.AddChild(newButton(r, "Create simulation", func() {
+	toolbar.AddChild(newButton(r, "Create branch", func() {
 		r.state.Error = ""
-		if _, _, _, _, err := r.createSimulation(); err != nil {
+		if _, err := r.createBranchFromActiveTab(); err != nil {
 			r.state.SetError(err)
 		}
 		r.uiDirty = true
@@ -84,6 +114,14 @@ func buildSidebarUI(r *Runtime) (*ebitenui.UI, error) {
 	)
 
 	addSectionTitle(sidebar, r, "Simulation")
+	activeLabel := "Active simulation: none"
+	for _, tab := range r.tabs {
+		if tab.SimulationID == r.activeSimulationID {
+			activeLabel = fmt.Sprintf("Active simulation: %s", tab.Label)
+			break
+		}
+	}
+	sidebar.AddChild(newLabel(r, activeLabel, textSecondary))
 	r.statusLabel = newLabel(r, fmt.Sprintf("Status: %s | Tick: %d", r.state.Status, r.state.Tick), textSecondary)
 	sidebar.AddChild(r.statusLabel)
 	timeText := "Time: n/a"
@@ -126,6 +164,7 @@ func buildSidebarUI(r *Runtime) (*ebitenui.UI, error) {
 		sidebar.AddChild(btn)
 	}
 
+	root.AddChild(tabStrip)
 	root.AddChild(toolbar)
 	root.AddChild(sidebar)
 	return &ebitenui.UI{Container: root}, nil
@@ -171,6 +210,19 @@ func newListRow(r *Runtime, text string, selected bool, onClick func()) *widget.
 	)
 }
 
+func newTabButton(r *Runtime, text string, selected bool, onClick func()) *widget.Button {
+	return widget.NewButton(
+		widget.ButtonOpts.Image(tabButtonImage(selected)),
+		widget.ButtonOpts.Text(text, r.uiFace, &widget.ButtonTextColor{Idle: textPrimary}),
+		widget.ButtonOpts.TextPadding(&widget.Insets{Left: 14, Right: 14, Top: 8, Bottom: 8}),
+		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
+			if onClick != nil {
+				onClick()
+			}
+		}),
+	)
+}
+
 func listRowButtonImage(selected bool) *widget.ButtonImage {
 	idle := color.NRGBA{R: 48, G: 57, B: 77, A: 255}
 	hover := color.NRGBA{R: 66, G: 78, B: 103, A: 255}
@@ -184,6 +236,24 @@ func listRowButtonImage(selected bool) *widget.ButtonImage {
 		Idle:    ebitenuiimage.NewNineSliceColor(idle),
 		Hover:   ebitenuiimage.NewNineSliceColor(hover),
 		Pressed: ebitenuiimage.NewNineSliceColor(pressed),
+	}
+}
+
+func tabButtonImage(selected bool) *widget.ButtonImage {
+	idle := color.NRGBA{R: 39, G: 47, B: 64, A: 255}
+	hover := color.NRGBA{R: 55, G: 66, B: 89, A: 255}
+	pressed := color.NRGBA{R: 65, G: 78, B: 104, A: 255}
+	border := color.NRGBA{R: 70, G: 83, B: 111, A: 255}
+	if selected {
+		idle = color.NRGBA{R: 84, G: 108, B: 153, A: 255}
+		hover = color.NRGBA{R: 96, G: 121, B: 170, A: 255}
+		pressed = color.NRGBA{R: 70, G: 90, B: 128, A: 255}
+		border = color.NRGBA{R: 124, G: 151, B: 207, A: 255}
+	}
+	return &widget.ButtonImage{
+		Idle:    ebitenuiimage.NewBorderedNineSliceColor(idle, border, 2),
+		Hover:   ebitenuiimage.NewBorderedNineSliceColor(hover, border, 2),
+		Pressed: ebitenuiimage.NewBorderedNineSliceColor(pressed, border, 2),
 	}
 }
 

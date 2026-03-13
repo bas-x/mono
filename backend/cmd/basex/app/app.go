@@ -26,23 +26,31 @@ type RuntimeConfig struct {
 }
 
 type Runtime struct {
-	config       Config
-	session      *Session
-	state        *State
-	viewport     Viewport
-	ui           *ebitenui.UI
-	startButton  *widget.Button
-	statusLabel  *widget.Label
-	timeLabel    *widget.Label
-	airbaseRows  []*widget.Button
-	aircraftRows []*widget.Button
-	uiFace       *textv2.Face
-	uiDirty      bool
-	draggingMap  bool
-	lastMouseX   int
-	lastMouseY   int
-	qaRan        bool
-	closed       bool
+	config             Config
+	session            *Session
+	state              *State
+	tabs               []SimulationTab
+	activeSimulationID string
+	nextBranchNumber   int
+	viewport           Viewport
+	ui                 *ebitenui.UI
+	startButton        *widget.Button
+	statusLabel        *widget.Label
+	timeLabel          *widget.Label
+	airbaseRows        []*widget.Button
+	aircraftRows       []*widget.Button
+	uiFace             *textv2.Face
+	uiDirty            bool
+	draggingMap        bool
+	lastMouseX         int
+	lastMouseY         int
+	qaRan              bool
+	closed             bool
+}
+
+type SimulationTab struct {
+	SimulationID string
+	Label        string
 }
 
 func New(cfg RuntimeConfig) (*Runtime, error) {
@@ -54,14 +62,21 @@ func New(cfg RuntimeConfig) (*Runtime, error) {
 		return nil, fmt.Errorf("create ui font: %w", err)
 	}
 	face := textv2.Face(&textv2.GoTextFace{Source: faceSource, Size: 16})
-	return &Runtime{
-		config:   cfg.Config,
-		session:  NewSession(cfg.Service),
-		state:    NewState(),
-		viewport: DefaultViewport(),
-		uiFace:   &face,
-		uiDirty:  true,
-	}, nil
+	runtime := &Runtime{
+		config:             cfg.Config,
+		session:            NewSession(cfg.Service),
+		state:              NewState(),
+		tabs:               []SimulationTab{{SimulationID: services.BaseSimulationID, Label: "Base"}},
+		activeSimulationID: services.BaseSimulationID,
+		nextBranchNumber:   1,
+		viewport:           DefaultViewport(),
+		uiFace:             &face,
+		uiDirty:            true,
+	}
+	if _, _, _, _, err := runtime.createSimulation(); err != nil {
+		return nil, err
+	}
+	return runtime, nil
 }
 
 func (r *Runtime) Close() {
@@ -308,6 +323,9 @@ func (r *Runtime) createSimulation() (services.SimulationInfo, []services.Airbas
 	if err != nil {
 		return services.SimulationInfo{}, nil, nil, nil, err
 	}
+	r.activeSimulationID = info.ID
+	r.tabs = []SimulationTab{{SimulationID: services.BaseSimulationID, Label: "Base"}}
+	r.nextBranchNumber = 1
 	r.state.SetSnapshot(info, airbases, aircraft, threats)
 	r.state.addEvent("simulation created", true)
 	if len(airbases) > 0 {
@@ -320,7 +338,7 @@ func (r *Runtime) startSimulation() error {
 	if r.state.Paused {
 		return r.resumeSimulation()
 	}
-	simulationID, err := mustSimulationID(r.state)
+	simulationID, err := r.currentSimulationID()
 	if err != nil {
 		return err
 	}
@@ -332,7 +350,7 @@ func (r *Runtime) startSimulation() error {
 }
 
 func (r *Runtime) pauseSimulation() error {
-	simulationID, err := mustSimulationID(r.state)
+	simulationID, err := r.currentSimulationID()
 	if err != nil {
 		return err
 	}
@@ -344,7 +362,7 @@ func (r *Runtime) pauseSimulation() error {
 }
 
 func (r *Runtime) resumeSimulation() error {
-	simulationID, err := mustSimulationID(r.state)
+	simulationID, err := r.currentSimulationID()
 	if err != nil {
 		return err
 	}
@@ -363,21 +381,28 @@ func (r *Runtime) togglePause() error {
 }
 
 func (r *Runtime) resetSimulation() error {
-	simulationID, err := mustSimulationID(r.state)
+	if err := r.session.Reset(services.BaseSimulationID); err != nil {
+		return err
+	}
+	info, airbases, aircraft, threats, err := r.session.Create(r.config.Seed)
 	if err != nil {
 		return err
 	}
-	if err := r.session.Reset(simulationID); err != nil {
-		return err
-	}
+	r.tabs = []SimulationTab{{SimulationID: services.BaseSimulationID, Label: "Base"}}
+	r.activeSimulationID = services.BaseSimulationID
+	r.nextBranchNumber = 1
 	r.state.Clear()
+	r.state.SetSnapshot(info, airbases, aircraft, threats)
 	r.state.addEvent("simulation reset", true)
 	r.viewport = DefaultViewport()
+	if len(airbases) > 0 {
+		r.viewport = r.viewport.FocusAirbase(airbases[0])
+	}
 	return nil
 }
 
 func (r *Runtime) refreshState() error {
-	simulationID, err := mustSimulationID(r.state)
+	simulationID, err := r.currentSimulationID()
 	if err != nil {
 		return err
 	}
@@ -387,6 +412,47 @@ func (r *Runtime) refreshState() error {
 	}
 	r.state.SetSnapshot(info, airbases, aircraft, threats)
 	r.state.addEvent("state refreshed", true)
+	return nil
+}
+
+func (r *Runtime) createBranchFromActiveTab() (string, error) {
+	if r.activeSimulationID != services.BaseSimulationID {
+		return "", fmt.Errorf("branches can only be created from the base tab")
+	}
+	info, airbases, aircraft, threats, err := r.session.Branch(services.BaseSimulationID)
+	if err != nil {
+		return "", err
+	}
+	label := fmt.Sprintf("Branch %d", r.nextBranchNumber)
+	r.nextBranchNumber++
+	r.tabs = append(r.tabs, SimulationTab{SimulationID: info.ID, Label: label})
+	r.activeSimulationID = info.ID
+	r.state.Clear()
+	r.state.SetSnapshot(info, airbases, aircraft, threats)
+	r.state.addEvent("branch created", true)
+	r.uiDirty = true
+	return info.ID, nil
+}
+
+func (r *Runtime) currentSimulationID() (string, error) {
+	if r == nil || r.activeSimulationID == "" {
+		return mustSimulationID(r.state)
+	}
+	return r.activeSimulationID, nil
+}
+
+func (r *Runtime) setActiveTab(simulationID string) error {
+	if simulationID == "" || simulationID == r.activeSimulationID {
+		return nil
+	}
+	info, airbases, aircraft, threats, err := r.session.Snapshot(simulationID)
+	if err != nil {
+		return err
+	}
+	r.activeSimulationID = simulationID
+	r.state.Clear()
+	r.state.SetSnapshot(info, airbases, aircraft, threats)
+	r.uiDirty = true
 	return nil
 }
 
