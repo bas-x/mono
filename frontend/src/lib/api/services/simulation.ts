@@ -3,16 +3,19 @@ import type {
   CreateBaseSimulationRequest,
   SimulationAirbase,
   SimulationAircraft,
+  SimulationInfo,
   SimulationServiceClient,
 } from '@/lib/api/types';
 
 type GetSimulationsResponse = {
-  simulations: Array<{ id: string }>;
+  simulations: SimulationInfo[];
 };
 
 type CreateBaseSimulationResponse = {
   id: string;
 };
+
+type GetSimulationResponse = SimulationInfo;
 
 type GetAirbasesResponse = {
   airbases: SimulationAirbase[];
@@ -31,6 +34,13 @@ export function createSimulationServiceClient(
         signal,
       });
       return response.simulations || [];
+    },
+
+    async getSimulation(simulationId: string, signal?: AbortSignal) {
+      return httpClient.requestJson<GetSimulationResponse>(
+        `/simulations/${encodeURIComponent(simulationId)}`,
+        { signal },
+      );
     },
 
     async createBaseSimulation(request: CreateBaseSimulationRequest, signal?: AbortSignal) {

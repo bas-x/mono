@@ -127,8 +127,18 @@ export type CreateBaseSimulationRequest = {
   simulationOptions?: CreateSimulationOptions;
 };
 
+export type SimulationInfo = {
+  id: string;
+  running: boolean;
+  paused: boolean;
+  tick: number;
+  timestamp: string;
+  untilTick?: number;
+};
+
 export interface SimulationServiceClient {
-  getSimulations(signal?: AbortSignal): Promise<Array<{ id: string }>>;
+  getSimulations(signal?: AbortSignal): Promise<SimulationInfo[]>;
+  getSimulation(simulationId: string, signal?: AbortSignal): Promise<SimulationInfo>;
   createBaseSimulation(
     request: CreateBaseSimulationRequest,
     signal?: AbortSignal,

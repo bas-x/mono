@@ -2,6 +2,7 @@ import type {
   CreateBaseSimulationRequest,
   SimulationAirbase,
   SimulationAircraft,
+  SimulationInfo,
   SimulationServiceClient,
 } from '@/lib/api/types';
 
@@ -44,14 +45,34 @@ const MOCK_AIRCRAFTS: SimulationAircraft[] = [
 ];
 
 export function createMockSimulationServiceClient(): SimulationServiceClient {
+  let mockSimulationInfo: SimulationInfo = {
+    id: 'base',
+    running: false,
+    paused: false,
+    tick: 0,
+    timestamp: new Date().toISOString(),
+    untilTick: 180,
+  };
+
   return {
     async getSimulations() {
       console.log('Mock: Getting simulations');
-      return [{ id: 'base' }];
+      return [mockSimulationInfo];
+    },
+
+    async getSimulation(simulationId: string) {
+      console.log('Mock: Getting simulation', simulationId);
+      return mockSimulationInfo;
     },
 
     async createBaseSimulation(request: CreateBaseSimulationRequest) {
       console.log('Mock: Creating base simulation', request);
+      mockSimulationInfo = {
+        ...mockSimulationInfo,
+        tick: 0,
+        timestamp: new Date().toISOString(),
+        untilTick: request.untilTick ?? mockSimulationInfo.untilTick,
+      };
       return { id: 'base' };
     },
 
