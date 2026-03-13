@@ -142,6 +142,36 @@ func TestSimulationServiceEndToEnd_StartSimulationAndStatus(t *testing.T) {
 	}
 }
 
+func TestSimulationServiceEndToEnd_EmitsSimulationEndedEvent(t *testing.T) {
+	t.Parallel()
+
+	svc := services.NewSimulationService(services.SimulationServiceConfig{
+		RunnerConfig: simulation.ControlledRunnerConfig{TicksPerSecond: 128},
+		RunUntilTick: 3,
+	})
+	_, err := svc.CreateBaseSimulation(services.BaseSimulationConfig{Options: safeSimulationOptions(1, 1)})
+	require.NoError(t, err)
+
+	_, events := svc.Broadcaster().Subscribe()
+	require.NoError(t, svc.StartSimulation(services.BaseSimulationID))
+
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case raw := <-events:
+			ended, ok := raw.(services.SimulationEndedEvent)
+			if !ok {
+				continue
+			}
+			require.Equal(t, services.BaseSimulationID, ended.SimulationID)
+			require.Equal(t, uint64(3), ended.Tick)
+			return
+		case <-deadline:
+			t.Fatal("expected simulation ended event")
+		}
+	}
+}
+
 func TestSimulationServiceBranch_BaseReturnsRandomNonBaseID(t *testing.T) {
 	t.Parallel()
 

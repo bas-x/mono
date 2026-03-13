@@ -202,6 +202,15 @@
 
 ```json
 {
+  "type": "simulation_ended",
+  "simulationId": "base",
+  "tick": 3,
+  "timestamp": "2026-03-11T18:00:15Z"
+}
+```
+
+```json
+{
   "type": "aircraft_state_change",
   "simulationId": "base",
   "tailNumber": "9b2e...",

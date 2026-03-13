@@ -6,6 +6,7 @@ const (
 	EventTypeAircraftStateChange  = "aircraft_state_change"
 	EventTypeLandingAssignment    = "landing_assignment"
 	EventTypeSimulationStep       = "simulation_step"
+	EventTypeSimulationEnded      = "simulation_ended"
 	EventTypeThreatSpawned        = "threat_spawned"
 	EventTypeThreatTargeted       = "threat_targeted"
 	EventTypeThreatDespawned      = "threat_despawned"
@@ -64,6 +65,21 @@ func (e SimulationStepEvent) EventType() string {
 }
 
 func (e SimulationStepEvent) EventSimulationID() string {
+	return e.SimulationID
+}
+
+type SimulationEndedEvent struct {
+	Type         string    `json:"type"`
+	SimulationID string    `json:"simulationId"`
+	Tick         uint64    `json:"tick"`
+	Timestamp    time.Time `json:"timestamp"`
+}
+
+func (e SimulationEndedEvent) EventType() string {
+	return e.Type
+}
+
+func (e SimulationEndedEvent) EventSimulationID() string {
 	return e.SimulationID
 }
 
