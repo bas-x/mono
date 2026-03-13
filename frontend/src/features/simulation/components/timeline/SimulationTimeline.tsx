@@ -23,7 +23,9 @@ export function SimulationTimeline({
 
   const isRunning = simulationState.status === 'running';
   const currentTick = isRunning ? (simulationState.tick ?? 0) : 0;
-  const maxTick = isRunning ? (simulationState.maxTick ?? currentTick) : 0;
+  const maxTick = isRunning
+    ? Math.max(simulationState.untilTick ?? 0, simulationState.maxTick ?? currentTick)
+    : 0;
   const playbackTick = isRunning ? (simulationState.playbackTick ?? null) : null;
 
   useEffect(() => {

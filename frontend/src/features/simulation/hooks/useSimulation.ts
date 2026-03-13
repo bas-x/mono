@@ -10,6 +10,7 @@ import type {
   SimulationAircraft,
   SimulationAircraftNeed,
   SimulationEvent,
+  SimulationInfo,
 } from '@/lib/api/types';
 
 import type { SimulationSetupFormValues } from '@/features/simulation/types';
@@ -56,6 +57,18 @@ function buildCreateBaseSimulationRequest(
   };
 }
 
+function getTimelineEndTick(simulationInfo: Pick<SimulationInfo, 'tick' | 'untilTick'>): number {
+  return Math.max(simulationInfo.tick, simulationInfo.untilTick ?? 0);
+}
+
+function getLiveTimelineMaxTick(currentTick: number, currentMaxTick?: number, untilTick?: number): number {
+  if (untilTick != null) {
+    return Math.max(untilTick, currentMaxTick ?? 0);
+  }
+
+  return Math.max(currentTick, currentMaxTick ?? 0);
+}
+
 export type AircraftPosition = {
   tailNumber: string;
   position: { x: number; y: number };
@@ -66,24 +79,25 @@ export type AircraftPosition = {
 export type SimulationState =
   | { status: 'idle' }
   | { status: 'creating' }
-  | { 
-      status: 'running'; 
-      simulationId: string; 
-      airbases: SimulationAirbase[]; 
+  | {
+      status: 'running';
+      simulationId: string;
+      airbases: SimulationAirbase[];
       aircrafts: SimulationAircraft[];
       tick?: number;
       time?: string;
       aircraftPositions?: AircraftPosition[];
-      history: Record<number, { aircraftPositions?: AircraftPosition[], aircrafts: SimulationAircraft[] }>;
+      history: Record<number, { aircraftPositions?: AircraftPosition[]; aircrafts: SimulationAircraft[] }>;
       playbackTick?: number | null;
       maxTick?: number;
+      untilTick?: number;
     }
   | { status: 'error'; message: string };
 
 export function useSimulation() {
   const { clients } = useApi();
   const [state, setState] = useState<SimulationState>({ status: 'idle' });
-  const [simulations, setSimulations] = useState<Array<{ id: string }>>([]);
+  const [simulations, setSimulations] = useState<SimulationInfo[]>([]);
   const [isLoadingSimulations, setIsLoadingSimulations] = useState(false);
   
   const stream = useSimulationStream(state.status === 'running' ? state.simulationId : undefined);
@@ -101,12 +115,15 @@ export function useSimulation() {
           return {
             ...current,
             tick: currentTick,
-            maxTick: currentTick > (current.maxTick ?? 0) ? currentTick : current.maxTick,
+            maxTick: getLiveTimelineMaxTick(currentTick, current.maxTick, current.untilTick),
             time: event.timestamp,
             history: {
               ...current.history,
-              [currentTick]: current.history[currentTick] || { aircrafts: current.aircrafts, aircraftPositions: current.aircraftPositions },
-            }
+              [currentTick]: current.history[currentTick] || {
+                aircrafts: current.aircrafts,
+                aircraftPositions: current.aircraftPositions,
+              },
+            },
           };
         });
       } else if (event.type === 'aircraft_state_change') {
@@ -116,13 +133,13 @@ export function useSimulation() {
             a.tailNumber === event.tailNumber ? { ...a, ...event.aircraft } : a
           );
           const currentTick = current.tick ?? 0;
-          return { 
-            ...current, 
+          return {
+            ...current,
             aircrafts: updatedAircrafts,
             history: {
               ...current.history,
-              [currentTick]: { ...current.history[currentTick], aircrafts: updatedAircrafts }
-            }
+              [currentTick]: { ...current.history[currentTick], aircrafts: updatedAircrafts },
+            },
           };
         });
       } else if (event.type === 'landing_assignment') {
@@ -132,26 +149,40 @@ export function useSimulation() {
             a.tailNumber === event.tailNumber ? { ...a, assignedTo: event.baseId } : a
           );
           const currentTick = current.tick ?? 0;
-          return { 
-            ...current, 
+          return {
+            ...current,
             aircrafts: updatedAircrafts,
             history: {
               ...current.history,
-              [currentTick]: { ...current.history[currentTick], aircrafts: updatedAircrafts }
-            }
+              [currentTick]: { ...current.history[currentTick], aircrafts: updatedAircrafts },
+            },
           };
         });
       } else if (event.type === 'all_aircraft_positions') {
         setState((current) => {
           if (current.status !== 'running') return current;
           const currentTick = event.tick ?? current.tick ?? 0;
-          return { 
-            ...current, 
+          return {
+            ...current,
             aircraftPositions: event.positions,
             history: {
               ...current.history,
-              [currentTick]: { ...current.history[currentTick], aircraftPositions: event.positions }
-            }
+              [currentTick]: { ...current.history[currentTick], aircraftPositions: event.positions },
+            },
+          };
+        });
+      } else if (event.type === 'simulation_ended') {
+        setState((current) => {
+          if (current.status !== 'running') return current;
+          const endedTick = event.tick as number;
+          const boundedMaxTick = Math.max(endedTick, current.untilTick ?? 0, current.maxTick ?? 0);
+          return {
+            ...current,
+            tick: endedTick,
+            maxTick: boundedMaxTick,
+            time: event.timestamp,
+            playbackTick:
+              current.playbackTick == null ? null : Math.min(current.playbackTick, boundedMaxTick),
           };
         });
       }
@@ -177,7 +208,8 @@ export function useSimulation() {
   const loadSimulation = useCallback(async (id: string) => {
     setState({ status: 'creating' });
     try {
-      const [airbases, aircrafts] = await Promise.all([
+      const [simulationInfo, airbases, aircrafts] = await Promise.all([
+        clients.simulation.getSimulation(id),
         clients.simulation.getAirbases(id),
         clients.simulation.getAircrafts(id),
       ]);
@@ -187,8 +219,12 @@ export function useSimulation() {
         simulationId: id,
         airbases,
         aircrafts,
+        tick: simulationInfo.tick,
+        time: simulationInfo.timestamp,
         history: {},
         playbackTick: null,
+        maxTick: getTimelineEndTick(simulationInfo),
+        untilTick: simulationInfo.untilTick,
       });
       toast.success('Simulation loaded successfully');
     } catch (error) {
@@ -232,7 +268,8 @@ export function useSimulation() {
     if (state.status !== 'running') return;
 
     try {
-      const [airbases, aircrafts] = await Promise.all([
+      const [simulationInfo, airbases, aircrafts] = await Promise.all([
+        clients.simulation.getSimulation(state.simulationId),
         clients.simulation.getAirbases(state.simulationId),
         clients.simulation.getAircrafts(state.simulationId),
       ]);
@@ -243,6 +280,10 @@ export function useSimulation() {
           ...current,
           airbases,
           aircrafts,
+          tick: simulationInfo.tick,
+          time: simulationInfo.timestamp,
+          maxTick: Math.max(current.maxTick ?? 0, getTimelineEndTick(simulationInfo)),
+          untilTick: simulationInfo.untilTick ?? current.untilTick,
         };
       });
     } catch (error) {
