@@ -21,21 +21,24 @@ export function Navbar() {
           icon: <HiOutlineLightningBolt className="h-6 w-6" />,
           label: 'Using Mocks',
           next: 'Switch to Remote API',
-          colorClass: 'border-yellow-500/50 text-yellow-500',
+          colorClass:
+            'border-[color:var(--color-primary)]/45 text-[color:var(--color-primary)] bg-[color:var(--color-shell-button-hover)]',
         };
       case 'remote':
         return {
           icon: <HiOutlineServer className="h-6 w-6" />,
           label: 'Using Remote API',
           next: 'Switch to Localhost API',
-          colorClass: 'border-green-500/50 text-green-500',
+          colorClass:
+            'border-[color:var(--color-shell-button-border)] text-[color:var(--color-primary-strong)] bg-[color:var(--color-shell-panel)]',
         };
       case 'localhost':
         return {
           icon: <HiOutlineDesktopComputer className="h-6 w-6" />,
           label: 'Using Localhost (8080)',
           next: 'Switch to Mock API',
-          colorClass: 'border-blue-500/50 text-blue-500',
+          colorClass:
+            'border-[color:var(--color-accent)]/45 text-[color:var(--color-accent)] bg-[color:var(--color-shell-button-hover)]',
         };
     }
   };
@@ -48,12 +51,16 @@ export function Navbar() {
         <div className="flex w-full flex-col items-center gap-3">
           <div
             aria-label="Bas X"
-            className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-b from-white/[0.06] to-transparent shadow-[0_0_12px_-3px_rgba(255,255,255,0.1),inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-white/[0.04]"
+            className="flex h-12 w-12 items-center justify-center rounded-lg border border-[color:var(--color-primary)]/30 bg-[radial-gradient(circle_at_30%_30%,rgba(245,158,11,0.28),rgba(120,53,15,0.92)_68%)] shadow-[0_0_20px_-8px_rgba(217,119,6,0.8),inset_0_1px_0_rgba(255,255,255,0.08)]"
           >
             <img
               src={logoSrc}
               alt="Bas X"
-              className="h-full w-full object-contain drop-shadow-[0_0_4px_rgba(255,255,255,0.15)]"
+              className="h-full w-full object-contain opacity-95"
+              style={{
+                filter:
+                  'sepia(1) saturate(4.2) hue-rotate(345deg) brightness(0.88) contrast(1.12) drop-shadow(0 0 6px rgba(245,158,11,0.35))',
+              }}
             />
           </div>
         </div>

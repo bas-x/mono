@@ -38,22 +38,22 @@ type ThemeStyle = CSSProperties & {
 
 const MODE_THEME_STYLES: Record<ViewMode, ThemeStyle> = {
   live: {
-    '--color-map-surface': 'oklch(77% 0.112 186)',
-    '--color-map-boundary': 'oklch(36% 0.064 221)',
-    '--color-airbase-default-fill': 'oklch(31% 0.118 256)',
-    '--color-airbase-default-stroke': 'oklch(16% 0.031 258)',
-    '--color-airbase-hover': 'oklch(89% 0.11 181)',
-    '--color-airbase-selected-border': 'oklch(49% 0.157 34)',
-    '--color-airbase-selected-fill': 'oklch(71% 0.173 63)',
+    '--color-map-surface': 'oklch(79% 0.052 82)',
+    '--color-map-boundary': 'oklch(40% 0.032 62)',
+    '--color-airbase-default-fill': 'oklch(48% 0.11 52)',
+    '--color-airbase-default-stroke': 'oklch(29% 0.058 42)',
+    '--color-airbase-hover': 'oklch(74% 0.14 68)',
+    '--color-airbase-selected-border': 'oklch(30% 0.07 34)',
+    '--color-airbase-selected-fill': 'oklch(61% 0.16 58)',
   },
   simulate: {
-    '--color-map-surface': 'oklch(73% 0.157 42)',
-    '--color-map-boundary': 'oklch(35% 0.082 22)',
-    '--color-airbase-default-fill': 'oklch(39% 0.138 336)',
-    '--color-airbase-default-stroke': 'oklch(21% 0.045 334)',
-    '--color-airbase-hover': 'oklch(84% 0.136 32)',
-    '--color-airbase-selected-border': 'oklch(37% 0.143 257)',
-    '--color-airbase-selected-fill': 'oklch(66% 0.169 275)',
+    '--color-map-surface': 'oklch(71% 0.118 56)',
+    '--color-map-boundary': 'oklch(34% 0.058 30)',
+    '--color-airbase-default-fill': 'oklch(43% 0.136 36)',
+    '--color-airbase-default-stroke': 'oklch(24% 0.065 28)',
+    '--color-airbase-hover': 'oklch(79% 0.162 72)',
+    '--color-airbase-selected-border': 'oklch(32% 0.088 24)',
+    '--color-airbase-selected-fill': 'oklch(67% 0.168 62)',
   },
 };
 
