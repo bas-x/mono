@@ -150,84 +150,140 @@ func (s *SimulationService) CreateBaseSimulation(cfg BaseSimulationConfig) (*sim
 
 func (s *SimulationService) StartSimulation(simulationID string) error {
 	s.mu.Lock()
-	managed, err := s.managedSimulationByIDLocked(simulationID)
-	if err != nil {
+	if _, err := s.managedSimulationByIDLocked(simulationID); err != nil {
 		s.mu.Unlock()
 		return err
 	}
-	if managed.running {
+	managedSimulations := s.managedSimulationsLocked()
+	type runnerStart struct {
+		runner  *simulation.ControlledRunner
+		ctx     context.Context
+		sim     *simulation.Simulation
+		managed *managedSimulation
+	}
+	starts := make([]runnerStart, 0, len(managedSimulations))
+	hasAny := false
+	hasStopped := false
+	for _, managed := range managedSimulations {
+		if managed == nil {
+			continue
+		}
+		hasAny = true
+		if managed.running {
+			continue
+		}
+		hasStopped = true
+		runner, ctx, sim := s.startManagedRunnerLocked(managed)
+		starts = append(starts, runnerStart{runner: runner, ctx: ctx, sim: sim, managed: managed})
+	}
+	if !hasAny {
+		s.mu.Unlock()
+		return ErrBaseNotFound
+	}
+	if !hasStopped {
 		s.mu.Unlock()
 		return ErrSimulationRunning
 	}
-
-	runner := simulation.NewControlledRunner(s.runnerCfg)
-	ctx, cancel := context.WithCancel(context.Background())
-	managed.runner = runner
-	managed.cancel = cancel
-	managed.running = true
-	managed.paused = false
-	sim := managed.sim
 	s.mu.Unlock()
 
-	go func() {
-		runner.Run(ctx, sim)
-		s.mu.Lock()
-		defer s.mu.Unlock()
-		if s.base != managed {
-			return
-		}
-		managed.runner = nil
-		managed.cancel = nil
-		managed.running = false
-		managed.paused = false
-	}()
+	for _, start := range starts {
+		go s.runManagedSimulation(start.managed, start.runner, start.ctx, start.sim)
+	}
 
 	return nil
 }
 
 func (s *SimulationService) PauseSimulation(simulationID string) error {
 	s.mu.Lock()
-	managed, err := s.managedSimulationByIDLocked(simulationID)
-	if err != nil {
+	if _, err := s.managedSimulationByIDLocked(simulationID); err != nil {
 		s.mu.Unlock()
 		return err
 	}
-	if !managed.running || managed.runner == nil {
+	managedSimulations := s.managedSimulationsLocked()
+	runners := make([]*simulation.ControlledRunner, 0, len(managedSimulations))
+	hasRunning := false
+	hasUnpaused := false
+	for _, managed := range managedSimulations {
+		if managed == nil || !managed.running {
+			continue
+		}
+		hasRunning = true
+		if managed.paused {
+			continue
+		}
+		hasUnpaused = true
+		managed.paused = true
+		if managed.runner != nil {
+			runners = append(runners, managed.runner)
+		}
+	}
+	if !hasRunning {
 		s.mu.Unlock()
 		return ErrSimulationNotRunning
 	}
-	if managed.paused {
+	if !hasUnpaused {
 		s.mu.Unlock()
 		return ErrSimulationPaused
 	}
-	runner := managed.runner
-	managed.paused = true
 	s.mu.Unlock()
 
-	runner.Pause()
+	for _, runner := range runners {
+		runner.Pause()
+	}
 	return nil
 }
 
 func (s *SimulationService) ResumeSimulation(simulationID string) error {
 	s.mu.Lock()
-	managed, err := s.managedSimulationByIDLocked(simulationID)
-	if err != nil {
+	if _, err := s.managedSimulationByIDLocked(simulationID); err != nil {
 		s.mu.Unlock()
 		return err
 	}
-	if !managed.running || managed.runner == nil {
+	managedSimulations := s.managedSimulationsLocked()
+	hasRunning := false
+	hasPaused := false
+	type runnerResume struct {
+		runner  *simulation.ControlledRunner
+		ctx     context.Context
+		sim     *simulation.Simulation
+		spawn   bool
+		managed *managedSimulation
+	}
+	resumes := make([]runnerResume, 0, len(managedSimulations))
+	for _, managed := range managedSimulations {
+		if managed == nil || !managed.running {
+			continue
+		}
+		hasRunning = true
+		if !managed.paused {
+			continue
+		}
+		hasPaused = true
+		managed.paused = false
+		if managed.runner == nil {
+			runner, ctx, sim := s.startManagedRunnerLocked(managed)
+			resumes = append(resumes, runnerResume{runner: runner, ctx: ctx, sim: sim, spawn: true, managed: managed})
+			continue
+		}
+		resumes = append(resumes, runnerResume{runner: managed.runner, spawn: false, managed: managed})
+	}
+	if !hasRunning {
 		s.mu.Unlock()
 		return ErrSimulationNotRunning
 	}
-	if !managed.paused {
+	if !hasPaused {
 		s.mu.Unlock()
 		return ErrSimulationNotPaused
 	}
-	runner := managed.runner
-	managed.paused = false
 	s.mu.Unlock()
 
-	runner.Unpause()
+	for _, resume := range resumes {
+		if resume.spawn {
+			go s.runManagedSimulation(resume.managed, resume.runner, resume.ctx, resume.sim)
+			continue
+		}
+		resume.runner.Unpause()
+	}
 	return nil
 }
 
@@ -391,6 +447,40 @@ func (s *SimulationService) generateBranchIDLocked() (string, error) {
 		return id, nil
 	}
 	return "", errors.New("simulation service: failed to allocate branch id")
+}
+
+func (s *SimulationService) managedSimulationsLocked() []*managedSimulation {
+	result := make([]*managedSimulation, 0, 1+len(s.branches))
+	if s.base != nil {
+		result = append(result, s.base)
+	}
+	for _, managed := range s.branches {
+		result = append(result, managed)
+	}
+	return result
+}
+
+func (s *SimulationService) startManagedRunnerLocked(managed *managedSimulation) (*simulation.ControlledRunner, context.Context, *simulation.Simulation) {
+	runner := simulation.NewControlledRunner(s.runnerCfg)
+	ctx, cancel := context.WithCancel(context.Background())
+	managed.runner = runner
+	managed.cancel = cancel
+	managed.running = true
+	managed.paused = false
+	return runner, ctx, managed.sim
+}
+
+func (s *SimulationService) runManagedSimulation(managed *managedSimulation, runner *simulation.ControlledRunner, ctx context.Context, sim *simulation.Simulation) {
+	runner.Run(ctx, sim)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if managed.runner != runner {
+		return
+	}
+	managed.runner = nil
+	managed.cancel = nil
+	managed.running = false
+	managed.paused = false
 }
 
 func resetSimulationHooks(sim *simulation.Simulation) {

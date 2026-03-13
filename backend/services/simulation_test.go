@@ -103,6 +103,39 @@ func TestSimulationService_SimulationsReflectRunningState(t *testing.T) {
 	}, time.Second, 10*time.Millisecond)
 }
 
+func TestSimulationService_StartSimulationStartsAllBranches(t *testing.T) {
+	t.Parallel()
+
+	svc := NewSimulationService(SimulationServiceConfig{RunnerConfig: simulation.ControlledRunnerConfig{TicksPerSecond: 128}})
+	_, err := svc.CreateBaseSimulation(BaseSimulationConfig{Options: testSimulationOptions(1, 1)})
+	require.NoError(t, err)
+
+	branchID, err := svc.BranchSimulation(BaseSimulationID)
+	require.NoError(t, err)
+
+	_, eventCh := svc.Broadcaster().Subscribe()
+	require.NoError(t, svc.StartSimulation(branchID))
+
+	require.Eventually(t, func() bool {
+		baseInfo, err := svc.Simulation(BaseSimulationID)
+		if err != nil {
+			return false
+		}
+		branchInfo, err := svc.Simulation(branchID)
+		if err != nil {
+			return false
+		}
+		return baseInfo.Running && !baseInfo.Paused && branchInfo.Running && !branchInfo.Paused
+	}, time.Second, 10*time.Millisecond)
+
+	baseStep := waitForSimulationStepEvent(t, eventCh, BaseSimulationID, time.Second)
+	branchStep := waitForSimulationStepEvent(t, eventCh, branchID, time.Second)
+	require.Greater(t, baseStep.Tick, uint64(0))
+	require.Greater(t, branchStep.Tick, uint64(0))
+
+	require.ErrorIs(t, svc.StartSimulation(BaseSimulationID), ErrSimulationRunning)
+}
+
 func TestSimulationService_PauseResume(t *testing.T) {
 	t.Parallel()
 
@@ -113,25 +146,48 @@ func TestSimulationService_PauseResume(t *testing.T) {
 	_, eventCh := svc.Broadcaster().Subscribe()
 	require.NoError(t, svc.StartSimulation(BaseSimulationID))
 
-	firstTick := waitForStepEvent(t, eventCh, time.Second)
+	firstTick := waitForSimulationStepEvent(t, eventCh, BaseSimulationID, time.Second)
 	require.Greater(t, firstTick.Tick, uint64(0))
 
-	require.NoError(t, svc.PauseSimulation(BaseSimulationID))
-	info, err := svc.Simulation(BaseSimulationID)
+	branchID, err := svc.BranchSimulation(BaseSimulationID)
 	require.NoError(t, err)
-	require.True(t, info.Running)
-	require.True(t, info.Paused)
+
+	baseInfo, err := svc.Simulation(BaseSimulationID)
+	require.NoError(t, err)
+	branchInfo, err := svc.Simulation(branchID)
+	require.NoError(t, err)
+	require.True(t, baseInfo.Running)
+	require.True(t, baseInfo.Paused)
+	require.True(t, branchInfo.Running)
+	require.True(t, branchInfo.Paused)
+
+	require.NoError(t, svc.ResumeSimulation(branchID))
+
+	baseInfo, err = svc.Simulation(BaseSimulationID)
+	require.NoError(t, err)
+	branchInfo, err = svc.Simulation(branchID)
+	require.NoError(t, err)
+	require.True(t, baseInfo.Running)
+	require.False(t, baseInfo.Paused)
+	require.True(t, branchInfo.Running)
+	require.False(t, branchInfo.Paused)
+
+	nextBaseTick := waitForSimulationStepEvent(t, eventCh, BaseSimulationID, time.Second)
+	require.Greater(t, nextBaseTick.Tick, firstTick.Tick)
+	nextBranchTick := waitForSimulationStepEvent(t, eventCh, branchID, time.Second)
+	require.Greater(t, nextBranchTick.Tick, uint64(0))
+
+	require.NoError(t, svc.PauseSimulation(branchID))
+	baseInfo, err = svc.Simulation(BaseSimulationID)
+	require.NoError(t, err)
+	branchInfo, err = svc.Simulation(branchID)
+	require.NoError(t, err)
+	require.True(t, baseInfo.Running)
+	require.True(t, baseInfo.Paused)
+	require.True(t, branchInfo.Running)
+	require.True(t, branchInfo.Paused)
 
 	ensureNoStepEvent(t, eventCh, 150*time.Millisecond)
-
-	require.NoError(t, svc.ResumeSimulation(BaseSimulationID))
-	info, err = svc.Simulation(BaseSimulationID)
-	require.NoError(t, err)
-	require.True(t, info.Running)
-	require.False(t, info.Paused)
-
-	nextTick := waitForStepEvent(t, eventCh, time.Second)
-	require.Greater(t, nextTick.Tick, firstTick.Tick)
 }
 
 func TestSimulationService_Simulation(t *testing.T) {
@@ -258,6 +314,24 @@ func waitForStepEvent(t *testing.T, ch <-chan Event, timeout time.Duration) Simu
 			}
 		case <-timer.C:
 			t.Fatal("timed out waiting for simulation step event")
+		}
+	}
+}
+
+func waitForSimulationStepEvent(t *testing.T, ch <-chan Event, simulationID string, timeout time.Duration) SimulationStepEvent {
+	t.Helper()
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+	for {
+		select {
+		case event := <-ch:
+			step, ok := event.(SimulationStepEvent)
+			if !ok || step.SimulationID != simulationID {
+				continue
+			}
+			return step
+		case <-timer.C:
+			t.Fatalf("timed out waiting for simulation step event for %s", simulationID)
 		}
 	}
 }
