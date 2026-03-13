@@ -18,7 +18,7 @@ Recommended frontend flow:
    - load initial aircraft data
 5. `GET /ws/simulations/base/events`
    - connect websocket for live updates
-6. `POST /simulations/base/start`
+6. `POST /simulations/start`
    - start the continuous simulation runner if `running=false`
 
 ## REST Endpoints
@@ -54,7 +54,7 @@ Response:
 
 ### Start simulation
 
-- `POST /simulations/:simulationId/start`
+- `POST /simulations/start`
 - `202` on success
 - `404` if missing
 - `409` if already running
@@ -75,6 +75,7 @@ The socket emits **all** event types for the selected simulation.
 Current event types:
 
 - `simulation_step`
+- `simulation_ended`
 - `aircraft_state_change`
 - `landing_assignment`
 
@@ -117,6 +118,17 @@ Current event types:
 }
 ```
 
+### Simulation ended
+
+```json
+{
+  "type": "simulation_ended",
+  "simulationId": "base",
+  "tick": 3,
+  "timestamp": "2026-03-11T18:00:15Z"
+}
+```
+
 ### Landing assignment
 
 ```json
@@ -149,13 +161,15 @@ Suggested reducer behavior:
   - optionally annotate the selected base in UI
 - `simulation_step`
   - update current tick / time cursor
+- `simulation_ended`
+  - mark the simulation as completed and stop assuming further live updates will arrive unless restarted
 
 ## Operational Notes
 
 - IDs are opaque lowercase hex strings
 - the simulation package itself does **not** know about `simulationId`; the service injects it into outgoing events
 - slow websocket clients are disconnected by the backend rather than allowed to block simulation progress
-- current implementation is still service-layer-first for branching: base branching exists in the service, but no HTTP branch endpoint is documented yet
+- branch creation is available via `POST /simulations/:simulationId/branch`
 - first branch support is base simulation only; checkpoint-based branch creation and branch-from-branch workflows are not implemented
 - determinism guarantee: branch creation copies current simulation state and RNG state, so equivalent future advancement keeps base and branch aligned until a later divergence decision is introduced
 - the local tester auto-creates the base simulation at startup, shows `Base` as the initial tab, and switches the full tester context when a branch tab is selected
