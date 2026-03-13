@@ -30,7 +30,9 @@ export function SimulationTimeline({
     simulation_step: false,
     landing_assignment: true,
     aircraft_state_change: true,
-    ThreatSpawnedEvent: true,
+    threat_spawned: true,
+    threat_targeted: true,
+    threat_despawned: true,
     all_aircraft_positions: false,
   });
 

@@ -111,8 +111,12 @@ export function TimelineControls({ status, isLoading, onStart, onPause, onResume
         />
         <FilterToggle 
           label="Threats" 
-          isActive={filters.ThreatSpawnedEvent !== false} 
-          onClick={() => onToggleFilter('ThreatSpawnedEvent')} 
+          isActive={filters.threat_spawned !== false} 
+          onClick={() => {
+            onToggleFilter('threat_spawned');
+            onToggleFilter('threat_targeted');
+            onToggleFilter('threat_despawned');
+          }} 
           colorClass="bg-red-500"
         />
       </div>

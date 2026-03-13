@@ -4,12 +4,13 @@ import { toast } from 'sonner';
 import { useApi } from '@/lib/api';
 import { extractErrorMessage, getErrorStatus } from '@/lib/api/errors';
 import { useSimulationStream } from '@/lib/api/useSimulationStream';
-import type { SimulationAirbase, SimulationAircraft, SimulationEvent } from '@/lib/api/types';
+import type { SimulationAirbase, SimulationAircraft, SimulationAircraftNeed, SimulationEvent } from '@/lib/api/types';
 
 export type AircraftPosition = {
   tailNumber: string;
   position: { x: number; y: number };
   state: string;
+  needs: SimulationAircraftNeed[];
 };
 
 export type SimulationState =
