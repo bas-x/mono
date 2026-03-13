@@ -11,7 +11,7 @@ Recommended frontend flow:
 1. `GET /simulations`
    - discover existing simulations and whether they are already running
 2. `POST /simulations/base`
-   - create the base simulation if it does not exist yet
+   - create the base simulation if it does not exist yet; request can include `seed`, `untilTick`, and `simulationOptions`
 3. `GET /simulations/base/airbases`
    - load initial airbase data
 4. `GET /simulations/base/aircrafts`
@@ -43,6 +43,13 @@ Response:
 ### Create base simulation
 
 - `POST /simulations/base`
+
+Optional request fields:
+
+- `seed`
+- `untilTick`
+- `simulationOptions`
+  - supports `constellationOpts`, `fleetOpts`, `threatOpts`, and `lifecycleOpts`
 
 Response:
 

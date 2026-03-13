@@ -10,9 +10,57 @@
 
 ```json
 {
-  "seed": "<optional 64-char hex seed>"
+  "seed": "<optional seed string>",
+  "untilTick": 3,
+  "simulationOptions": {
+    "constellationOpts": {
+      "includeRegions": ["Blekinge"],
+      "minPerRegion": 1,
+      "maxPerRegion": 1,
+      "maxTotal": 1,
+      "regionProbability": {"numerator": 1, "denominator": 1}
+    },
+    "fleetOpts": {
+      "aircraftMin": 1,
+      "aircraftMax": 1,
+      "needsMin": 0,
+      "needsMax": 0,
+      "needsPool": ["fuel", "munitions"],
+      "blockingChance": {"numerator": 1, "denominator": 2}
+    },
+    "threatOpts": {
+      "spawnChance": {"numerator": 1, "denominator": 1},
+      "maxActive": 1,
+      "maxActiveTicks": 10
+    },
+    "lifecycleOpts": {
+      "durations": {
+        "outbound": 1500000000000,
+        "engaged": 2100000000000,
+        "inboundDecision": 480000000000,
+        "commitApproach": 360000000000,
+        "servicing": 4500000000000,
+        "ready": 1200000000000
+      },
+      "returnThreshold": 85,
+      "needRates": {
+        "fuel": {
+          "outboundMilliPerHour": 2600,
+          "engagedMilliPerHour": 4200,
+          "servicingMilliPerHour": 12000,
+          "variancePermille": 450
+        }
+      }
+    }
+  }
 }
 ```
+
+- **Behavior**:
+  - `untilTick` is optional and stops the created simulation once that tick is reached.
+  - `simulationOptions` is optional; if omitted, the backend uses the current default demo options.
+  - `needsPool` accepts: `fuel`, `charge`, `munitions`, `repairs`, `maintenance`, `mission_configuration`, `crew_support`, `emergency`, `weather_constraint`, `ground_support`, `protection`.
+  - `lifecycleOpts.needRates` uses the same need keys as `needsPool`.
 
 - **Response** `201`:
 
