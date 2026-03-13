@@ -26,6 +26,7 @@ export type PolygonBackedAirbasePlacement = Pick<Airbase, 'id' | 'area'>;
 export type PointBackedAirbasePlacement = {
   id: SimulationAirbase['id'];
   point: AirbasePoint;
+  regionId?: SimulationAirbase['regionId'];
 };
 export type AirbasePlacementSource =
   | PolygonBackedAirbasePlacement
