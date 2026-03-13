@@ -4,6 +4,8 @@
 - `POST /simulations/base`
   - Request: `{ seed?: string, untilTick?: number, simulationOptions?: { constellationOpts?: {...}, fleetOpts?: {...}, threatOpts?: {...}, lifecycleOpts?: {...} } }`
   - Response: `{ id: string }`
+- `GET /simulations/:simulationId`
+  - Response: `{ id: string, running: boolean, paused: boolean, tick: number, timestamp: string, untilTick?: number }`
 
 ## Request Shaping
 - `seed` remains top-level and is optional; an empty frontend seed should be omitted so the backend can apply its default seed handling.
@@ -16,3 +18,4 @@
 - Request/response types live in `frontend/src/lib/api/types.ts`.
 - Real HTTP transport is implemented in `frontend/src/lib/api/services/simulation.ts`.
 - Mock parity for create simulation requests lives in `frontend/src/lib/api/mock/simulation.ts`.
+- The timeline should treat `untilTick` as the preferred replay boundary when present, and fall back to the latest observed tick or `simulation_ended.tick` when it is not present yet.

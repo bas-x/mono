@@ -16,6 +16,7 @@
 ## Frontend Scrubbing
 - Timeline scrubber navigates event index/time position.
 - Scrubbing must not mutate backend truth; it only changes viewed reconstruction point.
+- Timeline upper bounds should prefer backend-provided `untilTick` when available, with websocket `simulation_ended.tick` as the authoritative terminal fallback for completed runs.
 
 ## Compare Runs
 - Compare mode aligns runs by consistent coordinate (time/event index/phase).
