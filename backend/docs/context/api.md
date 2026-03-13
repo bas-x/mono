@@ -207,6 +207,46 @@
 }
 ```
 
+### Override an aircraft landing assignment
+
+- **Method**: `POST`
+- **Path**: `/simulations/:simulationId/aircraft/:tailNumber/assignment-override`
+- **Body**:
+
+```json
+{
+  "baseId": "3a5f..."
+}
+```
+
+- **Behavior**:
+  - Applies a human landing assignment override for the specified aircraft tail number.
+  - V1 supports **set override only**; clearing an override is not exposed over HTTP.
+  - The override is allowed only before the aircraft is committed to landing/service flow.
+  - The response returns both the aircraft read model and the assignment metadata.
+
+- **Response** `200`:
+
+```json
+{
+  "aircraft": {
+    "tailNumber": "9b2e...",
+    "state": "Inbound",
+    "needs": [],
+    "assignedTo": "3a5f...",
+    "position": {"x": 0, "y": 0}
+  },
+  "assignment": {
+    "base": "3a5f...",
+    "source": "human"
+  }
+}
+```
+
+- **Response** `400`: invalid tail number, base ID, or target airbase
+- **Response** `404`: simulation or aircraft not found
+- **Response** `409`: assignment override too late
+
 ### List threats for a simulation
 
 - **Method**: `GET`

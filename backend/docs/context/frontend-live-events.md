@@ -71,6 +71,38 @@ Response:
 - `GET /simulations/:simulationId/airbases`
 - `GET /simulations/:simulationId/aircrafts`
 
+### Override landing assignment
+
+- `POST /simulations/:simulationId/aircraft/:tailNumber/assignment-override`
+
+Request:
+
+```json
+{
+  "baseId": "3a5f..."
+}
+```
+
+Response:
+
+```json
+{
+  "aircraft": {
+    "tailNumber": "9b2e...",
+    "state": "Inbound",
+    "needs": [],
+    "assignedTo": "3a5f...",
+    "position": {"x": 0, "y": 0}
+  },
+  "assignment": {
+    "base": "3a5f...",
+    "source": "human"
+  }
+}
+```
+
+- `409` means the aircraft is already past the pre-commit override window.
+
 These endpoints are useful for initial page hydration before live updates arrive.
 
 ## WebSocket Endpoint
@@ -148,6 +180,14 @@ Current event types:
   "timestamp": "2026-03-11T18:00:08Z"
 }
 ```
+
+Notes:
+
+- A landing override uses the existing `landing_assignment` websocket event.
+- Frontend code should key off `source`:
+  - `algorithm` = dispatcher-selected assignment
+  - `human` = operator override applied through the API
+- It is valid to receive an `algorithm` assignment event before a `human` override event for the same aircraft if the backend registers inbound and then applies the override.
 
 ## Frontend State Strategy
 
