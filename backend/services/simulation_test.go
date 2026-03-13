@@ -187,6 +187,7 @@ func TestSimulationService_PauseResume(t *testing.T) {
 	require.True(t, branchInfo.Running)
 	require.True(t, branchInfo.Paused)
 
+	drainStepEvents(eventCh)
 	ensureNoStepEvent(t, eventCh, 150*time.Millisecond)
 }
 
@@ -347,6 +348,17 @@ func ensureNoStepEvent(t *testing.T, ch <-chan Event, duration time.Duration) {
 				t.Fatalf("unexpected simulation step event while paused: %#v", event)
 			}
 		case <-timer.C:
+			return
+		}
+	}
+}
+
+func drainStepEvents(ch <-chan Event) {
+	for {
+		select {
+		case <-ch:
+			continue
+		default:
 			return
 		}
 	}
