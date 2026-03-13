@@ -9,25 +9,74 @@ type SimulationTimelineProps = {
   simulationId: string;
   simulationState: SimulationState;
   setPlaybackTick: (tick: number | null) => void;
+  onRefresh: () => Promise<void>;
 };
 
 export function SimulationTimeline({
   simulationId,
   simulationState,
   setPlaybackTick,
+  onRefresh,
 }: SimulationTimelineProps) {
-  const { status, isLoading, start, pause, resume } = useSimulationControls(simulationId);
+  const {
+    status,
+    isLoading,
+    start,
+    pause,
+    resume,
+  } = useSimulationControls(
+    simulationId,
+    simulationState.status === 'running'
+      ? {
+          isRunnerActive: simulationState.isRunnerActive,
+          isRunnerPaused: simulationState.isRunnerPaused,
+          tick: simulationState.tick,
+          untilTick: simulationState.untilTick,
+        }
+      : undefined,
+    onRefresh,
+  );
   const { events } = useSimulationEvents(simulationId, status === 'paused', status === 'idle');
 
   const [zoom, setZoom] = useState(1);
 
   const isRunning = simulationState.status === 'running';
   const currentTick = isRunning ? (simulationState.tick ?? 0) : 0;
-  const maxTick = isRunning
-    ? Math.max(simulationState.untilTick ?? 0, simulationState.maxTick ?? currentTick)
+  const highestEventTick = events.reduce((highest, event) => {
+    const tick = typeof event.tick === 'number' ? event.tick : 0;
+    return Math.max(highest, tick);
+  }, 0);
+  const timelineEndTick = isRunning
+    ? Math.max(simulationState.untilTick ?? 0, highestEventTick, simulationState.maxTick ?? currentTick, currentTick)
     : 0;
   const playbackTick = isRunning ? (simulationState.playbackTick ?? null) : null;
-  const durationLabel = isRunning ? formatSimulationDurationFromTicks(simulationState.untilTick ?? maxTick) : null;
+  const visibleTick = playbackTick ?? currentTick;
+  const isLivePlayback = status === 'running' && playbackTick == null;
+  const durationLabel = isRunning
+    ? formatSimulationDurationFromTicks(simulationState.untilTick ?? timelineEndTick)
+    : null;
+
+  const handlePause = async () => {
+    if (status !== 'running') {
+      return;
+    }
+
+    const paused = await pause();
+    if (paused) {
+      setPlaybackTick(visibleTick);
+    }
+  };
+
+  const handleResume = async () => {
+    setPlaybackTick(null);
+    await resume();
+  };
+
+  const handleBeforeScrub = () => {
+    if (status === 'running' && !isLoading) {
+      void pause();
+    }
+  };
 
   useEffect(() => {
     if (!isRunning) return;
@@ -45,10 +94,10 @@ export function SimulationTimeline({
         if (e.key === 'ArrowLeft') {
           newTick = Math.max(0, startTick - step);
         } else {
-          newTick = Math.min(maxTick, startTick + step);
+          newTick = Math.min(timelineEndTick, startTick + step);
         }
 
-        if (newTick >= maxTick) {
+        if (newTick >= timelineEndTick) {
           setPlaybackTick(null);
         } else {
           setPlaybackTick(newTick);
@@ -58,7 +107,7 @@ export function SimulationTimeline({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isRunning, currentTick, maxTick, playbackTick, setPlaybackTick]);
+  }, [isRunning, currentTick, playbackTick, setPlaybackTick, timelineEndTick]);
 
   const [filters, setFilters] = useState<Record<string, boolean>>({
     simulation_step: false,
@@ -130,8 +179,8 @@ export function SimulationTimeline({
           status={status}
           isLoading={isLoading}
           onStart={start}
-          onPause={pause}
-          onResume={resume}
+          onPause={handlePause}
+          onResume={handleResume}
           filters={filters}
           onToggleFilter={handleToggleFilter}
           zoom={zoom}
@@ -141,10 +190,12 @@ export function SimulationTimeline({
         <TimelineTrack
           events={filteredEvents}
           currentTick={currentTick}
-          maxTick={maxTick}
+          maxTick={timelineEndTick}
           playbackTick={playbackTick}
           onScrub={setPlaybackTick}
           zoom={zoom}
+          onBeforeScrub={handleBeforeScrub}
+          isLive={isLivePlayback}
         />
       </div>
     </div>

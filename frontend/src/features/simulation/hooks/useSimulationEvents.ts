@@ -2,7 +2,11 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { useSimulationStream } from '@/lib/api/useSimulationStream';
 import type { SimulationEvent } from '@/lib/api/types';
 
-export function useSimulationEvents(simulationId?: string, isPaused: boolean = false, isIdle: boolean = false, maxEvents = 200) {
+export function useSimulationEvents(
+  simulationId?: string,
+  isPaused: boolean = false,
+  isIdle: boolean = false,
+) {
   const stream = useSimulationStream(simulationId);
   const [events, setEvents] = useState<SimulationEvent[]>([]);
   const isPausedRef = useRef(isPaused);
@@ -20,14 +24,10 @@ export function useSimulationEvents(simulationId?: string, isPaused: boolean = f
       if (isPausedRef.current || isIdleRef.current) return;
 
       setEvents((prev) => {
-        const next = [...prev, event];
-        if (next.length > maxEvents) {
-          return next.slice(next.length - maxEvents);
-        }
-        return next;
+        return [...prev, event];
       });
     });
-  }, [stream, simulationId, maxEvents]);
+  }, [stream, simulationId]);
 
   const clear = useCallback(() => {
     setEvents([]);

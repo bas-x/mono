@@ -86,6 +86,7 @@ export function MapPanel() {
     simulations,
     loadSimulation,
     createSimulation,
+    refreshData,
     reset: resetSimulation,
     triggerReset,
   } = useSimulation();
@@ -377,6 +378,7 @@ export function MapPanel() {
               simulationId={simulationState.simulationId}
               simulationState={simulationState}
               setPlaybackTick={setPlaybackTick}
+              onRefresh={refreshData}
             />
           </div>
         ) : null}

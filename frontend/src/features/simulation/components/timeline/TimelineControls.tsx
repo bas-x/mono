@@ -64,6 +64,9 @@ type TimelineControlsProps = {
 };
 
 export function TimelineControls({ status, isLoading, onStart, onPause, onResume, filters, onToggleFilter, zoom, onZoomChange, durationLabel }: TimelineControlsProps) {
+  const isFinished = status === 'finished';
+  const isResumeLike = status === 'paused' || status === 'resumable';
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
@@ -74,14 +77,14 @@ export function TimelineControls({ status, isLoading, onStart, onPause, onResume
         onStart();
       } else if (e.key.toLowerCase() === 'p' && status === 'running' && !isLoading) {
         onPause();
-      } else if (e.key.toLowerCase() === 'r' && status === 'paused' && !isLoading) {
+      } else if (e.key.toLowerCase() === 'r' && isResumeLike && !isLoading) {
         onResume();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [status, isLoading, onStart, onPause, onResume]);
+  }, [isLoading, isResumeLike, onPause, onResume, onStart, status]);
 
   return (
     <div className="flex items-center justify-between border-b border-[color:var(--color-shell-panel-border)] pb-3 relative">
@@ -125,7 +128,7 @@ export function TimelineControls({ status, isLoading, onStart, onPause, onResume
         <button
           type="button"
           onClick={onStart}
-          disabled={status !== 'idle' || isLoading}
+          disabled={status !== 'idle' || isLoading || isFinished}
           className="relative flex items-center justify-center rounded-lg bg-white/10 px-4 py-2 text-white transition-all hover:bg-white/20 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-white/10 min-w-[4rem]"
           title="Start Simulation"
         >
@@ -138,7 +141,7 @@ export function TimelineControls({ status, isLoading, onStart, onPause, onResume
         <button
           type="button"
           onClick={onPause}
-          disabled={status !== 'running' || isLoading}
+          disabled={status !== 'running' || isLoading || isFinished}
           className="relative flex items-center justify-center rounded-lg bg-amber-500/20 px-4 py-2 text-amber-500 transition-all hover:bg-amber-500/30 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-amber-500/20 min-w-[4rem]"
           title="Pause Simulation"
         >
@@ -151,12 +154,16 @@ export function TimelineControls({ status, isLoading, onStart, onPause, onResume
         <button
           type="button"
           onClick={onResume}
-          disabled={status !== 'paused' || isLoading}
-          className="relative flex items-center justify-center rounded-lg bg-green-500/20 px-4 py-2 text-green-500 transition-all hover:bg-green-500/30 active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:bg-green-500/20 min-w-[4rem]"
-          title="Resume Simulation"
+          disabled={!isResumeLike || isLoading || isFinished}
+          className={`relative flex items-center justify-center rounded-lg px-4 py-2 transition-all active:scale-95 min-w-[4rem] disabled:opacity-30 disabled:cursor-not-allowed ${
+            isResumeLike
+              ? 'bg-[color:var(--color-primary)]/20 text-[color:var(--color-primary)] hover:bg-[color:var(--color-primary)]/30'
+              : 'bg-green-500/20 text-green-500 hover:bg-green-500/30 disabled:hover:bg-green-500/20'
+          }`}
+          title={status === 'resumable' ? 'Continue Simulation' : 'Resume Simulation'}
         >
           <RxResume size={18} />
-          <span className="absolute right-1 top-0.5 text-[8px] font-bold text-green-500/40">
+          <span className="absolute right-1 top-0.5 text-[8px] font-bold text-current/40">
             R
           </span>
         </button>
