@@ -3,6 +3,7 @@ import { Input } from '@/features/ui/components/Input';
 import { NumberField } from '@/features/ui/components/NumberField';
 
 import type { SimulationFormSectionProps } from '@/features/simulation/components/shared';
+import { durationSecondsToTicks } from '@/features/simulation/types';
 
 export function SeedAndAirbaseSection({ values, onUpdateField }: SimulationFormSectionProps) {
   return (
@@ -16,6 +17,20 @@ export function SeedAndAirbaseSection({ values, onUpdateField }: SimulationFormS
             value={values.seedHex}
             onChange={(event) => onUpdateField('seedHex', event.target.value)}
             placeholder="001122..."
+          />
+        </FormField>
+
+        <FormField
+          label="Simulation duration"
+          hint={`Sent to the backend as ticks at 64 ticks/sec. ${values.durationSeconds}s = ${durationSecondsToTicks(values.durationSeconds)} ticks.`}
+        >
+          <Input
+            type="number"
+            min={1}
+            value={values.durationSeconds}
+            onChange={(event) =>
+              onUpdateField('durationSeconds', Number(event.target.value || 1))
+            }
           />
         </FormField>
 

@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import { useApi } from '@/lib/api';
 import { extractErrorMessage, getErrorStatus } from '@/lib/api/errors';
 import { useSimulationStream } from '@/lib/api/useSimulationStream';
+import { SIMULATION_TICKS_PER_SECOND } from '@/lib/api/types';
 import type {
   CreateBaseSimulationRequest,
   SimulationAirbase,
@@ -13,7 +14,11 @@ import type {
   SimulationInfo,
 } from '@/lib/api/types';
 
-import type { SimulationSetupFormValues } from '@/features/simulation/types';
+import {
+  durationSecondsToTicks,
+  ticksToDurationSeconds,
+  type SimulationSetupFormValues,
+} from '@/features/simulation/types';
 
 function parseCsvList(value: string): string[] {
   return value
@@ -34,6 +39,7 @@ function buildCreateBaseSimulationRequest(
 ): CreateBaseSimulationRequest {
   return {
     seed: values.seedHex || undefined,
+    untilTick: durationSecondsToTicks(values.durationSeconds),
     simulationOptions: {
       constellationOpts: {
         includeRegions: parseCsvList(values.includeRegions),
@@ -55,6 +61,17 @@ function buildCreateBaseSimulationRequest(
       },
     },
   };
+}
+
+export function formatSimulationDurationFromTicks(ticks?: number): string | null {
+  if (ticks == null || ticks <= 0) {
+    return null;
+  }
+
+  const seconds = ticksToDurationSeconds(ticks);
+  const wholeSeconds = Math.round(seconds);
+  const secondsLabel = Math.abs(seconds - wholeSeconds) < 0.05 ? `${wholeSeconds}s` : `${seconds.toFixed(1)}s`;
+  return `${secondsLabel} (${ticks} ticks @ ${SIMULATION_TICKS_PER_SECOND}/s)`;
 }
 
 function getTimelineEndTick(simulationInfo: Pick<SimulationInfo, 'tick' | 'untilTick'>): number {

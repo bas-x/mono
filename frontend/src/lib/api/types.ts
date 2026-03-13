@@ -60,6 +60,8 @@ export type SimulationAircraft = {
   assignedTo?: string;
 };
 
+export const SIMULATION_TICKS_PER_SECOND = 64;
+
 export type ApiRatio = {
   numerator: number;
   denominator: number;

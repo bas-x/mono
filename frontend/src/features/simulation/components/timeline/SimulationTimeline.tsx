@@ -3,7 +3,7 @@ import { TimelineControls } from './TimelineControls';
 import { TimelineTrack } from './TimelineTrack';
 import { useSimulationControls } from '../../hooks/useSimulationControls';
 import { useSimulationEvents } from '../../hooks/useSimulationEvents';
-import type { SimulationState } from '../../hooks/useSimulation';
+import { formatSimulationDurationFromTicks, type SimulationState } from '../../hooks/useSimulation';
 
 type SimulationTimelineProps = {
   simulationId: string;
@@ -27,6 +27,7 @@ export function SimulationTimeline({
     ? Math.max(simulationState.untilTick ?? 0, simulationState.maxTick ?? currentTick)
     : 0;
   const playbackTick = isRunning ? (simulationState.playbackTick ?? null) : null;
+  const durationLabel = isRunning ? formatSimulationDurationFromTicks(simulationState.untilTick ?? maxTick) : null;
 
   useEffect(() => {
     if (!isRunning) return;
@@ -135,6 +136,7 @@ export function SimulationTimeline({
           onToggleFilter={handleToggleFilter}
           zoom={zoom}
           onZoomChange={setZoom}
+          durationLabel={durationLabel}
         />
         <TimelineTrack
           events={filteredEvents}
