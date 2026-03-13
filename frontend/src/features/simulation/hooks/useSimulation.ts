@@ -4,7 +4,57 @@ import { toast } from 'sonner';
 import { useApi } from '@/lib/api';
 import { extractErrorMessage, getErrorStatus } from '@/lib/api/errors';
 import { useSimulationStream } from '@/lib/api/useSimulationStream';
-import type { SimulationAirbase, SimulationAircraft, SimulationAircraftNeed, SimulationEvent } from '@/lib/api/types';
+import type {
+  CreateBaseSimulationRequest,
+  SimulationAirbase,
+  SimulationAircraft,
+  SimulationAircraftNeed,
+  SimulationEvent,
+} from '@/lib/api/types';
+
+import type { SimulationSetupFormValues } from '@/features/simulation/types';
+
+function parseCsvList(value: string): string[] {
+  return value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function toPercentRatio(percent: number) {
+  return {
+    numerator: percent,
+    denominator: 100,
+  };
+}
+
+function buildCreateBaseSimulationRequest(
+  values: SimulationSetupFormValues,
+): CreateBaseSimulationRequest {
+  return {
+    seed: values.seedHex || undefined,
+    simulationOptions: {
+      constellationOpts: {
+        includeRegions: parseCsvList(values.includeRegions),
+        excludeRegions: parseCsvList(values.excludeRegions),
+        minPerRegion: values.minPerRegion,
+        maxPerRegion: values.maxPerRegion,
+        maxTotal: values.maxTotal,
+        regionProbability: toPercentRatio(values.regionProbabilityPercent),
+      },
+      fleetOpts: {
+        aircraftMin: values.aircraftMin,
+        aircraftMax: values.aircraftMax,
+        needsMin: values.needsMin,
+        needsMax: values.needsMax,
+        needsPool: values.needsPool,
+        severityMin: values.severityMin,
+        severityMax: values.severityMax,
+        blockingChance: toPercentRatio(values.blockingChancePercent),
+      },
+    },
+  };
+}
 
 export type AircraftPosition = {
   tailNumber: string;
@@ -151,10 +201,12 @@ export function useSimulation() {
     }
   }, [clients.simulation]);
 
-  const createSimulation = useCallback(async (seed: string): Promise<boolean> => {
+  const createSimulation = useCallback(async (values: SimulationSetupFormValues): Promise<boolean> => {
     setState({ status: 'creating' });
     try {
-      const { id } = await clients.simulation.createBaseSimulation(seed);
+      const { id } = await clients.simulation.createBaseSimulation(
+        buildCreateBaseSimulationRequest(values),
+      );
       toast.success('Simulation created successfully');
       await fetchSimulations();
       await loadSimulation(id);

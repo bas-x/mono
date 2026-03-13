@@ -288,7 +288,7 @@ export function MapPanel() {
   const handleSubmitSimulationSetup = useCallback(
     async (values: SimulationSetupFormValues) => {
       setSimulationSetupValues(values);
-      const success = await createSimulation(values.seedHex);
+      const success = await createSimulation(values);
       if (success) {
         setIsSimulationSheetOpen(false);
       }
