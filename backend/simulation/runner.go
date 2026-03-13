@@ -80,7 +80,6 @@ func (r *BasicRunner) Run(ctx context.Context, s *Simulation) {
 type ControlledRunner struct {
 	ticksPerSecond  uint
 	maxCatchUpTicks uint
-	untilTick       int64
 	pause           chan struct{}
 	unpause         chan struct{}
 	active          atomic.Bool
@@ -89,7 +88,6 @@ type ControlledRunner struct {
 type ControlledRunnerConfig struct {
 	TicksPerSecond  uint
 	MaxCatchUpTicks uint
-	UntilTick       int64
 }
 
 func NewControlledRunner(config ControlledRunnerConfig) *ControlledRunner {
@@ -102,7 +100,6 @@ func NewControlledRunner(config ControlledRunnerConfig) *ControlledRunner {
 	return &ControlledRunner{
 		ticksPerSecond:  config.TicksPerSecond,
 		maxCatchUpTicks: config.MaxCatchUpTicks,
-		untilTick:       config.UntilTick,
 		pause:           make(chan struct{}),
 		unpause:         make(chan struct{}),
 		active:          atomic.Bool{},
@@ -125,13 +122,14 @@ func (r *ControlledRunner) Unpause() {
 	r.unpause <- struct{}{}
 }
 
-func (r *ControlledRunner) Run(ctx context.Context, s *Simulation) {
+func (r *ControlledRunner) Run(ctx context.Context, s *Simulation, runUntilTick int64) {
 	assert.NotNil(ctx, "ctx")
 	r.AssertInvariants()
 	s.AssertInvariants()
 	defer func() {
 		s.AssertInvariants()
 	}()
+	untilTick := runUntilTick
 
 	r.active.Store(true)
 	defer r.active.Store(false)
@@ -162,7 +160,7 @@ func (r *ControlledRunner) Run(ctx context.Context, s *Simulation) {
 		for !now.Before(nextTick) && catchUp < int(r.maxCatchUpTicks) {
 			s.Step()
 
-			if r.untilTick == int64(s.ts.ticks) {
+			if untilTick > 0 && untilTick == int64(s.ts.ticks) {
 				return
 			}
 

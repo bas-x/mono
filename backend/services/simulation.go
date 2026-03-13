@@ -26,15 +26,17 @@ const BaseSimulationID = "base"
 type SimulationServiceConfig struct {
 	Resolution   time.Duration
 	RunnerConfig simulation.ControlledRunnerConfig
+	RunUntilTick int64
 }
 
 type SimulationService struct {
-	mu          sync.RWMutex
-	base        *managedSimulation
-	branches    map[string]*managedSimulation
-	broadcaster *EventBroadcaster
-	resolution  time.Duration
-	runnerCfg   simulation.ControlledRunnerConfig
+	mu           sync.RWMutex
+	base         *managedSimulation
+	branches     map[string]*managedSimulation
+	broadcaster  *EventBroadcaster
+	resolution   time.Duration
+	runnerCfg    simulation.ControlledRunnerConfig
+	runUntilTick int64
 }
 
 type managedSimulation struct {
@@ -69,10 +71,11 @@ func NewSimulationService(cfg SimulationServiceConfig) *SimulationService {
 		cfg.RunnerConfig.MaxCatchUpTicks = 5
 	}
 	return &SimulationService{
-		broadcaster: NewEventBroadcaster(0),
-		branches:    make(map[string]*managedSimulation),
-		resolution:  cfg.Resolution,
-		runnerCfg:   cfg.RunnerConfig,
+		broadcaster:  NewEventBroadcaster(0),
+		branches:     make(map[string]*managedSimulation),
+		resolution:   cfg.Resolution,
+		runnerCfg:    cfg.RunnerConfig,
+		runUntilTick: cfg.RunUntilTick,
 	}
 }
 
@@ -187,7 +190,7 @@ func (s *SimulationService) StartSimulation(simulationID string) error {
 	s.mu.Unlock()
 
 	for _, start := range starts {
-		go s.runManagedSimulation(start.managed, start.runner, start.ctx, start.sim)
+		go s.runManagedSimulation(simulationIDFromManaged(s, start.managed), start.managed, start.runner, start.ctx, start.sim)
 	}
 
 	return nil
@@ -279,7 +282,7 @@ func (s *SimulationService) ResumeSimulation(simulationID string) error {
 
 	for _, resume := range resumes {
 		if resume.spawn {
-			go s.runManagedSimulation(resume.managed, resume.runner, resume.ctx, resume.sim)
+			go s.runManagedSimulation(simulationIDFromManaged(s, resume.managed), resume.managed, resume.runner, resume.ctx, resume.sim)
 			continue
 		}
 		resume.runner.Unpause()
@@ -470,17 +473,42 @@ func (s *SimulationService) startManagedRunnerLocked(managed *managedSimulation)
 	return runner, ctx, managed.sim
 }
 
-func (s *SimulationService) runManagedSimulation(managed *managedSimulation, runner *simulation.ControlledRunner, ctx context.Context, sim *simulation.Simulation) {
-	runner.Run(ctx, sim)
+func (s *SimulationService) runManagedSimulation(simulationID string, managed *managedSimulation, runner *simulation.ControlledRunner, ctx context.Context, sim *simulation.Simulation) {
+	runner.Run(ctx, sim, s.runUntilTick)
+	finishedNaturally := ctx.Err() == nil
+	finalTick := sim.Tick()
+	finalTime := sim.Now()
 	s.mu.Lock()
-	defer s.mu.Unlock()
 	if managed.runner != runner {
+		s.mu.Unlock()
 		return
 	}
 	managed.runner = nil
 	managed.cancel = nil
 	managed.running = false
 	managed.paused = false
+	s.mu.Unlock()
+
+	if finishedNaturally {
+		s.broadcaster.Emit(SimulationEndedEvent{
+			Type:         EventTypeSimulationEnded,
+			SimulationID: simulationID,
+			Tick:         finalTick,
+			Timestamp:    finalTime,
+		})
+	}
+}
+
+func simulationIDFromManaged(s *SimulationService, managed *managedSimulation) string {
+	if s.base == managed {
+		return BaseSimulationID
+	}
+	for id, branch := range s.branches {
+		if branch == managed {
+			return id
+		}
+	}
+	return BaseSimulationID
 }
 
 func resetSimulationHooks(sim *simulation.Simulation) {

@@ -82,21 +82,18 @@ func TestSimulation_RunnerPauseAndBranch(t *testing.T) {
 		t.Parallel()
 		synctest.Test(t, func(t *testing.T) {
 			ts := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
-			runnerConfig := ControlledRunnerConfig{
-				TicksPerSecond: 64,
-				UntilTick:      128,
-			}
+			runnerConfig := ControlledRunnerConfig{TicksPerSecond: 64}
 
 			sim := NewSimulator([32]byte{1, 2, 3}, ts)
 			simRunner := NewControlledRunner(runnerConfig)
-			go simRunner.Run(t.Context(), sim)
+			go simRunner.Run(t.Context(), sim, 128)
 
 			time.Sleep(100 * time.Millisecond)
 			simRunner.Pause()
 
 			clone := sim.Clone()
 			cloneRunner := NewControlledRunner(runnerConfig)
-			go cloneRunner.Run(t.Context(), clone)
+			go cloneRunner.Run(t.Context(), clone, 128)
 
 			simRunner.Unpause()
 			time.Sleep(3 * time.Second)
@@ -111,6 +108,18 @@ func TestSimulation_RunnerPauseAndBranch(t *testing.T) {
 			require.False(t, cloneRunner.active.Load())
 		})
 	})
+}
+
+func TestControlledRunner_RunUntilTickParameterStopsAtRequestedTick(t *testing.T) {
+	t.Parallel()
+	ts := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
+	sim := NewSimulator([32]byte{4, 5, 6}, ts)
+	runner := NewControlledRunner(ControlledRunnerConfig{TicksPerSecond: 256})
+
+	runner.Run(t.Context(), sim, 3)
+
+	require.Equal(t, uint64(3), sim.Tick())
+	require.False(t, runner.active.Load())
 }
 
 func TestSimulationInitAirbases(t *testing.T) {
