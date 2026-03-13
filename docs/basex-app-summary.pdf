@@ -1,0 +1,68 @@
+%PDF-1.4
+%‚„œ”
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Count 1 /Kids [3 0 R] >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
+endobj
+6 0 obj
+<< /Length 3291 >>
+stream
+0 0 0 rg
+BT /F2 20 Tf 1 0 0 1 42 792 Tm (Smart Airbase \(Bas X\)) Tj ET
+BT /F1 10 Tf 1 0 0 1 42 768 Tm (One-page app summary) Tj ET
+BT /F2 12 Tf 1 0 0 1 42 750 Tm (What It Is) Tj ET
+BT /F1 10 Tf 1 0 0 1 42 735 Tm (A decision-support app for sortie turnaround planning after aircraft land.) Tj ET
+BT /F1 10 Tf 1 0 0 1 42 722 Tm (It uses a deterministic simulation plus replay and branching to compare plans before execution.) Tj ET
+BT /F2 12 Tf 1 0 0 1 42 704 Tm (Who It Is For) Tj ET
+BT /F1 10 Tf 1 0 0 1 42 689 Tm (Primary persona: operators/planners managing post-landing turnaround decisions at an airbase.) Tj ET
+BT /F2 12 Tf 1 0 0 1 42 671 Tm (What It Does) Tj ET
+BT /F1 10 Tf 1 0 0 1 42 656 Tm (- Simulates multi-aircraft post-landing turnaround under constrained resources.) Tj ET
+BT /F1 10 Tf 1 0 0 1 42 644 Tm (- Generates deterministic runs from explicit seeds for repeatable analysis.) Tj ET
+BT /F1 10 Tf 1 0 0 1 42 632 Tm (- Shows map-based airbase and aircraft state during live or simulated views.) Tj ET
+BT /F1 10 Tf 1 0 0 1 42 620 Tm (- Streams simulation progress and state changes over WebSocket events.) Tj ET
+BT /F1 10 Tf 1 0 0 1 42 608 Tm (- Supports pause, resume, reset, and branch creation for alternative futures.) Tj ET
+BT /F1 10 Tf 1 0 0 1 42 596 Tm (- Surfaces timeline data for replay, scrubbing, and event inspection.) Tj ET
+BT /F1 10 Tf 1 0 0 1 42 584 Tm (- Lets users configure seed, airbase generation, fleet, needs, and threat inputs.) Tj ET
+BT /F2 12 Tf 1 0 0 1 42 568 Tm (How It Works) Tj ET
+BT /F1 10 Tf 1 0 0 1 42 553 Tm (- Frontend: React 19 + TypeScript + Vite app centered on MapPanel and timeline UI.) Tj ET
+BT /F1 10 Tf 1 0 0 1 42 541 Tm (- API layer: frontend/src/lib/api/* owns HTTP and WebSocket clients plus mock/real modes.) Tj ET
+BT /F1 10 Tf 1 0 0 1 42 529 Tm (- Backend server: Go + Echo exposes /health, /ping, simulation REST routes, and WS event streams.) Tj ET
+BT /F1 10 Tf 1 0 0 1 42 517 Tm (- Service layer: SimulationService manages the base run, branch clones, runners, and event broadcast.) Tj ET
+BT /F1 10 Tf 1 0 0 1 42 505 Tm (- Engine: backend/simulation builds seeded constellation, fleet, dispatcher, and threat models.) Tj ET
+BT /F1 10 Tf 1 0 0 1 42 493 Tm (- Data flow: UI -> API clients -> backend routes -> SimulationService -> simulation engine -> WS/HTTP back to UI.) Tj ET
+BT /F2 12 Tf 1 0 0 1 42 477 Tm (How To Run) Tj ET
+BT /F1 10 Tf 1 0 0 1 42 462 Tm (1. Prereqs from repo evidence: pnpm and Go installed locally.) Tj ET
+BT /F1 10 Tf 1 0 0 1 42 450 Tm (2. From /frontend, run: pnpm install) Tj ET
+BT /F1 10 Tf 1 0 0 1 42 438 Tm (3. From /frontend, run: pnpm dev:full  \(starts Vite plus `go run .` in /backend\)) Tj ET
+BT /F1 10 Tf 1 0 0 1 42 426 Tm (4. Optional: set frontend/.env.local with VITE_USE_MOCK_API=false to target the real backend.) Tj ET
+BT /F1 10 Tf 1 0 0 1 42 414 Tm (5. Backend hot-reload setup details with `air`: Not found in repo.) Tj ET
+BT /F1 8 Tf 1 0 0 1 42 402 Tm (Evidence used: AGENTS.md, frontend/README.md, backend/main.go, backend/api/routes.go,) Tj ET
+BT /F1 8 Tf 1 0 0 1 42 391 Tm (backend/api/server.go, backend/docs/context/api.md, backend/services/simulation.go,) Tj ET
+BT /F1 8 Tf 1 0 0 1 42 380 Tm (frontend/src/lib/api/*, frontend/src/features/map/components/MapPanel.tsx.) Tj ET
+endstream
+endobj
+xref
+0 7
+0000000000 65535 f 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000121 00000 n 
+0000000257 00000 n 
+0000000327 00000 n 
+0000000402 00000 n 
+trailer
+<< /Size 7 /Root 1 0 R >>
+startxref
+3745
+%%EOF
