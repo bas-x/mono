@@ -37,7 +37,13 @@ func TestEventRequiresUIRefresh(t *testing.T) {
 	require.False(t, eventRequiresUIRefresh(services.ThreatSpawnedEvent{
 		Type:         services.EventTypeThreatSpawned,
 		SimulationID: services.BaseSimulationID,
-		Threat:       services.Threat{ID: "th1", RegionID: "SE-K", Region: "Blekinge"},
+		Threat:       services.Threat{ID: "th1", Position: services.Point{X: 10, Y: 20}},
+		Timestamp:    time.Unix(0, 1),
+	}))
+	require.False(t, eventRequiresUIRefresh(services.AllAircraftPositionsEvent{
+		Type:         services.EventTypeAllAircraftPositions,
+		SimulationID: services.BaseSimulationID,
+		Tick:         1,
 		Timestamp:    time.Unix(0, 1),
 	}))
 }

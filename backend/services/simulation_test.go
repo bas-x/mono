@@ -176,8 +176,7 @@ func TestSimulationService_Threats(t *testing.T) {
 	threats, err := svc.Threats(BaseSimulationID)
 	require.NoError(t, err)
 	require.NotEmpty(t, threats)
-	require.NotEmpty(t, threats[0].Region)
-	require.NotEmpty(t, threats[0].RegionID)
+	require.NotZero(t, threats[0].Position.X+threats[0].Position.Y)
 }
 
 func TestSimulationService_ResetClearsSimulationAndStopsRunner(t *testing.T) {

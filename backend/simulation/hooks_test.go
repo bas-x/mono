@@ -70,7 +70,9 @@ func TestSimulationHooks_StepEvent(t *testing.T) {
 		steps <- event
 	})
 
-	sim.Step()
+	for range 4 {
+		sim.Step()
+	}
 
 	select {
 	case event := <-steps:
@@ -86,7 +88,9 @@ func TestSimulationHooks_ThreatEvents(t *testing.T) {
 
 	ts := New(time.Second, WithEpoch(time.Unix(0, 1)))
 	sim := NewSimulator([32]byte{2}, ts)
-	sim.lifecycle = testLifecycleModel()
+	lifecycle := testLifecycleModel()
+	lifecycle.Durations.Ready = 0
+	sim.lifecycle = lifecycle
 	sim.constellation.airbases = []Airbase{{ID: BaseID{0, 0, 0, 0, 0, 0, 0, 1}, RegionID: "SE-K", Region: "Blekinge"}}
 	sim.dispatcher = NewDispatcher(sim.constellation, &RoundRobinAssigner{})
 	sim.bindInternalHooks()
@@ -94,28 +98,30 @@ func TestSimulationHooks_ThreatEvents(t *testing.T) {
 	sim.fleet = &Fleet{aircrafts: []Aircraft{NewAircraft(TailNumber{9}, &ReadyState{}, []Need{{Type: NeedFuel, Severity: 0, RequiredCapability: NeedFuel}})}}
 
 	spawned := make(chan ThreatSpawnedEvent, 1)
-	claimed := make(chan ThreatClaimedEvent, 1)
+	targeted := make(chan ThreatTargetedEvent, 1)
 	sim.AddThreatSpawnedHook(func(event ThreatSpawnedEvent) { spawned <- event })
-	sim.AddThreatClaimedHook(func(event ThreatClaimedEvent) { claimed <- event })
+	sim.AddThreatTargetedHook(func(event ThreatTargetedEvent) { targeted <- event })
 
 	sim.Step()
 
 	select {
 	case event := <-spawned:
-		require.NotEmpty(t, event.Threat.Region)
-		require.NotEmpty(t, event.Threat.RegionID)
+		require.NotZero(t, event.Threat.Position.X+event.Threat.Position.Y)
 	case <-time.After(time.Second):
 		t.Fatal("expected threat spawned event")
 	}
 
-	select {
-	case event := <-claimed:
-		require.Equal(t, TailNumber{9}, event.TailNumber)
-		require.NotEmpty(t, event.Threat.Region)
-		require.NotEmpty(t, event.Threat.RegionID)
-	case <-time.After(time.Second):
-		t.Fatal("expected threat claimed event")
+	for range 8 {
+		select {
+		case event := <-targeted:
+			require.Equal(t, TailNumber{9}, event.TailNumber)
+			require.NotZero(t, event.Threat.Position.X+event.Threat.Position.Y)
+			return
+		default:
+			sim.Step()
+		}
 	}
+	t.Fatal("expected threat targeted event")
 }
 
 func TestAllAircraftPositionsHook(t *testing.T) {

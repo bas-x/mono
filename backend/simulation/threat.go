@@ -1,35 +1,44 @@
 package simulation
 
 import (
-	"sort"
+	"math/rand/v2"
 	"time"
 
 	"github.com/bas-x/basex/assert"
-	"github.com/bas-x/basex/assets"
+	"github.com/bas-x/basex/geometry"
 	"github.com/bas-x/basex/prng"
+)
+
+const (
+	mapMinX = 0.254
+	mapMinY = 0.273
+	mapMaxX = 345.374
+	mapMaxY = 792.273
 )
 
 type ThreatID [8]byte
 
 type Threat struct {
 	ID          ThreatID
-	RegionID    string
-	Region      string
 	CreatedAt   time.Time
 	CreatedTick uint64
+	Position    geometry.Point
 }
 
 type ThreatOptions struct {
-	SpawnChance prng.Ratio
-	MaxActive   uint
+	SpawnChance    prng.Ratio
+	MaxActive      uint
+	MaxActiveTicks uint64
 }
 
 type ThreatSet struct {
-	pending []Threat
+	pending      []Threat
+	active       map[ThreatID]Threat
+	nextTargetIx int
 }
 
 func NewThreatSet() *ThreatSet {
-	return &ThreatSet{pending: make([]Threat, 0)}
+	return &ThreatSet{pending: make([]Threat, 0), active: make(map[ThreatID]Threat)}
 }
 
 func (t *ThreatSet) Clone() *ThreatSet {
@@ -38,7 +47,11 @@ func (t *ThreatSet) Clone() *ThreatSet {
 	}
 	cp := make([]Threat, len(t.pending))
 	copy(cp, t.pending)
-	return &ThreatSet{pending: cp}
+	activeCP := make(map[ThreatID]Threat, len(t.active))
+	for k, v := range t.active {
+		activeCP[k] = v
+	}
+	return &ThreatSet{pending: cp, active: activeCP, nextTargetIx: t.nextTargetIx}
 }
 
 func (t *ThreatSet) Pending() []Threat {
@@ -50,18 +63,89 @@ func (t *ThreatSet) Pending() []Threat {
 	return cp
 }
 
-func (t *ThreatSet) TrySpawn(env *Environment, bases []Airbase, opts ThreatOptions, tick uint64) (Threat, bool) {
-	return t.TrySpawnFromRegions(env, threatRegionsFromBases(bases), opts, tick)
+func (t *ThreatSet) Activate(threat Threat) {
+	if t == nil {
+		return
+	}
+	if t.active == nil {
+		t.active = make(map[ThreatID]Threat)
+	}
+	t.active[threat.ID] = threat
 }
 
-func (t *ThreatSet) TrySpawnFromRegions(env *Environment, regions []threatRegion, opts ThreatOptions, tick uint64) (Threat, bool) {
+func (t *ThreatSet) NextTarget() (Threat, bool) {
+	if t == nil || len(t.pending) == 0 {
+		return Threat{}, false
+	}
+	idx := t.nextTargetIx % len(t.pending)
+	threat := t.pending[idx]
+	t.nextTargetIx = (idx + 1) % len(t.pending)
+	t.Activate(threat)
+	return threat, true
+}
+
+func (t *ThreatSet) IsActive(id ThreatID) bool {
+	if t == nil {
+		return false
+	}
+	_, ok := t.active[id]
+	return ok
+}
+
+func (t *ThreatSet) DespawnActive(tick uint64, maxAgeTicks uint64) []Threat {
+	if t == nil || maxAgeTicks == 0 {
+		return nil
+	}
+	if len(t.active) == 0 {
+		return nil
+	}
+	despawned := make([]Threat, 0)
+	for id, threat := range t.active {
+		if tick-threat.CreatedTick >= maxAgeTicks {
+			despawned = append(despawned, threat)
+			delete(t.active, id)
+			filtered := t.pending[:0]
+			for _, pendingThreat := range t.pending {
+				if pendingThreat.ID != id {
+					filtered = append(filtered, pendingThreat)
+				}
+			}
+			t.pending = filtered
+			if len(t.pending) == 0 {
+				t.nextTargetIx = 0
+			} else if t.nextTargetIx >= len(t.pending) {
+				t.nextTargetIx %= len(t.pending)
+			}
+		}
+	}
+	return despawned
+}
+
+func spawnEdgePoint(rng *rand.Rand, minX, minY, maxX, maxY float64) geometry.Point {
+	width := maxX - minX
+	height := maxY - minY
+	perimeter := 2 * (width + height)
+	t := rng.Float64() * perimeter
+	if t < width {
+		return geometry.Point{X: minX + t, Y: maxY}
+	}
+	if t < width+height {
+		return geometry.Point{X: maxX, Y: maxY - (t - width)}
+	}
+	if t < 2*width+height {
+		return geometry.Point{X: maxX - (t - width - height), Y: minY}
+	}
+	return geometry.Point{X: minX, Y: minY + (t - 2*width - height)}
+}
+
+func (t *ThreatSet) TrySpawnEdge(env *Environment, opts ThreatOptions, tick uint64) (Threat, bool) {
 	if t == nil {
 		return Threat{}, false
 	}
 	if opts.MaxActive == 0 {
 		return Threat{}, false
 	}
-	if uint(len(t.pending)) >= opts.MaxActive {
+	if uint(len(t.pending)+len(t.active)) >= opts.MaxActive {
 		return Threat{}, false
 	}
 	if opts.SpawnChance.Denominator() == 0 {
@@ -71,99 +155,15 @@ func (t *ThreatSet) TrySpawnFromRegions(env *Environment, regions []threatRegion
 	if !prng.Chance(rng, opts.SpawnChance) {
 		return Threat{}, false
 	}
-	if len(regions) == 0 {
-		return Threat{}, false
-	}
-	idx := int(prng.RangeInclusive(rng, 0, uint(len(regions)-1)))
-	region := regions[idx]
+	pos := spawnEdgePoint(rng, mapMinX, mapMinY, mapMaxX, mapMaxY)
 	threat := Threat{
 		ID:          makeThreatID(rng.Uint64()),
-		RegionID:    region.RegionID,
-		Region:      region.Region,
 		CreatedAt:   env.Clock().Now(),
 		CreatedTick: tick,
+		Position:    pos,
 	}
 	t.pending = append(t.pending, threat)
 	return threat, true
-}
-
-func (t *ThreatSet) ClaimNext() (Threat, bool) {
-	if t == nil || len(t.pending) == 0 {
-		return Threat{}, false
-	}
-	threat := t.pending[0]
-	t.pending = t.pending[1:]
-	return threat, true
-}
-
-type threatRegion struct {
-	RegionID string
-	Region   string
-}
-
-func threatRegionsFromBases(bases []Airbase) []threatRegion {
-	if len(bases) == 0 {
-		return nil
-	}
-	seen := make(map[string]threatRegion, len(bases))
-	for _, base := range bases {
-		key := base.RegionID + "|" + base.Region
-		seen[key] = threatRegion{RegionID: base.RegionID, Region: base.Region}
-	}
-	regions := make([]threatRegion, 0, len(seen))
-	for _, region := range seen {
-		regions = append(regions, region)
-	}
-	sort.SliceStable(regions, func(i, j int) bool {
-		if regions[i].Region == regions[j].Region {
-			return regions[i].RegionID < regions[j].RegionID
-		}
-		return regions[i].Region < regions[j].Region
-	})
-	return regions
-}
-
-func threatRegionsFromNames(names []string) []threatRegion {
-	if len(names) == 0 {
-		return nil
-	}
-	regions := make([]threatRegion, 0, len(names))
-	seen := make(map[string]struct{}, len(names))
-	for _, name := range names {
-		if name == "" {
-			continue
-		}
-		bounds, ok := assets.GetRegionBounds(name)
-		if !ok {
-			continue
-		}
-		if _, exists := seen[bounds.ID]; exists {
-			continue
-		}
-		seen[bounds.ID] = struct{}{}
-		regions = append(regions, threatRegion{RegionID: bounds.ID, Region: bounds.Name})
-	}
-	sort.SliceStable(regions, func(i, j int) bool {
-		if regions[i].Region == regions[j].Region {
-			return regions[i].RegionID < regions[j].RegionID
-		}
-		return regions[i].Region < regions[j].Region
-	})
-	return regions
-}
-
-func threatRegionsAll() []threatRegion {
-	regions := make([]threatRegion, 0, len(assets.BoundsData.Regions))
-	for _, region := range assets.BoundsData.Regions {
-		regions = append(regions, threatRegion{RegionID: region.ID, Region: region.Name})
-	}
-	sort.SliceStable(regions, func(i, j int) bool {
-		if regions[i].Region == regions[j].Region {
-			return regions[i].RegionID < regions[j].RegionID
-		}
-		return regions[i].Region < regions[j].Region
-	})
-	return regions
 }
 
 func makeThreatID(value uint64) ThreatID {
@@ -176,6 +176,6 @@ func makeThreatID(value uint64) ThreatID {
 }
 
 func (t Threat) AssertInvariants() {
-	assert.True(t.RegionID != "", "threat region id", t.RegionID)
-	assert.True(t.Region != "", "threat region", t.Region)
+	assert.InRange(t.Position.X, mapMinX, mapMaxX, "threat position x")
+	assert.InRange(t.Position.Y, mapMinY, mapMaxY, "threat position y")
 }

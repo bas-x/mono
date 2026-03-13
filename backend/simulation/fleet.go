@@ -151,7 +151,7 @@ func normalizeFleetOptions(opts FleetOptions) FleetOptions {
 	}
 
 	if opts.StateFactory == nil {
-		opts.StateFactory = func(_ *rand.Rand) AircraftState { return &OutboundState{} }
+		opts.StateFactory = func(_ *rand.Rand) AircraftState { return &ReadyState{} }
 	}
 
 	return opts
@@ -215,12 +215,10 @@ func generateNeeds(rng *rand.Rand, opts FleetOptions) []Need {
 	return needs
 }
 
-// aircraftSpeed returns a deterministic per-aircraft speed in [1.5, 3.4] units/sim-second.
-// Derived from tail number hash — no RNG call at runtime.
 func aircraftSpeed(tail TailNumber) float64 {
 	h := int64(binary.BigEndian.Uint64(tail[:]))
 	if h < 0 {
 		h = -h
 	}
-	return 1.5 + float64(h%20)*0.1
+	return 1.0 + float64(h%20)*0.5
 }

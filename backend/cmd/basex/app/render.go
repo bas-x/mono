@@ -88,10 +88,8 @@ func (r *Runtime) drawMap(img *image.RGBA, rect image.Rectangle) {
 		if !ok {
 			continue
 		}
-		drawCircle(mapSurface, pt.X, pt.Y, 6, color.RGBA{R: 255, G: 80, B: 80, A: 255})
-		drawLine(mapSurface, image.Pt(pt.X-6, pt.Y-6), image.Pt(pt.X+6, pt.Y+6), textPrimary)
-		drawLine(mapSurface, image.Pt(pt.X-6, pt.Y+6), image.Pt(pt.X+6, pt.Y-6), textPrimary)
-		drawThreatLabel(mapSurface, pt, threat.Region)
+		drawSquare(mapSurface, pt.X, pt.Y, 6, color.RGBA{R: 255, G: 80, B: 80, A: 255})
+		drawThreatLabel(mapSurface, pt, shortID(threat.ID))
 	}
 
 	for _, aircraft := range r.state.Aircraft {
@@ -189,17 +187,11 @@ func selectedOverlayLines(state *State) []string {
 	}
 }
 
-func projectedThreatPoint(state *State, proj projection, threat services.Threat) (image.Point, bool) {
-	for _, base := range state.Airbases {
-		if base.RegionID == threat.RegionID {
-			return proj.projectServicePoint(base.Location), true
-		}
+func projectedThreatPoint(_ *State, proj projection, threat services.Threat) (image.Point, bool) {
+	if threat.Position.X == 0 && threat.Position.Y == 0 {
+		return image.Point{}, false
 	}
-	if bounds, ok := assets.GetRegionBounds(threat.Region); ok {
-		center := assets.Point{X: bounds.Min.X + bounds.Width/2, Y: bounds.Min.Y + bounds.Height/2}
-		return proj.projectAssetPoint(center), true
-	}
-	return image.Point{}, false
+	return proj.projectServicePoint(threat.Position), true
 }
 
 func drawThreatLabel(img *image.RGBA, anchor image.Point, region string) {
@@ -410,6 +402,15 @@ func drawCircle(img *image.RGBA, cx, cy, radius int, col color.Color) {
 			}
 		}
 	}
+}
+
+func drawSquare(img *image.RGBA, cx, cy, half int, col color.Color) {
+	r := image.Rect(cx-half, cy-half, cx+half+1, cy+half+1)
+	r = r.Intersect(img.Bounds())
+	if r.Empty() {
+		return
+	}
+	draw.Draw(img, r, &image.Uniform{C: col}, image.Point{}, draw.Src)
 }
 
 func distanceSquared(a, b image.Point) int {

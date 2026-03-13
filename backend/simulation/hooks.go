@@ -31,10 +31,15 @@ type ThreatSpawnedEvent struct {
 	Timestamp time.Time
 }
 
-type ThreatClaimedEvent struct {
+type ThreatTargetedEvent struct {
 	Threat     Threat
 	TailNumber TailNumber
 	Timestamp  time.Time
+}
+
+type ThreatDespawnedEvent struct {
+	Threat    Threat
+	Timestamp time.Time
 }
 
 type AircraftStateChangeHook func(AircraftStateChangeEvent)
@@ -45,7 +50,9 @@ type SimulationStepHook func(SimulationStepEvent)
 
 type ThreatSpawnedHook func(ThreatSpawnedEvent)
 
-type ThreatClaimedHook func(ThreatClaimedEvent)
+type ThreatTargetedHook func(ThreatTargetedEvent)
+
+type ThreatDespawnedHook func(ThreatDespawnedEvent)
 
 func safeInvoke[T any, H ~func(T)](hooks []H, event T) {
 	for _, hook := range hooks {
@@ -63,6 +70,7 @@ type AircraftPositionSnapshot struct {
 	TailNumber TailNumber
 	Position   geometry.Point
 	State      string
+	Needs      []Need
 }
 
 // AllAircraftPositionsEvent is emitted every simulation tick with the current

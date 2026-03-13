@@ -1,7 +1,7 @@
 {
-  "active_plan": "C:\\Users\\JoshuaDeMatas\\Projects\\_tifye\\mono\\backend\\.sisyphus\\plans\\threat-rework.md",
-  "started_at": "2026-03-12T17:30:00Z",
-  "session_ids": [],
-  "plan_name": "threat-rework",
-  "worktree_path": "C:\\Users\\JoshuaDeMatas\\Projects\\_tifye\\mono-threat-rework"
+  "active_plan": "C:\Users\JoshuaDeMatas\Projects\_tifye\mono\backend\.sisyphus\plans\service-simulation-cloning.md",
+  "started_at": "2026-03-13T01:30:14Z",
+  "session_ids": ["session-unavailable-in-shell"],
+  "plan_name": "service-simulation-cloning",
+  "worktree_path": "C:\Users\JoshuaDeMatas\Projects\_tifye\mono-service-simulation-cloning\backend"
 }

@@ -121,12 +121,15 @@ func (s *State) ApplyEvent(event services.Event) {
 			}
 		}
 	case services.ThreatSpawnedEvent:
-		s.addEvent("threat spawned in "+e.Threat.Region, true)
-		s.addThreatActivity("spawned " + e.Threat.Region)
+		s.addEvent("threat spawned", true)
+		s.addThreatActivity("spawned")
 		s.Threats = append(s.Threats, e.Threat)
-	case services.ThreatClaimedEvent:
-		s.addEvent("threat claimed in "+e.Threat.Region, true)
-		s.addThreatActivity("claimed " + e.Threat.Region + " by " + shortTail(e.TailNumber))
+	case services.ThreatTargetedEvent:
+		s.addEvent("threat targeted by "+shortTail(e.TailNumber), true)
+		s.addThreatActivity("targeted by " + shortTail(e.TailNumber))
+	case services.ThreatDespawnedEvent:
+		s.addEvent("threat despawned", true)
+		s.addThreatActivity("despawned")
 		filtered := s.Threats[:0]
 		for _, threat := range s.Threats {
 			if threat.ID != e.Threat.ID {
@@ -140,6 +143,7 @@ func (s *State) ApplyEvent(event services.Event) {
 				if s.Aircraft[i].TailNumber == snap.TailNumber {
 					s.Aircraft[i].Position = snap.Position
 					s.Aircraft[i].State = snap.State
+					s.Aircraft[i].Needs = append([]services.Need(nil), snap.Needs...)
 					break
 				}
 			}

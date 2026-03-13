@@ -10,6 +10,7 @@ func testLifecycleModel() LifecycleModel {
 			InboundDecision: 3 * time.Second,
 			CommitApproach:  4 * time.Second,
 			Servicing:       6 * time.Second,
+			Ready:           2 * time.Second,
 		},
 		ReturnThreshold: 80,
 		NeedRates: map[NeedType]NeedRateModel{

@@ -260,6 +260,8 @@ func safeSimulationOptions(numBases, numAircraft uint) *simulation.SimulationOpt
 }
 
 func positionTrackingSimulationOptions(numAircraft uint) *simulation.SimulationOptions {
+	lifecycle := simulation.DefaultLifecycleModel()
+	lifecycle.Durations.Ready = 0
 	return &simulation.SimulationOptions{
 		ConstellationOpts: simulation.ConstellationOptions{
 			IncludeRegions:    []string{"Blekinge"},
@@ -281,5 +283,6 @@ func positionTrackingSimulationOptions(numAircraft uint) *simulation.SimulationO
 			SpawnChance: prng.New(1, 1),
 			MaxActive:   numAircraft,
 		},
+		LifecycleOpts: &lifecycle,
 	}
 }

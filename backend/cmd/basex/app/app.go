@@ -75,8 +75,10 @@ func (r *Runtime) Close() {
 func (r *Runtime) Update() error {
 	events := r.session.DrainEvents()
 	refreshUI := false
+	refreshDynamic := false
 	for _, event := range events {
 		r.state.ApplyEvent(event)
+		refreshDynamic = true
 		if eventRequiresUIRefresh(event) {
 			refreshUI = true
 		}
@@ -106,7 +108,9 @@ func (r *Runtime) Update() error {
 		return err
 	}
 	if r.ui != nil {
-		r.refreshDynamicUI()
+		if refreshDynamic || refreshUI || r.uiDirty {
+			r.refreshDynamicUI()
+		}
 		r.ui.Update()
 	}
 	return nil
@@ -553,34 +557,28 @@ func (r *Runtime) refreshDynamicUI() {
 			continue
 		}
 		text := ""
-		selected := false
 		if i < len(r.state.Airbases) {
 			base := r.state.Airbases[i]
 			text = truncateText(fmt.Sprintf("%d. %s (%s)", i+1, shortID(base.ID), base.Region), 28)
-			selected = base.ID == r.state.SelectedAirbaseID
 		}
 		btn.SetText(text)
-		btn.SetImage(listRowButtonImage(selected))
 	}
 	for i, btn := range r.aircraftRows {
 		if btn == nil {
 			continue
 		}
 		text := ""
-		selected := false
 		if i < len(r.state.Aircraft) {
 			aircraft := r.state.Aircraft[i]
 			text = truncateText(fmt.Sprintf("%d. %s | %s | needs:%d", i+1, shortID(aircraft.TailNumber), aircraft.State, len(aircraft.Needs)), 30)
-			selected = aircraft.TailNumber == r.state.SelectedAircraft
 		}
 		btn.SetText(text)
-		btn.SetImage(listRowButtonImage(selected))
 	}
 }
 
 func eventRequiresUIRefresh(event services.Event) bool {
 	switch event.(type) {
-	case services.AircraftStateChangeEvent, services.AllAircraftPositionsEvent:
+	case services.AircraftStateChangeEvent:
 		return true
 	}
 	return false

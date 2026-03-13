@@ -164,7 +164,7 @@ func TestSimulationInitFleet(t *testing.T) {
 	for _, aircraft := range aircrafts {
 		aircraft.AssertInvariants()
 		require.NotEmpty(t, aircraft.State.Name())
-		require.Equal(t, "Outbound", aircraft.State.Name())
+		require.Equal(t, "Ready", aircraft.State.Name())
 		require.NotEmpty(t, aircraft.Needs)
 		require.LessOrEqual(t, len(aircraft.Needs), 2)
 		require.GreaterOrEqual(t, len(aircraft.Needs), 1)
@@ -430,16 +430,21 @@ func TestReadyStateRedeploysOnThreat(t *testing.T) {
 
 	ts := New(time.Second, WithEpoch(time.Unix(0, 1)))
 	sim := NewSimulator([32]byte{8}, ts)
+	lifecycle := testLifecycleModel()
+	lifecycle.Durations.Ready = 0
+	sim.lifecycle = lifecycle
 	sim.constellation.airbases = []Airbase{{ID: BaseID{0, 0, 0, 0, 0, 0, 0, 1}, RegionID: "SE-K", Region: "Blekinge"}}
 	sim.dispatcher = NewDispatcher(sim.constellation, &RoundRobinAssigner{})
-	sim.threats = &ThreatSet{pending: []Threat{{ID: makeThreatID(1), RegionID: "SE-K", Region: "Blekinge", CreatedAt: ts.Now(), CreatedTick: 0}}}
+	sim.threats = &ThreatSet{pending: []Threat{{ID: makeThreatID(1), Position: geometry.Point{X: mapMinX, Y: mapMinY}, CreatedAt: ts.Now(), CreatedTick: 0}}, active: make(map[ThreatID]Threat)}
 	sim.fleet = &Fleet{aircrafts: []Aircraft{NewAircraft(TailNumber{9}, &ReadyState{}, []Need{{Type: NeedFuel, Severity: 0, RequiredCapability: NeedFuel}})}}
 
-	sim.Step()
+	for range 4 {
+		sim.Step()
+	}
 	aircrafts := sim.Aircrafts()
 	require.Len(t, aircrafts, 1)
 	require.Equal(t, "Outbound", aircrafts[0].State.Name())
-	require.Empty(t, sim.Threats())
+	require.Len(t, sim.Threats(), 1)
 }
 
 func TestSimulationInitDeterministic(t *testing.T) {

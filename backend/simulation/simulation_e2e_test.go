@@ -6,6 +6,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/bas-x/basex/prng"
 	sim "github.com/bas-x/basex/simulation"
 )
 
@@ -24,6 +25,10 @@ func TestSimulationEndToEndLandingFlow(t *testing.T) {
 		FleetOpts: sim.FleetOptions{
 			AircraftMin: 1,
 			AircraftMax: 1,
+		},
+		ThreatOpts: sim.ThreatOptions{
+			SpawnChance: prng.New(1, 1),
+			MaxActive:   1,
 		},
 	}
 	require.NoError(t, simulation.Init(opts))

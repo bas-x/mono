@@ -57,8 +57,13 @@ func TestSimulationEventsWebSocketEndToEnd(t *testing.T) {
 			continue
 		}
 		require.Equal(t, services.BaseSimulationID, payload["simulationId"])
-		require.Equal(t, "Outbound", payload["oldState"])
-		require.Equal(t, "Engaged", payload["newState"])
+		oldState, ok := payload["oldState"].(string)
+		require.True(t, ok)
+		newState, ok := payload["newState"].(string)
+		require.True(t, ok)
+		if !(oldState == "Ready" && newState == "Outbound") && !(oldState == "Outbound" && newState == "Engaged") {
+			continue
+		}
 		aircraft, ok := payload["aircraft"].(map[string]any)
 		require.True(t, ok)
 		require.NotEmpty(t, aircraft["tailNumber"])
@@ -255,8 +260,7 @@ func TestPauseResumeAndThreatEndpoints(t *testing.T) {
 	}
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&threatsPayload))
 	require.NotEmpty(t, threatsPayload.Threats)
-	require.NotEmpty(t, threatsPayload.Threats[0].Region)
-	require.NotEmpty(t, threatsPayload.Threats[0].RegionID)
+	require.NotZero(t, threatsPayload.Threats[0].Position.X+threatsPayload.Threats[0].Position.Y)
 }
 
 func TestCreateBaseSimulationProvidesGeneratedAircrafts(t *testing.T) {
@@ -305,6 +309,10 @@ func websocketSafeOptions() *simulation.SimulationOptions {
 			AircraftMax: 1,
 			NeedsMin:    0,
 			NeedsMax:    0,
+		},
+		ThreatOpts: simulation.ThreatOptions{
+			SpawnChance: prng.New(1, 1),
+			MaxActive:   1,
 		},
 	}
 }

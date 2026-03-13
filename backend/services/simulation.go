@@ -357,9 +357,9 @@ func (s *SimulationService) registerHooks(simulationID string, sim *simulation.S
 		})
 	})
 
-	sim.AddThreatClaimedHook(func(event simulation.ThreatClaimedEvent) {
-		s.broadcaster.Emit(ThreatClaimedEvent{
-			Type:         EventTypeThreatClaimed,
+	sim.AddThreatTargetedHook(func(event simulation.ThreatTargetedEvent) {
+		s.broadcaster.Emit(ThreatTargetedEvent{
+			Type:         EventTypeThreatTargeted,
 			SimulationID: simulationID,
 			Threat:       mapThreat(event.Threat),
 			TailNumber:   hex.EncodeToString(event.TailNumber[:]),
@@ -367,13 +367,32 @@ func (s *SimulationService) registerHooks(simulationID string, sim *simulation.S
 		})
 	})
 
+	sim.AddThreatDespawnedHook(func(event simulation.ThreatDespawnedEvent) {
+		s.broadcaster.Emit(ThreatDespawnedEvent{
+			Type:         EventTypeThreatDespawned,
+			SimulationID: simulationID,
+			Threat:       mapThreat(event.Threat),
+			Timestamp:    event.Timestamp,
+		})
+	})
+
 	sim.AddAllAircraftPositionsHook(func(event simulation.AllAircraftPositionsEvent) {
 		snapshots := make([]AircraftPositionSnapshot, len(event.Positions))
 		for i, snap := range event.Positions {
+			needs := make([]Need, len(snap.Needs))
+			for j, need := range snap.Needs {
+				needs[j] = Need{
+					Type:               string(need.Type),
+					Severity:           need.Severity,
+					RequiredCapability: string(need.RequiredCapability),
+					Blocking:           need.Blocking,
+				}
+			}
 			snapshots[i] = AircraftPositionSnapshot{
 				TailNumber: hex.EncodeToString(snap.TailNumber[:]),
 				Position:   Point{X: snap.Position.X, Y: snap.Position.Y},
 				State:      snap.State,
+				Needs:      needs,
 			}
 		}
 		s.broadcaster.Emit(AllAircraftPositionsEvent{

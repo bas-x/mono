@@ -7,7 +7,8 @@ const (
 	EventTypeLandingAssignment    = "landing_assignment"
 	EventTypeSimulationStep       = "simulation_step"
 	EventTypeThreatSpawned        = "threat_spawned"
-	EventTypeThreatClaimed        = "threat_claimed"
+	EventTypeThreatTargeted       = "threat_targeted"
+	EventTypeThreatDespawned      = "threat_despawned"
 	EventTypeAllAircraftPositions = "all_aircraft_positions"
 )
 
@@ -81,7 +82,7 @@ func (e ThreatSpawnedEvent) EventSimulationID() string {
 	return e.SimulationID
 }
 
-type ThreatClaimedEvent struct {
+type ThreatTargetedEvent struct {
 	Type         string    `json:"type"`
 	SimulationID string    `json:"simulationId"`
 	Threat       Threat    `json:"threat"`
@@ -89,11 +90,26 @@ type ThreatClaimedEvent struct {
 	Timestamp    time.Time `json:"timestamp"`
 }
 
-func (e ThreatClaimedEvent) EventType() string {
+type ThreatDespawnedEvent struct {
+	Type         string    `json:"type"`
+	SimulationID string    `json:"simulationId"`
+	Threat       Threat    `json:"threat"`
+	Timestamp    time.Time `json:"timestamp"`
+}
+
+func (e ThreatDespawnedEvent) EventType() string {
 	return e.Type
 }
 
-func (e ThreatClaimedEvent) EventSimulationID() string {
+func (e ThreatDespawnedEvent) EventSimulationID() string {
+	return e.SimulationID
+}
+
+func (e ThreatTargetedEvent) EventType() string {
+	return e.Type
+}
+
+func (e ThreatTargetedEvent) EventSimulationID() string {
 	return e.SimulationID
 }
 

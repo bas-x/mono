@@ -186,8 +186,7 @@ func cloneThreat(t *Threat) *Threat {
 	}
 	return &Threat{
 		ID:          t.ID,
-		RegionID:    t.RegionID,
-		Region:      t.Region,
+		Position:    t.Position,
 		CreatedAt:   t.CreatedAt,
 		CreatedTick: t.CreatedTick,
 	}
