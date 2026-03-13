@@ -10,7 +10,7 @@ export function BaseXOps() {
         Skip to main content
       </a>
       <Navbar />
-      <main id="main-content" className="min-h-0 min-w-0 flex-1">
+      <main id="main-content" className="min-h-0 min-w-0 flex-1 bg-bg-muted">
         <MapPanel />
       </main>
     </div>

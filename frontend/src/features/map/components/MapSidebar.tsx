@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import type { ReactNode } from 'react';
+import { HiEye, HiEyeOff } from 'react-icons/hi';
 
 import { AirbaseList } from '@/features/map/components/AirbaseList';
 import {
@@ -22,6 +23,8 @@ type MapSidebarProps = {
   onClearSelection: () => void;
   onResetView: () => void;
   onToggleAirbaseList: () => void;
+  isOverlayVisible: boolean;
+  onToggleOverlay: () => void;
   onSelectAirbaseFromList: (airbaseId: string) => void;
   onOpenSimulationSheet: () => void;
   onResetSimulation?: () => void;
@@ -47,6 +50,8 @@ type LiveActionsSectionProps = Pick<
   | 'onClearSelection'
   | 'onResetView'
   | 'onToggleAirbaseList'
+  | 'isOverlayVisible'
+  | 'onToggleOverlay'
   | 'onSelectAirbaseFromList'
 >;
 
@@ -95,15 +100,40 @@ function ModeSection({ viewMode, onModeChange }: ModeSectionProps) {
   );
 }
 
+type OverlayToggleButtonProps = Pick<MapSidebarProps, 'isOverlayVisible' | 'onToggleOverlay'>;
+
+function OverlayToggleButton({ isOverlayVisible, onToggleOverlay }: OverlayToggleButtonProps) {
+  const label = isOverlayVisible ? 'Hide overlays' : 'Show overlays';
+
+  return (
+    <button
+      type="button"
+      aria-pressed={isOverlayVisible}
+      onClick={onToggleOverlay}
+      title={label}
+      className={`${buttonClassName(isOverlayVisible)} cursor-pointer rounded-sm border p-2 transition-colors`}
+    >
+      {isOverlayVisible ? (
+        <HiEyeOff className="size-4" aria-hidden="true" />
+      ) : (
+        <HiEye className="size-4" aria-hidden="true" />
+      )}
+      <span className="sr-only">{label}</span>
+    </button>
+  );
+}
+
 function LiveActionsSection({
   airbases,
   airbaseStatus,
   airbaseMessage,
   isAirbaseListOpen,
+  isOverlayVisible,
   selectedAirbaseId,
   onClearSelection,
   onResetView,
   onToggleAirbaseList,
+  onToggleOverlay,
   onSelectAirbaseFromList,
 }: LiveActionsSectionProps) {
   return (
@@ -126,6 +156,12 @@ function LiveActionsSection({
         >
           By base
         </button>
+        <div className="flex justify-end">
+          <OverlayToggleButton
+            isOverlayVisible={isOverlayVisible}
+            onToggleOverlay={onToggleOverlay}
+          />
+        </div>
       </div>
       {isAirbaseListOpen ? (
         airbaseStatus === 'loading' ? (
@@ -154,6 +190,8 @@ type SimulateActionsSectionProps = Pick<
   | 'onOpenSimulationSheet'
   | 'onResetSimulation'
   | 'isSimulationRunning'
+  | 'isOverlayVisible'
+  | 'onToggleOverlay'
   | 'simulations'
   | 'onLoadSimulation'
 >;
@@ -162,6 +200,8 @@ function SimulateActionsSection({
   onOpenSimulationSheet,
   onResetSimulation,
   isSimulationRunning,
+  isOverlayVisible,
+  onToggleOverlay,
   simulations = [],
   onLoadSimulation,
 }: SimulateActionsSectionProps) {
@@ -195,6 +235,13 @@ function SimulateActionsSection({
 
   return (
     <SidebarInsetSection className="shell-divider border-t pt-4">
+      <div className="flex justify-end">
+        <OverlayToggleButton
+          isOverlayVisible={isOverlayVisible}
+          onToggleOverlay={onToggleOverlay}
+        />
+      </div>
+
       <button
         type="button"
         onClick={onOpenSimulationSheet}
@@ -251,7 +298,7 @@ function SimulateActionsSection({
 export function MapSidebar(props: MapSidebarProps) {
   return (
     <aside
-      className="shell-panel relative h-full min-h-0 w-full max-w-40"
+      className="shell-panel relative z-10 h-full min-h-0 w-full max-w-40"
       aria-label="Map controls"
     >
       <div className="flex h-full min-h-0 flex-col gap-5 overflow-y-auto py-4">
@@ -263,10 +310,12 @@ export function MapSidebar(props: MapSidebarProps) {
             airbaseStatus={props.airbaseStatus}
             airbaseMessage={props.airbaseMessage}
             isAirbaseListOpen={props.isAirbaseListOpen}
+            isOverlayVisible={props.isOverlayVisible}
             selectedAirbaseId={props.selectedAirbaseId}
             onClearSelection={props.onClearSelection}
             onResetView={props.onResetView}
             onToggleAirbaseList={props.onToggleAirbaseList}
+            onToggleOverlay={props.onToggleOverlay}
             onSelectAirbaseFromList={props.onSelectAirbaseFromList}
           />
         ) : (
@@ -274,6 +323,8 @@ export function MapSidebar(props: MapSidebarProps) {
             onOpenSimulationSheet={props.onOpenSimulationSheet}
             onResetSimulation={props.onResetSimulation}
             isSimulationRunning={props.isSimulationRunning}
+            isOverlayVisible={props.isOverlayVisible}
+            onToggleOverlay={props.onToggleOverlay}
             simulations={props.simulations}
             onLoadSimulation={props.onLoadSimulation}
           />

@@ -6,13 +6,18 @@ import { AccordionCard } from '@/features/ui/components/AccordionCard';
 type SimulationInfoCardProps = {
   simulationState: SimulationState;
   simulations?: Array<{ id: string }>;
+  portalRoot: Element | null;
 };
 
-export function SimulationInfoCard({ simulationState, simulations = [] }: SimulationInfoCardProps) {
+export function SimulationInfoCard({
+  simulationState,
+  simulations = [],
+  portalRoot,
+}: SimulationInfoCardProps) {
   const [isSimOpen, setIsSimOpen] = useState(true);
   const [isAirOpen, setIsAirOpen] = useState(false);
 
-  if (typeof document === 'undefined' || simulationState.status !== 'running') {
+  if (typeof document === 'undefined' || simulationState.status !== 'running' || !portalRoot) {
     return null;
   }
 
@@ -46,13 +51,14 @@ export function SimulationInfoCard({ simulationState, simulations = [] }: Simula
       }));
 
   return createPortal(
-    <div className="pointer-events-none fixed inset-y-4 left-20 z-20 flex w-96 flex-col gap-4 pl-4">
-      <AccordionCard
-        title="Simulation information"
-        isOpen={isSimOpen}
-        onToggle={() => setIsSimOpen(!isSimOpen)}
-        flexRatio={7}
-      >
+    <div className="pointer-events-none absolute inset-4 z-20 flex items-start justify-start">
+      <div className="pointer-events-auto flex w-full max-w-96 flex-col gap-4">
+        <AccordionCard
+          title="Simulation information"
+          isOpen={isSimOpen}
+          onToggle={() => setIsSimOpen(!isSimOpen)}
+          flexRatio={7}
+        >
         <div className="grid grid-cols-4 gap-2">
           <div className="flex flex-col">
             <span className="text-[10px] font-semibold uppercase tracking-widest text-white/50">
@@ -107,7 +113,7 @@ export function SimulationInfoCard({ simulationState, simulations = [] }: Simula
                 stroke="currentColor"
                 strokeWidth="2"
                 strokeLinecap="round"
-                strokeLinelinejoin="round"
+                strokeLinejoin="round"
                 className="text-blue-400"
               >
                 <path d="M6 3v12" />
@@ -167,14 +173,14 @@ export function SimulationInfoCard({ simulationState, simulations = [] }: Simula
             ))}
           </div>
         </div>
-      </AccordionCard>
+        </AccordionCard>
 
-      <AccordionCard
-        title="Aircrafts"
-        isOpen={isAirOpen}
-        onToggle={() => setIsAirOpen(!isAirOpen)}
-        flexRatio={3}
-      >
+        <AccordionCard
+          title="Aircrafts"
+          isOpen={isAirOpen}
+          onToggle={() => setIsAirOpen(!isAirOpen)}
+          flexRatio={3}
+        >
         <div className="flex flex-col gap-0 overflow-hidden rounded-lg border border-[color:var(--color-shell-panel-border)] bg-[#0d0d0d]">
           {simulationState.aircrafts?.map((ac, idx) => (
             <div
@@ -204,8 +210,9 @@ export function SimulationInfoCard({ simulationState, simulations = [] }: Simula
             </div>
           )}
         </div>
-      </AccordionCard>
+        </AccordionCard>
+      </div>
     </div>,
-    document.body,
+    portalRoot,
   );
 }

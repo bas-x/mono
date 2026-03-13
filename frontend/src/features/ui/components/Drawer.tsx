@@ -45,7 +45,9 @@ export function Drawer({ isOpen, onClose, children, width, positionClassName }: 
   return createPortal(
     <div
       aria-hidden={!isOpen}
-      className={positionClassName ?? 'absolute inset-y-4 right-full z-20 flex pr-4'}
+      className={`${positionClassName ?? 'absolute inset-y-4 right-full z-20 flex pr-4'} ${
+        isOpen ? 'pointer-events-auto' : 'pointer-events-none'
+      }`}
     >
       <section
         role="dialog"

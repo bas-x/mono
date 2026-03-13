@@ -8,6 +8,7 @@ import { useAirbases } from '@/features/map/hooks/useAirbases';
 import { createFocusedViewBox } from '@/features/map/lib/geometry';
 import { getPlacementBounds, resolveActivePlacementSources } from '@/features/map/lib/placement';
 import { SimulationSetupSheet } from '@/features/simulation/components/SimulationSetupSheet';
+import { SimulationTimeline } from '@/features/simulation/components/timeline/SimulationTimeline';
 import { useSimulation } from '@/features/simulation/hooks/useSimulation';
 import {
   DEFAULT_SIMULATION_SETUP_FORM_VALUES,
@@ -24,7 +25,6 @@ import {
 import { useApi } from '@/lib/api';
 
 import { SimulationInfoCard } from '@/features/simulation/components/SimulationInfoCard';
-import { SimulationTimeline } from '@/features/simulation/components/timeline/SimulationTimeline';
 
 type ThemeStyle = CSSProperties & {
   '--color-map-surface': string;
@@ -70,12 +70,14 @@ export function MapPanel() {
   const dataSource: MapDataSource = 'mock';
   const [viewMode, setViewMode] = useState<ViewMode>('live');
   const [isAirbaseListOpen, setIsAirbaseListOpen] = useState(false);
+  const [isOverlayVisible, setIsOverlayVisible] = useState(true);
   const [mapViewBox, setMapViewBox] = useState<MapViewBox>({ ...DEFAULT_MAP_VIEW_BOX });
   const [selectedAirbaseId, setSelectedAirbaseId] = useState<string | null>(null);
   const [isSimulationSheetOpen, setIsSimulationSheetOpen] = useState(false);
   const [simulationSetupValues, setSimulationSetupValues] = useState<SimulationSetupFormValues>(
     DEFAULT_SIMULATION_SETUP_FORM_VALUES,
   );
+  const [mapOverlayPortalRoot, setMapOverlayPortalRoot] = useState<HTMLDivElement | null>(null);
   const [selectedAirbaseDetailsState, setSelectedAirbaseDetailsState] =
     useState<SelectedAirbaseDetailsState>({ status: 'idle' });
   const {
@@ -205,6 +207,10 @@ export function MapPanel() {
     });
   }, [focusAirbase, selectedAirbaseId]);
 
+  const handleToggleOverlay = useCallback(() => {
+    setIsOverlayVisible((current) => !current);
+  }, []);
+
   const handleSelectAirbase = useCallback(
     (airbaseId: string | null) => {
       setSelectedAirbaseId(airbaseId);
@@ -293,72 +299,88 @@ export function MapPanel() {
   return (
     <>
       <section
-        className="grid h-full min-h-0 min-w-0 overflow-hidden bg-bg min-[1040px]:grid-cols-[minmax(0,1fr)_10rem]"
+        className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-bg"
         aria-label="Constellation map workspace"
         style={MODE_THEME_STYLES[viewMode]}
       >
-        <div className="relative min-h-[55vh] min-w-0 bg-bg min-[1040px]:min-h-0">
-          <ConstellationMap
-            className="h-full min-h-full rounded-none border-0"
-            dataSource={viewMode === 'simulate' ? 'api' : dataSource}
-            mode={viewMode === 'live' ? 'live' : 'static'}
-            placementSources={activePlacementSources}
+        <div className="grid min-h-0 min-w-0 flex-1 overflow-hidden min-[1040px]:grid-cols-[minmax(0,1fr)_10rem]">
+          <div className="relative min-h-[55vh] min-w-0 bg-bg min-[1040px]:min-h-0">
+            <ConstellationMap
+              className="h-full min-h-full rounded-none border-0"
+              dataSource={viewMode === 'simulate' ? 'api' : dataSource}
+              mode={viewMode === 'live' ? 'live' : 'static'}
+              placementSources={activePlacementSources}
+              selectedAirbaseId={selectedAirbaseId}
+              viewBox={mapViewBox}
+              onSelectAirbase={handleSelectAirbase}
+              aircraftPositions={simulationState.status === 'running' ? simulationState.aircraftPositions : undefined}
+            />
+
+            <div
+              ref={setMapOverlayPortalRoot}
+              className="pointer-events-none absolute inset-0 z-20"
+            />
+
+            {isOverlayVisible && viewMode === 'simulate' && simulationState.status === 'running' && (
+              <SimulationInfoCard
+                simulationState={simulationState}
+                simulations={simulations}
+                portalRoot={mapOverlayPortalRoot}
+              />
+            )}
+          </div>
+
+          <MapSidebar
+            airbases={
+              viewMode === 'simulate' && simulationState.status === 'running'
+                ? activeRenderableAirbases
+                : airbaseState.airbases
+            }
+            airbaseStatus={
+              viewMode === 'simulate'
+                ? simulationState.status === 'running'
+                  ? 'success'
+                  : 'loading'
+                : airbaseState.status
+            }
+            airbaseMessage={
+              viewMode === 'simulate'
+                ? simulationState.status === 'error'
+                  ? simulationState.message
+                  : undefined
+                : airbaseState.status === 'error'
+                  ? airbaseState.message
+                  : undefined
+            }
+            viewMode={viewMode}
+            isAirbaseListOpen={isAirbaseListOpen}
             selectedAirbaseId={selectedAirbaseId}
-            viewBox={mapViewBox}
-            onSelectAirbase={handleSelectAirbase}
-            aircraftPositions={simulationState.status === 'running' ? simulationState.aircraftPositions : undefined}
+            selectedAirbaseDetailsState={selectedAirbaseDetailsState}
+            onModeChange={handleModeChange}
+            onClearSelection={handleClearSelection}
+            onResetView={handleResetView}
+            onToggleAirbaseList={handleToggleAirbaseList}
+            isOverlayVisible={isOverlayVisible}
+            onToggleOverlay={handleToggleOverlay}
+            onSelectAirbaseFromList={handleSelectAirbaseFromList}
+            onOpenSimulationSheet={handleOpenSimulationSheet}
+            onResetSimulation={triggerReset}
+            isSimulationRunning={simulationState.status === 'running'}
+            simulations={simulations}
+            onLoadSimulation={loadSimulation}
           />
         </div>
 
-        <MapSidebar
-          airbases={
-            viewMode === 'simulate' && simulationState.status === 'running'
-              ? activeRenderableAirbases
-              : airbaseState.airbases
-          }
-          airbaseStatus={
-            viewMode === 'simulate'
-              ? simulationState.status === 'running'
-                ? 'success'
-                : 'loading'
-              : airbaseState.status
-          }
-          airbaseMessage={
-            viewMode === 'simulate'
-              ? simulationState.status === 'error'
-                ? simulationState.message
-                : undefined
-              : airbaseState.status === 'error'
-                ? airbaseState.message
-                : undefined
-          }
-          viewMode={viewMode}
-          isAirbaseListOpen={isAirbaseListOpen}
-          selectedAirbaseId={selectedAirbaseId}
-          selectedAirbaseDetailsState={selectedAirbaseDetailsState}
-          onModeChange={handleModeChange}
-          onClearSelection={handleClearSelection}
-          onResetView={handleResetView}
-          onToggleAirbaseList={handleToggleAirbaseList}
-          onSelectAirbaseFromList={handleSelectAirbaseFromList}
-          onOpenSimulationSheet={handleOpenSimulationSheet}
-          onResetSimulation={triggerReset}
-          isSimulationRunning={simulationState.status === 'running'}
-          simulations={simulations}
-          onLoadSimulation={loadSimulation}
-        />
+        {viewMode === 'simulate' && simulationState.status === 'running' ? (
+          <div className="shrink-0 border-t border-border bg-bg">
+            <SimulationTimeline
+              simulationId={simulationState.simulationId}
+              simulationState={simulationState}
+              setPlaybackTick={setPlaybackTick}
+            />
+          </div>
+        ) : null}
       </section>
-
-      {viewMode === 'simulate' && simulationState.status === 'running' && (
-        <>
-          <SimulationInfoCard simulationState={simulationState} simulations={simulations} />
-          <SimulationTimeline 
-            simulationId={simulationState.simulationId} 
-            simulationState={simulationState}
-            setPlaybackTick={setPlaybackTick}
-          />
-        </>
-      )}
 
       <SimulationSetupSheet
         isOpen={viewMode === 'simulate' && isSimulationSheetOpen}
