@@ -1,4 +1,5 @@
 import type {
+  CreateBaseSimulationRequest,
   SimulationAirbase,
   SimulationAircraft,
   SimulationServiceClient,
@@ -49,8 +50,8 @@ export function createMockSimulationServiceClient(): SimulationServiceClient {
       return [{ id: 'base' }];
     },
 
-    async createBaseSimulation(seed: string) {
-      console.log('Mock: Creating base simulation with seed', seed);
+    async createBaseSimulation(request: CreateBaseSimulationRequest) {
+      console.log('Mock: Creating base simulation', request);
       return { id: 'base' };
     },
 

@@ -1,5 +1,6 @@
 import type { HttpClient } from '@/lib/api/http/client';
 import type {
+  CreateBaseSimulationRequest,
   SimulationAirbase,
   SimulationAircraft,
   SimulationServiceClient,
@@ -32,10 +33,10 @@ export function createSimulationServiceClient(
       return response.simulations || [];
     },
 
-    async createBaseSimulation(seed: string, signal?: AbortSignal) {
+    async createBaseSimulation(request: CreateBaseSimulationRequest, signal?: AbortSignal) {
       return httpClient.requestJson<CreateBaseSimulationResponse>('/simulations/base', {
         method: 'POST',
-        body: JSON.stringify({ seed }),
+        body: JSON.stringify(request),
         signal,
       });
     },

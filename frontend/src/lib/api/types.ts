@@ -60,9 +60,79 @@ export type SimulationAircraft = {
   assignedTo?: string;
 };
 
+export type ApiRatio = {
+  numerator: number;
+  denominator: number;
+};
+
+export type CreateSimulationConstellationOptions = {
+  includeRegions?: string[];
+  excludeRegions?: string[];
+  minPerRegion?: number;
+  maxPerRegion?: number;
+  maxTotal?: number;
+  regionProbability?: ApiRatio;
+  maxAttemptsPerAirbase?: number;
+};
+
+export type CreateSimulationFleetOptions = {
+  aircraftMin?: number;
+  aircraftMax?: number;
+  needsMin?: number;
+  needsMax?: number;
+  needsPool?: string[];
+  severityMin?: number;
+  severityMax?: number;
+  blockingChance?: ApiRatio;
+};
+
+export type CreateSimulationThreatOptions = {
+  spawnChance?: ApiRatio;
+  maxActive?: number;
+  maxActiveTicks?: number;
+};
+
+export type CreateSimulationPhaseDurations = {
+  outbound?: number;
+  engaged?: number;
+  inboundDecision?: number;
+  commitApproach?: number;
+  servicing?: number;
+  ready?: number;
+};
+
+export type CreateSimulationNeedRateModel = {
+  outboundMilliPerHour?: number;
+  engagedMilliPerHour?: number;
+  servicingMilliPerHour?: number;
+  variancePermille?: number;
+};
+
+export type CreateSimulationLifecycleOptions = {
+  durations?: CreateSimulationPhaseDurations;
+  returnThreshold?: number;
+  needRates?: Record<string, CreateSimulationNeedRateModel>;
+};
+
+export type CreateSimulationOptions = {
+  constellationOpts?: CreateSimulationConstellationOptions;
+  fleetOpts?: CreateSimulationFleetOptions;
+  threatOpts?: CreateSimulationThreatOptions;
+  lifecycleOpts?: CreateSimulationLifecycleOptions;
+};
+
+export type CreateBaseSimulationRequest = {
+  seed?: string;
+  untilTick?: number;
+  simulationOptions?: CreateSimulationOptions;
+};
+
 export interface SimulationServiceClient {
   getSimulations(signal?: AbortSignal): Promise<Array<{ id: string }>>;
-  createBaseSimulation(seed: string, signal?: AbortSignal): Promise<{ id: string }>;
+  createBaseSimulation(
+    request: CreateBaseSimulationRequest,
+    signal?: AbortSignal,
+  ): Promise<{ id: string }>;
   startSimulation(simulationId: string, signal?: AbortSignal): Promise<void>;
   pauseSimulation(simulationId: string, signal?: AbortSignal): Promise<void>;
   resumeSimulation(simulationId: string, signal?: AbortSignal): Promise<void>;
