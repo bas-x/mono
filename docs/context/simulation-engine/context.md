@@ -28,9 +28,10 @@
 - No implicit race behavior; conflict outcomes must be reproducible from inputs + seed.
 
 ## Current Frontend Configuration Surface
-- The current frontend simulation setup UI is limited to fields backed by `simulation.SimulationOptions`, `simulation.ConstellationOptions`, and `simulation.FleetOptions`.
+- The simulation setup UI still exposes the same operator-facing controls and checkboxes, but `POST /simulations/base` now submits them under `simulationOptions.constellationOpts` and `simulationOptions.fleetOpts` instead of flattening everything to a seed-only request.
 - User-editable airbase fields are region filters, per-region counts, max total, and region probability.
 - User-editable fleet fields are aircraft count range, need count range, need pool, severity range, and blocking chance.
+- `simulationOptions.threatOpts` and `simulationOptions.lifecycleOpts` are part of the request contract but are not yet surfaced as editable controls in the current UI.
 - Internal factories (`MetadataFactory`, `StateFactory`) and low-level generation controls remain backend-owned and are not exposed in the UI.
 
 ## Performance Expectations
