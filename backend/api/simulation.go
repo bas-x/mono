@@ -110,25 +110,16 @@ func PostBranchSimulation(logger *log.Logger, deps *ServerDependencies) echo.Han
 }
 
 func PostStartSimulation(logger *log.Logger, deps *ServerDependencies) echo.HandlerFunc {
-	type request struct {
-		SimulationID string `param:"simulationId"`
-	}
-
 	return func(c echo.Context) error {
-		req, err := bindAndValidate[request](c)
+		err := deps.SimulationService.StartSimulation(services.BaseSimulationID)
 		if err != nil {
-			return err
-		}
-
-		err = deps.SimulationService.StartSimulation(req.SimulationID)
-		if err != nil {
-			if errors.Is(err, services.ErrBaseNotFound) || errors.Is(err, services.ErrSimulationNotFound) {
+			if errors.Is(err, services.ErrBaseNotFound) {
 				return echo.NewHTTPError(http.StatusNotFound, "simulation not found")
 			}
 			if errors.Is(err, services.ErrSimulationRunning) {
 				return echo.NewHTTPError(http.StatusConflict, "simulation already running")
 			}
-			logger.Error("start simulation", "simulationId", req.SimulationID, "err", err)
+			logger.Error("start simulations", "err", err)
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to start simulation")
 		}
 
@@ -137,25 +128,16 @@ func PostStartSimulation(logger *log.Logger, deps *ServerDependencies) echo.Hand
 }
 
 func PostPauseSimulation(logger *log.Logger, deps *ServerDependencies) echo.HandlerFunc {
-	type request struct {
-		SimulationID string `param:"simulationId"`
-	}
-
 	return func(c echo.Context) error {
-		req, err := bindAndValidate[request](c)
+		err := deps.SimulationService.PauseSimulation(services.BaseSimulationID)
 		if err != nil {
-			return err
-		}
-
-		err = deps.SimulationService.PauseSimulation(req.SimulationID)
-		if err != nil {
-			if errors.Is(err, services.ErrBaseNotFound) || errors.Is(err, services.ErrSimulationNotFound) {
+			if errors.Is(err, services.ErrBaseNotFound) {
 				return echo.NewHTTPError(http.StatusNotFound, "simulation not found")
 			}
 			if errors.Is(err, services.ErrSimulationNotRunning) || errors.Is(err, services.ErrSimulationPaused) {
 				return echo.NewHTTPError(http.StatusConflict, err.Error())
 			}
-			logger.Error("pause simulation", "simulationId", req.SimulationID, "err", err)
+			logger.Error("pause simulations", "err", err)
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to pause simulation")
 		}
 
@@ -164,25 +146,16 @@ func PostPauseSimulation(logger *log.Logger, deps *ServerDependencies) echo.Hand
 }
 
 func PostResumeSimulation(logger *log.Logger, deps *ServerDependencies) echo.HandlerFunc {
-	type request struct {
-		SimulationID string `param:"simulationId"`
-	}
-
 	return func(c echo.Context) error {
-		req, err := bindAndValidate[request](c)
+		err := deps.SimulationService.ResumeSimulation(services.BaseSimulationID)
 		if err != nil {
-			return err
-		}
-
-		err = deps.SimulationService.ResumeSimulation(req.SimulationID)
-		if err != nil {
-			if errors.Is(err, services.ErrBaseNotFound) || errors.Is(err, services.ErrSimulationNotFound) {
+			if errors.Is(err, services.ErrBaseNotFound) {
 				return echo.NewHTTPError(http.StatusNotFound, "simulation not found")
 			}
 			if errors.Is(err, services.ErrSimulationNotRunning) || errors.Is(err, services.ErrSimulationNotPaused) {
 				return echo.NewHTTPError(http.StatusConflict, err.Error())
 			}
-			logger.Error("resume simulation", "simulationId", req.SimulationID, "err", err)
+			logger.Error("resume simulations", "err", err)
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to resume simulation")
 		}
 
