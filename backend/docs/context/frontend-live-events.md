@@ -240,6 +240,8 @@ Suggested reducer behavior:
 - the simulation package itself does **not** know about `simulationId`; the service injects it into outgoing events
 - slow websocket clients are disconnected by the backend rather than allowed to block simulation progress
 - branch creation is available via `POST /simulations/:simulationId/branch`
+- branch lineage metadata (`parentId`, `splitTick`, `splitTimestamp`) comes from REST simulation reads and the branch creation response
+- websocket event payloads are unchanged and do not include lineage fields
 - first branch support is base simulation only; checkpoint-based branch creation and branch-from-branch workflows are not implemented
 - determinism guarantee: branch creation copies current simulation state and RNG state, so equivalent future advancement keeps base and branch aligned until a later divergence decision is introduced
 - the local tester auto-creates the base simulation at startup, shows `Base` as the initial tab, and switches the full tester context when a branch tab is selected

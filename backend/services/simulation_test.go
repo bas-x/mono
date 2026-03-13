@@ -113,6 +113,18 @@ func TestSimulationService_StartSimulationStartsAllBranches(t *testing.T) {
 
 	branchID, err := svc.BranchSimulation(BaseSimulationID)
 	require.NoError(t, err)
+	branchInfo, err := svc.Simulation(branchID)
+	require.NoError(t, err)
+	require.NotNil(t, branchInfo.ParentID)
+	require.Equal(t, BaseSimulationID, *branchInfo.ParentID)
+	require.NotNil(t, branchInfo.SplitTick)
+	require.Equal(t, uint64(0), *branchInfo.SplitTick)
+	require.NotNil(t, branchInfo.SplitTimestamp)
+
+	baseInfo, err := svc.Simulation(BaseSimulationID)
+	require.NoError(t, err)
+	require.Equal(t, baseInfo.Tick, *branchInfo.SplitTick)
+	require.Equal(t, baseInfo.Timestamp, *branchInfo.SplitTimestamp)
 
 	_, eventCh := svc.Broadcaster().Subscribe()
 	require.NoError(t, svc.StartSimulation(branchID))
@@ -157,10 +169,18 @@ func TestSimulationService_PauseResume(t *testing.T) {
 	require.NoError(t, err)
 	branchInfo, err := svc.Simulation(branchID)
 	require.NoError(t, err)
+	require.NotNil(t, branchInfo.ParentID)
+	require.Equal(t, BaseSimulationID, *branchInfo.ParentID)
+	require.NotNil(t, branchInfo.SplitTick)
+	require.NotNil(t, branchInfo.SplitTimestamp)
+	require.Equal(t, baseInfo.Tick, *branchInfo.SplitTick)
+	require.Equal(t, baseInfo.Timestamp, *branchInfo.SplitTimestamp)
 	require.True(t, baseInfo.Running)
 	require.True(t, baseInfo.Paused)
 	require.True(t, branchInfo.Running)
 	require.True(t, branchInfo.Paused)
+	originalSplitTick := *branchInfo.SplitTick
+	originalSplitTimestamp := *branchInfo.SplitTimestamp
 
 	require.NoError(t, svc.ResumeSimulation(branchID))
 
@@ -187,6 +207,16 @@ func TestSimulationService_PauseResume(t *testing.T) {
 	require.True(t, baseInfo.Paused)
 	require.True(t, branchInfo.Running)
 	require.True(t, branchInfo.Paused)
+	require.NoError(t, svc.StepSimulation(BaseSimulationID))
+	require.NoError(t, svc.StepSimulation(BaseSimulationID))
+	require.NoError(t, svc.StepSimulation(branchID))
+
+	branchInfo, err = svc.Simulation(branchID)
+	require.NoError(t, err)
+	require.NotNil(t, branchInfo.SplitTick)
+	require.NotNil(t, branchInfo.SplitTimestamp)
+	require.Equal(t, originalSplitTick, *branchInfo.SplitTick)
+	require.Equal(t, originalSplitTimestamp, *branchInfo.SplitTimestamp)
 
 	drainStepEvents(eventCh)
 	ensureNoStepEvent(t, eventCh, 150*time.Millisecond)
@@ -206,6 +236,9 @@ func TestSimulationService_Simulation(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, BaseSimulationID, info.ID)
 	require.False(t, info.Running)
+	require.Nil(t, info.ParentID)
+	require.Nil(t, info.SplitTick)
+	require.Nil(t, info.SplitTimestamp)
 
 	_, err = svc.Simulation("branch-1")
 	require.ErrorIs(t, err, ErrSimulationNotFound)

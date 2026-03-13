@@ -183,8 +183,18 @@ func TestSimulationServiceBranch_BaseReturnsRandomNonBaseID(t *testing.T) {
 	require.NotEmpty(t, branchID)
 	require.NotEqual(t, services.BaseSimulationID, branchID)
 
-	_, err = svc.Simulation(branchID)
+	baseInfo, err := svc.Simulation(services.BaseSimulationID)
 	require.NoError(t, err)
+
+	branchInfo, err := svc.Simulation(branchID)
+	require.NoError(t, err)
+	require.NotNil(t, branchInfo.ParentID)
+	require.Equal(t, services.BaseSimulationID, *branchInfo.ParentID)
+	require.NotNil(t, branchInfo.SplitTick)
+	require.Equal(t, uint64(0), *branchInfo.SplitTick)
+	require.NotNil(t, branchInfo.SplitTimestamp)
+	require.Equal(t, baseInfo.Tick, *branchInfo.SplitTick)
+	require.Equal(t, baseInfo.Timestamp, *branchInfo.SplitTimestamp)
 
 	list := svc.Simulations()
 	require.Len(t, list, 2)
@@ -233,6 +243,12 @@ func TestSimulationServiceBranch_IdleBaseRemainsStartableAfterBranch(t *testing.
 	require.NoError(t, err)
 	branchInfo, err := svc.Simulation(branchID)
 	require.NoError(t, err)
+	require.NotNil(t, branchInfo.ParentID)
+	require.Equal(t, services.BaseSimulationID, *branchInfo.ParentID)
+	require.NotNil(t, branchInfo.SplitTick)
+	require.NotNil(t, branchInfo.SplitTimestamp)
+	require.Equal(t, baseInfo.Tick, *branchInfo.SplitTick)
+	require.Equal(t, baseInfo.Timestamp, *branchInfo.SplitTimestamp)
 	require.False(t, baseInfo.Running)
 	require.False(t, baseInfo.Paused)
 	require.False(t, branchInfo.Running)
@@ -350,6 +366,25 @@ func TestSimulationServiceBranch_DeterministicParityAfterEquivalentAdvancement(t
 	require.NoError(t, err)
 	require.Equal(t, baseInfo.Tick, branchInfo.Tick)
 	require.Equal(t, baseInfo.Timestamp, branchInfo.Timestamp)
+	require.NotNil(t, branchInfo.ParentID)
+	require.Equal(t, services.BaseSimulationID, *branchInfo.ParentID)
+	require.NotNil(t, branchInfo.SplitTick)
+	require.NotNil(t, branchInfo.SplitTimestamp)
+	require.Equal(t, uint64(0), *branchInfo.SplitTick)
+	baseSplitTick := *branchInfo.SplitTick
+	baseSplitTimestamp := *branchInfo.SplitTimestamp
+
+	require.NoError(t, svc.StepSimulation(services.BaseSimulationID))
+	require.NoError(t, svc.StepSimulation(services.BaseSimulationID))
+	require.NoError(t, svc.StepSimulation(branchID))
+	require.NoError(t, svc.StepSimulation(branchID))
+
+	branchInfoAfter, err := svc.Simulation(branchID)
+	require.NoError(t, err)
+	require.NotNil(t, branchInfoAfter.SplitTick)
+	require.NotNil(t, branchInfoAfter.SplitTimestamp)
+	require.Equal(t, baseSplitTick, *branchInfoAfter.SplitTick)
+	require.Equal(t, baseSplitTimestamp, *branchInfoAfter.SplitTimestamp)
 
 	baseAircraft, err := svc.Aircrafts(services.BaseSimulationID)
 	require.NoError(t, err)

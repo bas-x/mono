@@ -170,13 +170,15 @@ func TestBranchSimulationEndpointAndBranchReads(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, http.StatusCreated, resp.StatusCode)
 
-	var created struct {
-		ID string `json:"id"`
-	}
+	var created services.SimulationInfo
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&created))
 	resp.Body.Close()
 	require.NotEmpty(t, created.ID)
 	require.NotEqual(t, services.BaseSimulationID, created.ID)
+	require.NotNil(t, created.ParentID)
+	require.Equal(t, services.BaseSimulationID, *created.ParentID)
+	require.NotNil(t, created.SplitTick)
+	require.NotNil(t, created.SplitTimestamp)
 
 	resp, err = http.Get(httpServer.URL + "/simulations/" + created.ID)
 	require.NoError(t, err)
@@ -186,6 +188,12 @@ func TestBranchSimulationEndpointAndBranchReads(t *testing.T) {
 	var branchInfo services.SimulationInfo
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&branchInfo))
 	require.Equal(t, created.ID, branchInfo.ID)
+	require.NotNil(t, branchInfo.ParentID)
+	require.Equal(t, services.BaseSimulationID, *branchInfo.ParentID)
+	require.NotNil(t, branchInfo.SplitTick)
+	require.NotNil(t, branchInfo.SplitTimestamp)
+	require.Equal(t, *created.SplitTick, *branchInfo.SplitTick)
+	require.Equal(t, *created.SplitTimestamp, *branchInfo.SplitTimestamp)
 
 	resp, err = http.Get(httpServer.URL + "/simulations/" + created.ID + "/aircrafts")
 	require.NoError(t, err)
@@ -236,10 +244,29 @@ func TestGetSimulationEndpoint(t *testing.T) {
 	require.False(t, payload.Paused)
 	require.Zero(t, payload.Tick)
 	require.False(t, payload.Timestamp.IsZero())
+	require.Nil(t, payload.ParentID)
+	require.Nil(t, payload.SplitTick)
+	require.Nil(t, payload.SplitTimestamp)
+
+	branchID, err := deps.SimulationService.BranchSimulation(services.BaseSimulationID)
+	require.NoError(t, err)
+
+	resp, err = http.Get(httpServer.URL + "/simulations/" + branchID)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var branchPayload services.SimulationInfo
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&branchPayload))
+	require.Equal(t, branchID, branchPayload.ID)
+	require.NotNil(t, branchPayload.ParentID)
+	require.Equal(t, services.BaseSimulationID, *branchPayload.ParentID)
+	require.NotNil(t, branchPayload.SplitTick)
+	require.NotNil(t, branchPayload.SplitTimestamp)
 
 	resp, err = http.Get(httpServer.URL + "/simulations/branch-a")
 	require.NoError(t, err)
-	defer resp.Body.Close()
+	resp.Body.Close()
 	require.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 

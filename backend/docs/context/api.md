@@ -103,7 +103,10 @@
   "running": true,
   "paused": false,
   "tick": 42,
-  "timestamp": "2026-03-12T03:15:05Z"
+  "timestamp": "2026-03-12T03:15:05Z",
+  "parentId": null,
+  "splitTick": null,
+  "splitTimestamp": null
 }
 ```
 - **Response** `404`: simulation not found
@@ -116,13 +119,20 @@
 
 ```json
 {
-  "id": "7f3c2d1a9b8e6f10"
+  "id": "7f3c2d1a9b8e6f10",
+  "running": false,
+  "paused": false,
+  "tick": 42,
+  "timestamp": "2026-03-12T03:15:05Z",
+  "parentId": "base",
+  "splitTick": 42,
+  "splitTimestamp": "2026-03-12T03:15:05Z"
 }
 ```
 
 - **Behavior**:
   - V1 only supports branching from `simulationId=base`.
-  - The returned `id` is the new branch simulation ID.
+  - The response is the new branch `SimulationInfo`, including lineage metadata.
 - **Response** `404`: simulation not found
 
 ### Start a simulation

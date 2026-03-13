@@ -162,9 +162,6 @@ func PostBranchSimulation(logger *log.Logger, deps *ServerDependencies) echo.Han
 	type request struct {
 		SimulationID string `param:"simulationId"`
 	}
-	type response struct {
-		ID string `json:"id"`
-	}
 
 	return func(c echo.Context) error {
 		req, err := bindAndValidate[request](c)
@@ -181,7 +178,13 @@ func PostBranchSimulation(logger *log.Logger, deps *ServerDependencies) echo.Han
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to branch simulation")
 		}
 
-		return c.JSON(http.StatusCreated, response{ID: branchID})
+		simulationInfo, err := deps.SimulationService.Simulation(branchID)
+		if err != nil {
+			logger.Error("load branched simulation", "branchId", branchID, "err", err)
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to load branched simulation")
+		}
+
+		return c.JSON(http.StatusCreated, simulationInfo)
 	}
 }
 

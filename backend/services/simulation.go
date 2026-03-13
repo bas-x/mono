@@ -42,12 +42,15 @@ type SimulationService struct {
 }
 
 type managedSimulation struct {
-	sim       *simulation.Simulation
-	runner    *simulation.ControlledRunner
-	cancel    context.CancelFunc
-	running   bool
-	paused    bool
-	untilTick int64
+	sim            *simulation.Simulation
+	runner         *simulation.ControlledRunner
+	cancel         context.CancelFunc
+	running        bool
+	paused         bool
+	untilTick      int64
+	parentID       *string
+	splitTick      *uint64
+	splitTimestamp *time.Time
 }
 
 type BaseSimulationConfig struct {
@@ -57,12 +60,15 @@ type BaseSimulationConfig struct {
 }
 
 type SimulationInfo struct {
-	ID        string    `json:"id"`
-	Running   bool      `json:"running"`
-	Paused    bool      `json:"paused"`
-	Tick      uint64    `json:"tick"`
-	Timestamp time.Time `json:"timestamp"`
-	UntilTick int64     `json:"untilTick,omitempty"`
+	ID             string     `json:"id"`
+	Running        bool       `json:"running"`
+	Paused         bool       `json:"paused"`
+	Tick           uint64     `json:"tick"`
+	Timestamp      time.Time  `json:"timestamp"`
+	ParentID       *string    `json:"parentId"`
+	SplitTick      *uint64    `json:"splitTick"`
+	SplitTimestamp *time.Time `json:"splitTimestamp"`
+	UntilTick      int64      `json:"untilTick,omitempty"`
 }
 
 func NewSimulationService(cfg SimulationServiceConfig) *SimulationService {
@@ -110,14 +116,22 @@ func (s *SimulationService) BranchSimulation(simulationID string) (string, error
 		return "", err
 	}
 
-	branchSim := s.base.sim.Clone()
+	baseSnapshot := base.sim
+	parentID := BaseSimulationID
+	splitTick := baseSnapshot.Tick()
+	splitTimestamp := baseSnapshot.Now()
+
+	branchSim := baseSnapshot.Clone()
 	resetSimulationHooks(branchSim)
 	s.registerHooks(branchID, branchSim)
 	s.branches[branchID] = &managedSimulation{
-		sim:       branchSim,
-		running:   wasRunning,
-		paused:    wasRunning,
-		untilTick: base.untilTick,
+		sim:            branchSim,
+		running:        wasRunning,
+		paused:         wasRunning,
+		untilTick:      base.untilTick,
+		parentID:       ptr(parentID),
+		splitTick:      ptr(splitTick),
+		splitTimestamp: ptr(splitTimestamp),
 	}
 
 	return branchID, nil
@@ -460,6 +474,9 @@ func simulationInfoFromManaged(id string, managed *managedSimulation) Simulation
 	}
 	info.Running = managed.running
 	info.Paused = managed.paused
+	info.ParentID = managed.parentID
+	info.SplitTick = managed.splitTick
+	info.SplitTimestamp = managed.splitTimestamp
 	info.UntilTick = managed.untilTick
 	if managed.sim != nil {
 		info.Tick = managed.sim.Tick()
