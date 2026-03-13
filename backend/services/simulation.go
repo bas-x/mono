@@ -14,6 +14,10 @@ import (
 var (
 	ErrBaseAlreadyExists    = errors.New("simulation service: base already exists")
 	ErrBaseNotFound         = errors.New("simulation service: base not found")
+	ErrAircraftNotFound     = errors.New("simulation service: aircraft not found")
+	ErrInvalidTailNumber    = errors.New("simulation service: invalid tail number")
+	ErrInvalidBaseID        = errors.New("simulation service: invalid base id")
+	ErrAssignmentTooLate    = errors.New("simulation service: assignment override too late")
 	ErrSimulationRunning    = errors.New("simulation service: simulation already running")
 	ErrSimulationNotRunning = errors.New("simulation service: simulation not running")
 	ErrSimulationPaused     = errors.New("simulation service: simulation already paused")
@@ -367,6 +371,64 @@ func (s *SimulationService) Threats(simulationID string) ([]Threat, error) {
 	return threats, nil
 }
 
+func (s *SimulationService) OverrideAssignment(simulationID, tailNumber, baseID string) (Aircraft, Assignment, error) {
+	managed, err := s.managedSimulationByID(simulationID)
+	if err != nil {
+		return Aircraft{}, Assignment{}, err
+	}
+	if managed.sim == nil {
+		return Aircraft{}, Assignment{}, ErrSimulationNotFound
+	}
+
+	tail, err := parseTailNumber(tailNumber)
+	if err != nil {
+		return Aircraft{}, Assignment{}, err
+	}
+	targetBase, err := parseBaseID(baseID)
+	if err != nil {
+		return Aircraft{}, Assignment{}, err
+	}
+
+	aircraft, ok := findAircraftByTail(managed.sim.Aircrafts(), tail)
+	if !ok {
+		return Aircraft{}, Assignment{}, ErrAircraftNotFound
+	}
+	if aircraft.HasAssignment && aircraft.State.Name() != "Inbound" {
+		return Aircraft{}, Assignment{}, ErrAssignmentTooLate
+	}
+	if !aircraft.HasAssignment {
+		if _, err := managed.sim.RequestLanding(tail); err != nil {
+			return Aircraft{}, Assignment{}, err
+		}
+	}
+
+	updatedAssignment, err := managed.sim.OverrideLandingAssignment(tail, targetBase)
+	if err != nil {
+		if errors.Is(err, simulation.ErrInboundNotRegistered) {
+			return Aircraft{}, Assignment{}, ErrAssignmentTooLate
+		}
+		return Aircraft{}, Assignment{}, err
+	}
+
+	updatedAircraft, ok := findAircraftByTail(managed.sim.Aircrafts(), tail)
+	if !ok {
+		return Aircraft{}, Assignment{}, ErrAircraftNotFound
+	}
+	mappedAircraft := mapAircraft(updatedAircraft)
+	if mappedAircraft.AssignedTo == nil {
+		mappedAircraft.AssignedTo = ptr(hex.EncodeToString(updatedAssignment.Base[:]))
+	}
+
+	return mappedAircraft, Assignment{
+		Base:   hex.EncodeToString(updatedAssignment.Base[:]),
+		Source: mapAssignmentSource(updatedAssignment.Source),
+	}, nil
+}
+
+func ptr[T any](value T) *T {
+	return &value
+}
+
 func (s *SimulationService) Simulations() []SimulationInfo {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -509,6 +571,41 @@ func simulationIDFromManaged(s *SimulationService, managed *managedSimulation) s
 		}
 	}
 	return BaseSimulationID
+}
+
+func parseTailNumber(raw string) (simulation.TailNumber, error) {
+	decoded, err := hex.DecodeString(raw)
+	if err != nil {
+		return simulation.TailNumber{}, ErrInvalidTailNumber
+	}
+	if len(decoded) != len(simulation.TailNumber{}) {
+		return simulation.TailNumber{}, ErrInvalidTailNumber
+	}
+	var tail simulation.TailNumber
+	copy(tail[:], decoded)
+	return tail, nil
+}
+
+func parseBaseID(raw string) (simulation.BaseID, error) {
+	decoded, err := hex.DecodeString(raw)
+	if err != nil {
+		return simulation.BaseID{}, ErrInvalidBaseID
+	}
+	if len(decoded) != len(simulation.BaseID{}) {
+		return simulation.BaseID{}, ErrInvalidBaseID
+	}
+	var base simulation.BaseID
+	copy(base[:], decoded)
+	return base, nil
+}
+
+func findAircraftByTail(aircrafts []simulation.Aircraft, tail simulation.TailNumber) (simulation.Aircraft, bool) {
+	for _, aircraft := range aircrafts {
+		if aircraft.TailNumber == tail {
+			return aircraft, true
+		}
+	}
+	return simulation.Aircraft{}, false
 }
 
 func resetSimulationHooks(sim *simulation.Simulation) {

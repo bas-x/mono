@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/hex"
+	"math/rand/v2"
 	"testing"
 	"time"
 
@@ -285,6 +286,152 @@ func TestSimulationService_RunnerStopsWhenUntilTickReached(t *testing.T) {
 	}, 2*time.Second, 10*time.Millisecond)
 }
 
+func TestSimulationServiceOverrideAssignmentBeforeCommit(t *testing.T) {
+	t.Parallel()
+
+	svc := NewSimulationService(SimulationServiceConfig{})
+	options := inboundOverrideTestOptions()
+	_, err := svc.CreateBaseSimulation(BaseSimulationConfig{Options: options})
+	require.NoError(t, err)
+
+	require.NoError(t, svc.StepSimulation(BaseSimulationID))
+
+	aircrafts, err := svc.Aircrafts(BaseSimulationID)
+	require.NoError(t, err)
+	require.Len(t, aircrafts, 1)
+	require.Equal(t, "Inbound", aircrafts[0].State)
+	require.Nil(t, aircrafts[0].AssignedTo)
+	tail := aircrafts[0].TailNumber
+	bases, err := svc.Airbases(BaseSimulationID)
+	require.NoError(t, err)
+	require.Len(t, bases, 2)
+	targetBase := bases[1].ID
+
+	aircraft, assignment, err := svc.OverrideAssignment(BaseSimulationID, tail, targetBase)
+	require.NoError(t, err)
+	require.Equal(t, tail, aircraft.TailNumber)
+	require.NotNil(t, aircraft.AssignedTo)
+	require.Equal(t, targetBase, *aircraft.AssignedTo)
+	require.Equal(t, targetBase, assignment.Base)
+	require.Equal(t, "human", assignment.Source)
+}
+
+func TestSimulationServiceOverrideAssignmentAfterCommitRejected(t *testing.T) {
+	t.Parallel()
+
+	svc := NewSimulationService(SimulationServiceConfig{})
+	options := inboundOverrideTestOptions()
+	_, err := svc.CreateBaseSimulation(BaseSimulationConfig{Options: options})
+	require.NoError(t, err)
+
+	for i := 0; i < 2; i++ {
+		require.NoError(t, svc.StepSimulation(BaseSimulationID))
+	}
+
+	aircrafts, err := svc.Aircrafts(BaseSimulationID)
+	require.NoError(t, err)
+	require.Len(t, aircrafts, 1)
+	require.Equal(t, "Committed", aircrafts[0].State)
+	tail := aircrafts[0].TailNumber
+	bases, err := svc.Airbases(BaseSimulationID)
+	require.NoError(t, err)
+	require.Len(t, bases, 2)
+	targetBase := bases[1].ID
+
+	_, _, err = svc.OverrideAssignment(BaseSimulationID, tail, targetBase)
+	require.Error(t, err)
+}
+
+func TestSimulationServiceOverrideAssignmentRejectsInvalidTailNumber(t *testing.T) {
+	t.Parallel()
+
+	svc := NewSimulationService(SimulationServiceConfig{})
+	_, err := svc.CreateBaseSimulation(BaseSimulationConfig{Options: inboundOverrideTestOptions()})
+	require.NoError(t, err)
+
+	bases, err := svc.Airbases(BaseSimulationID)
+	require.NoError(t, err)
+	require.Len(t, bases, 2)
+
+	_, _, err = svc.OverrideAssignment(BaseSimulationID, "not-hex", bases[1].ID)
+	require.ErrorIs(t, err, ErrInvalidTailNumber)
+}
+
+func TestSimulationServiceOverrideAssignmentRejectsInvalidBaseID(t *testing.T) {
+	t.Parallel()
+
+	svc := NewSimulationService(SimulationServiceConfig{})
+	_, err := svc.CreateBaseSimulation(BaseSimulationConfig{Options: inboundOverrideTestOptions()})
+	require.NoError(t, err)
+
+	aircrafts, err := svc.Aircrafts(BaseSimulationID)
+	require.NoError(t, err)
+	require.Len(t, aircrafts, 1)
+
+	_, _, err = svc.OverrideAssignment(BaseSimulationID, aircrafts[0].TailNumber, "not-hex")
+	require.ErrorIs(t, err, ErrInvalidBaseID)
+}
+
+func TestSimulationServiceOverrideAssignmentRejectsUnknownAircraft(t *testing.T) {
+	t.Parallel()
+
+	svc := NewSimulationService(SimulationServiceConfig{})
+	_, err := svc.CreateBaseSimulation(BaseSimulationConfig{Options: inboundOverrideTestOptions()})
+	require.NoError(t, err)
+
+	bases, err := svc.Airbases(BaseSimulationID)
+	require.NoError(t, err)
+	require.Len(t, bases, 2)
+
+	_, _, err = svc.OverrideAssignment(BaseSimulationID, "ffffffffffffffff", bases[1].ID)
+	require.ErrorIs(t, err, ErrAircraftNotFound)
+}
+
+func TestSimulationServiceOverrideAssignmentRejectsUnknownBase(t *testing.T) {
+	t.Parallel()
+
+	svc := NewSimulationService(SimulationServiceConfig{})
+	_, err := svc.CreateBaseSimulation(BaseSimulationConfig{Options: inboundOverrideTestOptions()})
+	require.NoError(t, err)
+
+	aircrafts, err := svc.Aircrafts(BaseSimulationID)
+	require.NoError(t, err)
+	require.Len(t, aircrafts, 1)
+
+	_, _, err = svc.OverrideAssignment(BaseSimulationID, aircrafts[0].TailNumber, "ffffffffffffffff")
+	require.ErrorIs(t, err, simulation.ErrAirbaseNotFound)
+}
+
+func TestSimulationServiceOverrideAssignmentAllowsRepeatedOverrideBeforeCommit(t *testing.T) {
+	t.Parallel()
+
+	svc := NewSimulationService(SimulationServiceConfig{})
+	_, err := svc.CreateBaseSimulation(BaseSimulationConfig{Options: inboundOverrideTestOptions()})
+	require.NoError(t, err)
+	require.NoError(t, svc.StepSimulation(BaseSimulationID))
+
+	aircrafts, err := svc.Aircrafts(BaseSimulationID)
+	require.NoError(t, err)
+	require.Len(t, aircrafts, 1)
+	bases, err := svc.Airbases(BaseSimulationID)
+	require.NoError(t, err)
+	require.Len(t, bases, 2)
+
+	firstAircraft, firstAssignment, err := svc.OverrideAssignment(BaseSimulationID, aircrafts[0].TailNumber, bases[1].ID)
+	require.NoError(t, err)
+	require.NotNil(t, firstAircraft.AssignedTo)
+	require.Equal(t, bases[1].ID, *firstAircraft.AssignedTo)
+	require.Equal(t, bases[1].ID, firstAssignment.Base)
+	require.Equal(t, "human", firstAssignment.Source)
+
+	secondAircraft, secondAssignment, err := svc.OverrideAssignment(BaseSimulationID, aircrafts[0].TailNumber, bases[0].ID)
+	require.NoError(t, err)
+	require.NotNil(t, secondAircraft.AssignedTo)
+	require.Equal(t, bases[0].ID, *secondAircraft.AssignedTo)
+	require.Equal(t, bases[0].ID, secondAssignment.Base)
+	require.Equal(t, "human", secondAssignment.Source)
+}
+
 func testSimulationOptions(numBases, numAircraft uint) *simulation.SimulationOptions {
 	return &simulation.SimulationOptions{
 		ConstellationOpts: simulation.ConstellationOptions{
@@ -301,6 +448,29 @@ func testSimulationOptions(numBases, numAircraft uint) *simulation.SimulationOpt
 			NeedsMax:    2,
 		},
 	}
+}
+
+func inboundOverrideTestOptions() *simulation.SimulationOptions {
+	options := testSimulationOptions(2, 1)
+	options.FleetOpts.StateFactory = func(_ *rand.Rand) simulation.AircraftState {
+		return &simulation.InboundState{}
+	}
+	options.LifecycleOpts = &simulation.LifecycleModel{
+		Durations: simulation.PhaseDurations{
+			Outbound:        5 * time.Second,
+			Engaged:         5 * time.Second,
+			InboundDecision: 3 * time.Second,
+			CommitApproach:  4 * time.Second,
+			Servicing:       6 * time.Second,
+			Ready:           2 * time.Second,
+		},
+		ReturnThreshold: 80,
+		NeedRates: map[simulation.NeedType]simulation.NeedRateModel{
+			simulation.NeedFuel:      {OutboundMilliPerHour: 18000000, EngagedMilliPerHour: 18000000, ServicingMilliPerHour: 28800000, VariancePermille: 0},
+			simulation.NeedMunitions: {OutboundMilliPerHour: 18000000, EngagedMilliPerHour: 18000000, ServicingMilliPerHour: 18000000, VariancePermille: 0},
+		},
+	}
+	return options
 }
 
 func waitForStepEvent(t *testing.T, ch <-chan Event, timeout time.Duration) SimulationStepEvent {

@@ -50,6 +50,11 @@ type AircraftPositionSnapshot struct {
 	Needs      []Need `json:"needs"`
 }
 
+type Assignment struct {
+	Base   string `json:"base"`
+	Source string `json:"source"`
+}
+
 func mapAirbase(input simulation.Airbase) Airbase {
 	var metadata map[string]any
 	if input.Metadata != nil {
