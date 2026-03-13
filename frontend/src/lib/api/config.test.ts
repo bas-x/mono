@@ -25,6 +25,7 @@ describe('parseApiConfigFromEnv', () => {
     expect(parseApiConfigFromEnv()).toEqual({
       apiBaseUrl: 'https://basex.shigure.joshuadematas.me',
       wsBaseUrl: 'wss://basex.shigure.joshuadematas.me',
+      mode: 'mock',
       useMock: true,
     });
   });
@@ -37,6 +38,7 @@ describe('parseApiConfigFromEnv', () => {
     expect(parseApiConfigFromEnv()).toEqual({
       apiBaseUrl: 'https://example.com',
       wsBaseUrl: 'wss://example.com',
+      mode: 'remote',
       useMock: false,
     });
   });
