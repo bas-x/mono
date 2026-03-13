@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { TimelineControls } from './TimelineControls';
 import { TimelineTrack } from './TimelineTrack';
 import { useSimulationControls } from '../../hooks/useSimulationControls';
@@ -25,6 +25,37 @@ export function SimulationTimeline({
   const currentTick = isRunning ? (simulationState.tick ?? 0) : 0;
   const maxTick = isRunning ? (simulationState.maxTick ?? currentTick) : 0;
   const playbackTick = isRunning ? (simulationState.playbackTick ?? null) : null;
+
+  useEffect(() => {
+    if (!isRunning) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        e.preventDefault();
+        
+        const step = e.shiftKey ? 10 : 1;
+        const startTick = playbackTick !== null ? playbackTick : currentTick;
+        let newTick;
+
+        if (e.key === 'ArrowLeft') {
+          newTick = Math.max(0, startTick - step);
+        } else {
+          newTick = Math.min(maxTick, startTick + step);
+        }
+
+        if (newTick >= maxTick) {
+          setPlaybackTick(null);
+        } else {
+          setPlaybackTick(newTick);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isRunning, currentTick, maxTick, playbackTick, setPlaybackTick]);
 
   const [filters, setFilters] = useState<Record<string, boolean>>({
     simulation_step: false,
