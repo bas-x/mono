@@ -2,6 +2,7 @@ import { SiOpenlayers } from 'react-icons/si';
 import { HiOutlineLightningBolt, HiOutlineServer, HiOutlineDesktopComputer } from 'react-icons/hi';
 import { useApi } from '@/lib/api';
 import type { ApiMode } from '@/lib/api/types';
+import logoSrc from '@/assets/logo.png';
 
 export function Navbar() {
   const { config, setMode } = useApi();
@@ -47,9 +48,13 @@ export function Navbar() {
         <div className="flex w-full flex-col items-center gap-3">
           <div
             aria-label="Bas X"
-            className="shell-panel-soft flex h-12 w-12 items-center justify-center rounded-md border border-border text-center text-[0.68rem] font-semibold uppercase tracking-[0.24em] text-text"
+            className="flex h-12 w-12 items-center justify-center rounded-lg border border-white/[0.08] bg-gradient-to-b from-white/[0.06] to-transparent p-1.5 shadow-[0_0_12px_-3px_rgba(255,255,255,0.1),inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-white/[0.04]"
           >
-            bas x
+            <img
+              src={logoSrc}
+              alt="Bas X"
+              className="h-full w-full object-contain drop-shadow-[0_0_4px_rgba(255,255,255,0.15)]"
+            />
           </div>
         </div>
 
