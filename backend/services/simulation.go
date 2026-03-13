@@ -2,6 +2,7 @@ package services
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/hex"
 	errors "errors"
 	"sync"
@@ -30,6 +31,7 @@ type SimulationServiceConfig struct {
 type SimulationService struct {
 	mu          sync.RWMutex
 	base        *managedSimulation
+	clones      map[string]*managedSimulation
 	broadcaster *EventBroadcaster
 	resolution  time.Duration
 	runnerCfg   simulation.ControlledRunnerConfig
@@ -68,9 +70,61 @@ func NewSimulationService(cfg SimulationServiceConfig) *SimulationService {
 	}
 	return &SimulationService{
 		broadcaster: NewEventBroadcaster(0),
+		clones:      make(map[string]*managedSimulation),
 		resolution:  cfg.Resolution,
 		runnerCfg:   cfg.RunnerConfig,
 	}
+}
+
+func (s *SimulationService) CloneSimulation(simulationID string) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if simulationID != BaseSimulationID {
+		return "", ErrSimulationNotFound
+	}
+	if s.base == nil || s.base.sim == nil {
+		return "", ErrBaseNotFound
+	}
+
+	base := s.base
+	wasRunning := base.running && base.runner != nil
+	if base.running && base.runner != nil && !base.paused {
+		base.runner.Pause()
+		base.paused = true
+	}
+	if wasRunning {
+		base.running = true
+		base.paused = true
+	}
+
+	cloneID, err := s.generateCloneIDLocked()
+	if err != nil {
+		return "", err
+	}
+
+	cloneSim := s.base.sim.Clone()
+	resetSimulationHooks(cloneSim)
+	s.registerHooks(cloneID, cloneSim)
+	s.clones[cloneID] = &managedSimulation{
+		sim:     cloneSim,
+		running: wasRunning,
+		paused:  wasRunning,
+	}
+
+	return cloneID, nil
+}
+
+func (s *SimulationService) StepSimulation(simulationID string) error {
+	managed, err := s.managedSimulationByID(simulationID)
+	if err != nil {
+		return err
+	}
+	if managed.sim == nil {
+		return ErrSimulationNotFound
+	}
+	managed.sim.Step()
+	return nil
 }
 
 // CreateBaseSimulation instantiates the base simulation using the configured defaults.
@@ -190,7 +244,10 @@ func (s *SimulationService) ResetSimulation(simulationID string) error {
 	}
 	if s.base == managed {
 		s.base = nil
+		clear(s.clones)
+		return nil
 	}
+	delete(s.clones, simulationID)
 	return nil
 }
 
@@ -255,9 +312,12 @@ func (s *SimulationService) Simulations() []SimulationInfo {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	result := make([]SimulationInfo, 0, 1)
+	result := make([]SimulationInfo, 0, 1+len(s.clones))
 	if s.base != nil {
 		result = append(result, simulationInfoFromManaged(BaseSimulationID, s.base))
+	}
+	for id, managed := range s.clones {
+		result = append(result, simulationInfoFromManaged(id, managed))
 	}
 
 	return result
@@ -302,13 +362,42 @@ func (s *SimulationService) managedSimulationByID(simulationID string) (*managed
 func (s *SimulationService) managedSimulationByIDLocked(simulationID string) (*managedSimulation, error) {
 
 	if simulationID != BaseSimulationID {
-		return nil, ErrSimulationNotFound
+		managed, ok := s.clones[simulationID]
+		if !ok {
+			return nil, ErrSimulationNotFound
+		}
+		return managed, nil
 	}
 	if s.base == nil {
 		return nil, ErrBaseNotFound
 	}
 
 	return s.base, nil
+}
+
+func (s *SimulationService) generateCloneIDLocked() (string, error) {
+	for range 16 {
+		buf := make([]byte, 8)
+		if _, err := rand.Read(buf); err != nil {
+			return "", err
+		}
+		id := hex.EncodeToString(buf)
+		if id == "" || id == BaseSimulationID {
+			continue
+		}
+		if _, exists := s.clones[id]; exists {
+			continue
+		}
+		return id, nil
+	}
+	return "", errors.New("simulation service: failed to allocate clone id")
+}
+
+func resetSimulationHooks(sim *simulation.Simulation) {
+	if sim == nil {
+		return
+	}
+	sim.ResetHooksForClone()
 }
 
 func (s *SimulationService) Reset() {

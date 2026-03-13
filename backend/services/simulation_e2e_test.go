@@ -142,6 +142,238 @@ func TestSimulationServiceEndToEnd_StartSimulationAndStatus(t *testing.T) {
 	}
 }
 
+func TestSimulationServiceClone_BaseReturnsRandomNonBaseID(t *testing.T) {
+	t.Parallel()
+
+	svc := services.NewSimulationService(services.SimulationServiceConfig{Resolution: 10 * time.Minute})
+	_, err := svc.CreateBaseSimulation(services.BaseSimulationConfig{Options: safeSimulationOptions(1, 1)})
+	require.NoError(t, err)
+
+	cloneID, err := svc.CloneSimulation(services.BaseSimulationID)
+	require.NoError(t, err)
+	require.NotEmpty(t, cloneID)
+	require.NotEqual(t, services.BaseSimulationID, cloneID)
+
+	_, err = svc.Simulation(cloneID)
+	require.NoError(t, err)
+
+	list := svc.Simulations()
+	require.Len(t, list, 2)
+	require.Equal(t, services.BaseSimulationID, list[0].ID)
+	require.Equal(t, cloneID, list[1].ID)
+}
+
+func TestSimulationServiceClone_PausesSourceAndClone(t *testing.T) {
+	t.Parallel()
+
+	svc := services.NewSimulationService(services.SimulationServiceConfig{
+		RunnerConfig: simulation.ControlledRunnerConfig{TicksPerSecond: 128},
+	})
+	_, err := svc.CreateBaseSimulation(services.BaseSimulationConfig{Options: safeSimulationOptions(1, 1)})
+	require.NoError(t, err)
+	require.NoError(t, svc.StartSimulation(services.BaseSimulationID))
+
+	cloneID, err := svc.CloneSimulation(services.BaseSimulationID)
+	require.NoError(t, err)
+
+	baseInfo, err := svc.Simulation(services.BaseSimulationID)
+	require.NoError(t, err)
+	cloneInfo, err := svc.Simulation(cloneID)
+	require.NoError(t, err)
+
+	require.True(t, baseInfo.Paused)
+	require.True(t, cloneInfo.Paused)
+	require.True(t, baseInfo.Running)
+	require.True(t, cloneInfo.Running)
+}
+
+func TestSimulationServiceClone_IdleBaseRemainsStartableAfterClone(t *testing.T) {
+	t.Parallel()
+
+	svc := services.NewSimulationService(services.SimulationServiceConfig{
+		RunnerConfig: simulation.ControlledRunnerConfig{TicksPerSecond: 128},
+	})
+	_, err := svc.CreateBaseSimulation(services.BaseSimulationConfig{Options: safeSimulationOptions(1, 1)})
+	require.NoError(t, err)
+
+	cloneID, err := svc.CloneSimulation(services.BaseSimulationID)
+	require.NoError(t, err)
+	require.NotEmpty(t, cloneID)
+
+	baseInfo, err := svc.Simulation(services.BaseSimulationID)
+	require.NoError(t, err)
+	cloneInfo, err := svc.Simulation(cloneID)
+	require.NoError(t, err)
+	require.False(t, baseInfo.Running)
+	require.False(t, baseInfo.Paused)
+	require.False(t, cloneInfo.Running)
+	require.False(t, cloneInfo.Paused)
+
+	require.NoError(t, svc.StartSimulation(services.BaseSimulationID))
+}
+
+func TestSimulationServiceClone_MissingBaseFails(t *testing.T) {
+	t.Parallel()
+
+	svc := services.NewSimulationService(services.SimulationServiceConfig{Resolution: 10 * time.Minute})
+
+	_, err := svc.CloneSimulation(services.BaseSimulationID)
+	require.ErrorIs(t, err, services.ErrBaseNotFound)
+}
+
+func TestSimulationServiceClone_NonBaseSimulationRejectedInV1(t *testing.T) {
+	t.Parallel()
+
+	svc := services.NewSimulationService(services.SimulationServiceConfig{Resolution: 10 * time.Minute})
+	_, err := svc.CreateBaseSimulation(services.BaseSimulationConfig{Options: safeSimulationOptions(1, 1)})
+	require.NoError(t, err)
+
+	_, err = svc.CloneSimulation("branch-a")
+	require.ErrorIs(t, err, services.ErrSimulationNotFound)
+}
+
+func TestSimulationServiceClone_ReadModelsAccessibleByCloneID(t *testing.T) {
+	t.Parallel()
+
+	svc := services.NewSimulationService(services.SimulationServiceConfig{Resolution: 10 * time.Minute})
+	_, err := svc.CreateBaseSimulation(services.BaseSimulationConfig{Options: safeSimulationOptions(2, 2)})
+	require.NoError(t, err)
+
+	cloneID, err := svc.CloneSimulation(services.BaseSimulationID)
+	require.NoError(t, err)
+
+	airbases, err := svc.Airbases(cloneID)
+	require.NoError(t, err)
+	require.Len(t, airbases, 2)
+
+	aircrafts, err := svc.Aircrafts(cloneID)
+	require.NoError(t, err)
+	require.Len(t, aircrafts, 2)
+
+	threats, err := svc.Threats(cloneID)
+	require.NoError(t, err)
+	require.NotNil(t, threats)
+}
+
+func TestSimulationServiceClone_EmitsCloneScopedEventsOnly(t *testing.T) {
+	t.Parallel()
+
+	svc := services.NewSimulationService(services.SimulationServiceConfig{Resolution: time.Second})
+	_, err := svc.CreateBaseSimulation(services.BaseSimulationConfig{
+		Seed:    [32]byte{9, 9, 9},
+		Options: positionTrackingSimulationOptions(2),
+	})
+	require.NoError(t, err)
+
+	cloneID, err := svc.CloneSimulation(services.BaseSimulationID)
+	require.NoError(t, err)
+
+	cloneInfo, err := svc.Simulation(cloneID)
+	require.NoError(t, err)
+	require.False(t, cloneInfo.Paused)
+	require.False(t, cloneInfo.Running)
+
+	clientID, rawEvents := svc.Broadcaster().Subscribe()
+	t.Cleanup(func() {
+		svc.Broadcaster().Unsubscribe(clientID)
+	})
+
+	deadline := time.After(2 * time.Second)
+	seenCloneStep := false
+	require.NoError(t, svc.StepSimulation(cloneID))
+	for !seenCloneStep {
+		select {
+		case raw := <-rawEvents:
+			step, ok := raw.(services.SimulationStepEvent)
+			if !ok {
+				continue
+			}
+			require.Equal(t, cloneID, step.SimulationID)
+			seenCloneStep = true
+		case <-deadline:
+			t.Fatal("expected clone-scoped step event")
+		}
+	}
+
+}
+
+func TestSimulationServiceClone_DeterministicParityAfterEquivalentAdvancement(t *testing.T) {
+	t.Parallel()
+
+	svc := services.NewSimulationService(services.SimulationServiceConfig{Resolution: time.Second})
+	_, err := svc.CreateBaseSimulation(services.BaseSimulationConfig{
+		Seed:    [32]byte{4, 5, 6},
+		Options: positionTrackingSimulationOptions(3),
+	})
+	require.NoError(t, err)
+
+	cloneID, err := svc.CloneSimulation(services.BaseSimulationID)
+	require.NoError(t, err)
+
+	for range 5 {
+		require.NoError(t, svc.StepSimulation(services.BaseSimulationID))
+		require.NoError(t, svc.StepSimulation(cloneID))
+	}
+
+	baseInfo, err := svc.Simulation(services.BaseSimulationID)
+	require.NoError(t, err)
+	cloneInfo, err := svc.Simulation(cloneID)
+	require.NoError(t, err)
+	require.Equal(t, baseInfo.Tick, cloneInfo.Tick)
+	require.Equal(t, baseInfo.Timestamp, cloneInfo.Timestamp)
+
+	baseAircraft, err := svc.Aircrafts(services.BaseSimulationID)
+	require.NoError(t, err)
+	cloneAircraft, err := svc.Aircrafts(cloneID)
+	require.NoError(t, err)
+	require.Equal(t, baseAircraft, cloneAircraft)
+
+	baseThreats, err := svc.Threats(services.BaseSimulationID)
+	require.NoError(t, err)
+	cloneThreats, err := svc.Threats(cloneID)
+	require.NoError(t, err)
+	require.Equal(t, baseThreats, cloneThreats)
+}
+
+func TestSimulationServiceClone_DeterministicEventIDsDoNotDuplicateBaseID(t *testing.T) {
+	t.Parallel()
+
+	svc := services.NewSimulationService(services.SimulationServiceConfig{Resolution: time.Second})
+	_, err := svc.CreateBaseSimulation(services.BaseSimulationConfig{
+		Seed:    [32]byte{1, 3, 5},
+		Options: positionTrackingSimulationOptions(2),
+	})
+	require.NoError(t, err)
+
+	cloneID, err := svc.CloneSimulation(services.BaseSimulationID)
+	require.NoError(t, err)
+
+	clientID, rawEvents := svc.Broadcaster().Subscribe()
+	t.Cleanup(func() {
+		svc.Broadcaster().Unsubscribe(clientID)
+	})
+
+	require.NoError(t, svc.StepSimulation(cloneID))
+
+	deadline := time.After(time.Second)
+	cloneStepCount := 0
+	for cloneStepCount == 0 {
+		select {
+		case raw := <-rawEvents:
+			step, ok := raw.(services.SimulationStepEvent)
+			if !ok {
+				continue
+			}
+			require.NotEqual(t, services.BaseSimulationID, step.SimulationID)
+			require.Equal(t, cloneID, step.SimulationID)
+			cloneStepCount++
+		case <-deadline:
+			t.Fatal("expected clone step event without base simulation id")
+		}
+	}
+	require.Equal(t, 1, cloneStepCount)
+}
+
 func TestAllAircraftPositionsEventEmitted(t *testing.T) {
 	t.Parallel()
 

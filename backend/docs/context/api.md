@@ -239,5 +239,8 @@
 ## Notes
 
 - `simulationId` is already part of the path to support future branch simulations.
-- Current implementation supports only `simulationId=base`.
+- Current implementation supports `simulationId=base` plus service-generated clone IDs created from the base simulation.
+- Clone creation is currently a service-layer capability only; no HTTP clone endpoint exists yet.
+- First clone support is base simulation only; checkpoint-based branch creation and branch-from-branch workflows are not implemented.
+- Determinism guarantee: cloning copies the current simulation state and RNG state, so if base and clone advance equivalently after cloning they produce the same future behavior.
 - Airbase IDs and tail numbers are serialized as lowercase hex strings.
