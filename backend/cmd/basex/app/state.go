@@ -18,23 +18,24 @@ const (
 )
 
 type State struct {
-	Status            Status              `json:"status"`
-	SimulationID      string              `json:"simulationId,omitempty"`
-	Running           bool                `json:"running"`
-	Paused            bool                `json:"paused"`
-	Tick              uint64              `json:"tick"`
-	CurrentTime       time.Time           `json:"currentTime"`
-	Airbases          []services.Airbase  `json:"airbases"`
-	Aircraft          []services.Aircraft `json:"aircraft"`
-	Threats           []services.Threat   `json:"threats"`
-	ThreatActivity    []string            `json:"threatActivity,omitempty"`
-	SelectedKind      string              `json:"selectedKind,omitempty"`
-	SelectedAirbaseID string              `json:"selectedAirbaseId,omitempty"`
-	SelectedAircraft  string              `json:"selectedAircraftTail,omitempty"`
-	LastEventType     string              `json:"lastEventType,omitempty"`
-	EventLog          []string            `json:"eventLog,omitempty"`
-	RecentEvents      []string            `json:"recentEvents,omitempty"`
-	Error             string              `json:"error,omitempty"`
+	Status            Status                   `json:"status"`
+	Simulation        *services.SimulationInfo `json:"simulation,omitempty"`
+	SimulationID      string                   `json:"simulationId,omitempty"`
+	Running           bool                     `json:"running"`
+	Paused            bool                     `json:"paused"`
+	Tick              uint64                   `json:"tick"`
+	CurrentTime       time.Time                `json:"currentTime"`
+	Airbases          []services.Airbase       `json:"airbases"`
+	Aircraft          []services.Aircraft      `json:"aircraft"`
+	Threats           []services.Threat        `json:"threats"`
+	ThreatActivity    []string                 `json:"threatActivity,omitempty"`
+	SelectedKind      string                   `json:"selectedKind,omitempty"`
+	SelectedAirbaseID string                   `json:"selectedAirbaseId,omitempty"`
+	SelectedAircraft  string                   `json:"selectedAircraftTail,omitempty"`
+	LastEventType     string                   `json:"lastEventType,omitempty"`
+	EventLog          []string                 `json:"eventLog,omitempty"`
+	RecentEvents      []string                 `json:"recentEvents,omitempty"`
+	Error             string                   `json:"error,omitempty"`
 }
 
 func NewState() *State {
@@ -42,6 +43,8 @@ func NewState() *State {
 }
 
 func (s *State) SetSnapshot(info services.SimulationInfo, airbases []services.Airbase, aircraft []services.Aircraft, threats []services.Threat) {
+	infoCopy := info
+	s.Simulation = &infoCopy
 	s.SimulationID = info.ID
 	s.Running = info.Running
 	s.Paused = info.Paused
