@@ -82,6 +82,33 @@ func GetSimulation(logger *log.Logger, deps *ServerDependencies) echo.HandlerFun
 	}
 }
 
+func PostBranchSimulation(logger *log.Logger, deps *ServerDependencies) echo.HandlerFunc {
+	type request struct {
+		SimulationID string `param:"simulationId"`
+	}
+	type response struct {
+		ID string `json:"id"`
+	}
+
+	return func(c echo.Context) error {
+		req, err := bindAndValidate[request](c)
+		if err != nil {
+			return err
+		}
+
+		branchID, err := deps.SimulationService.BranchSimulation(req.SimulationID)
+		if err != nil {
+			if errors.Is(err, services.ErrBaseNotFound) || errors.Is(err, services.ErrSimulationNotFound) {
+				return echo.NewHTTPError(http.StatusNotFound, "simulation not found")
+			}
+			logger.Error("branch simulation", "simulationId", req.SimulationID, "err", err)
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to branch simulation")
+		}
+
+		return c.JSON(http.StatusCreated, response{ID: branchID})
+	}
+}
+
 func PostStartSimulation(logger *log.Logger, deps *ServerDependencies) echo.HandlerFunc {
 	type request struct {
 		SimulationID string `param:"simulationId"`

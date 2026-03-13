@@ -59,11 +59,30 @@
 ```
 - **Response** `404`: simulation not found
 
+### Branch a simulation
+
+- **Method**: `POST`
+- **Path**: `/simulations/:simulationId/branch`
+- **Response** `201`:
+
+```json
+{
+  "id": "7f3c2d1a9b8e6f10"
+}
+```
+
+- **Behavior**:
+  - V1 only supports branching from `simulationId=base`.
+  - The returned `id` is the new branch simulation ID.
+- **Response** `404`: simulation not found
+
 ### Start a simulation
 
 - **Method**: `POST`
 - **Path**: `/simulations/:simulationId/start`
 - **Response** `202`: no body
+- **Behavior**:
+  - Validates the addressed simulation ID, then starts all non-running simulations.
 - **Response** `404`: simulation not found
 - **Response** `409`: simulation already running
 
@@ -72,6 +91,8 @@
 - **Method**: `POST`
 - **Path**: `/simulations/:simulationId/pause`
 - **Response** `202`: no body
+- **Behavior**:
+  - Validates the addressed simulation ID, then pauses all running simulations.
 - **Response** `404`: simulation not found
 - **Response** `409`: simulation not running or already paused
 
@@ -80,6 +101,8 @@
 - **Method**: `POST`
 - **Path**: `/simulations/:simulationId/resume`
 - **Response** `202`: no body
+- **Behavior**:
+  - Validates the addressed simulation ID, then resumes all paused running simulations.
 - **Response** `404`: simulation not found
 - **Response** `409`: simulation not running or not paused
 
@@ -238,9 +261,9 @@
 
 ## Notes
 
-- `simulationId` is already part of the path to support future branch simulations.
+- `simulationId` is part of the path for base and branch simulations.
 - Current implementation supports `simulationId=base` plus service-generated branch IDs created from the base simulation.
-- Branch creation is currently a service-layer capability only; no HTTP branch endpoint exists yet.
+- Branch creation is available over HTTP via `POST /simulations/:simulationId/branch`.
 - First branch support is base simulation only; checkpoint-based branch creation and branch-from-branch workflows are not implemented.
 - Determinism guarantee: branching copies the current simulation state and RNG state, so if base and branch advance equivalently after branching they produce the same future behavior.
 - The local tester now auto-creates the base simulation at startup, shows `Base` as the initial tab, and adds separate tabs for created branches.

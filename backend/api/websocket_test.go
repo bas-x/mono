@@ -148,6 +148,63 @@ func TestStartSimulationAndListSimulationsEndpoints(t *testing.T) {
 	require.Empty(t, listed.Simulations)
 }
 
+func TestBranchSimulationEndpointAndBranchReads(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	resp, err := http.Post(httpServer.URL+"/simulations/base", "application/json", bytes.NewBufferString(`{"seed":"demo-seed"}`))
+	require.NoError(t, err)
+	resp.Body.Close()
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	req, err := http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/branch", nil)
+	require.NoError(t, err)
+	resp, err = http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	var created struct {
+		ID string `json:"id"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&created))
+	resp.Body.Close()
+	require.NotEmpty(t, created.ID)
+	require.NotEqual(t, services.BaseSimulationID, created.ID)
+
+	resp, err = http.Get(httpServer.URL + "/simulations/" + created.ID)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var branchInfo services.SimulationInfo
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&branchInfo))
+	require.Equal(t, created.ID, branchInfo.ID)
+
+	resp, err = http.Get(httpServer.URL + "/simulations/" + created.ID + "/aircrafts")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var aircraftPayload struct {
+		Aircrafts []services.Aircraft `json:"aircrafts"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&aircraftPayload))
+	require.NotEmpty(t, aircraftPayload.Aircrafts)
+
+	req, err = http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/"+created.ID+"/branch", nil)
+	require.NoError(t, err)
+	resp, err = http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	resp.Body.Close()
+	require.Equal(t, http.StatusNotFound, resp.StatusCode)
+}
+
 func TestGetSimulationEndpoint(t *testing.T) {
 	t.Parallel()
 
@@ -261,6 +318,43 @@ func TestPauseResumeAndThreatEndpoints(t *testing.T) {
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&threatsPayload))
 	require.NotEmpty(t, threatsPayload.Threats)
 	require.NotZero(t, threatsPayload.Threats[0].Position.X+threatsPayload.Threats[0].Position.Y)
+}
+
+func TestBranchSimulationEventsWebSocketFiltersToBranch(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	deps.SimulationService = services.NewSimulationService(services.SimulationServiceConfig{Resolution: 10 * time.Minute})
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	_, err := deps.SimulationService.CreateBaseSimulation(services.BaseSimulationConfig{Options: websocketSafeOptions()})
+	require.NoError(t, err)
+
+	branchID, err := deps.SimulationService.BranchSimulation(services.BaseSimulationID)
+	require.NoError(t, err)
+
+	wsURL := "ws" + strings.TrimPrefix(httpServer.URL, "http") + "/ws/simulations/" + branchID + "/events"
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	require.NoError(t, deps.SimulationService.StepSimulation(services.BaseSimulationID))
+	require.NoError(t, deps.SimulationService.StepSimulation(branchID))
+
+	require.NoError(t, conn.SetReadDeadline(time.Now().Add(2*time.Second)))
+	for {
+		var payload map[string]any
+		err := conn.ReadJSON(&payload)
+		require.NoError(t, err)
+		require.Equal(t, branchID, payload["simulationId"])
+		if payload["type"] == services.EventTypeSimulationStep {
+			break
+		}
+	}
 }
 
 func TestCreateBaseSimulationProvidesGeneratedAircrafts(t *testing.T) {
