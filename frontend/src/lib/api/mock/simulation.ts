@@ -58,6 +58,14 @@ export function createMockSimulationServiceClient(): SimulationServiceClient {
       console.log('Mock: Starting simulation', simulationId);
     },
 
+    async pauseSimulation(simulationId: string) {
+      console.log('Mock: Pausing simulation', simulationId);
+    },
+
+    async resumeSimulation(simulationId: string) {
+      console.log('Mock: Resuming simulation', simulationId);
+    },
+
     async resetSimulation(simulationId: string) {
       console.log('Mock: Resetting simulation', simulationId);
     },

@@ -6,6 +6,12 @@ import { extractErrorMessage, getErrorStatus } from '@/lib/api/errors';
 import { useSimulationStream } from '@/lib/api/useSimulationStream';
 import type { SimulationAirbase, SimulationAircraft, SimulationEvent } from '@/lib/api/types';
 
+export type AircraftPosition = {
+  tailNumber: string;
+  position: { x: number; y: number };
+  state: string;
+};
+
 export type SimulationState =
   | { status: 'idle' }
   | { status: 'creating' }
@@ -16,6 +22,10 @@ export type SimulationState =
       aircrafts: SimulationAircraft[];
       tick?: number;
       time?: string;
+      aircraftPositions?: AircraftPosition[];
+      history: Record<number, { aircraftPositions?: AircraftPosition[], aircrafts: SimulationAircraft[] }>;
+      playbackTick?: number | null;
+      maxTick?: number;
     }
   | { status: 'error'; message: string };
 
@@ -36,10 +46,16 @@ export function useSimulation() {
       if (event.type === 'simulation_step') {
         setState((current) => {
           if (current.status !== 'running') return current;
+          const currentTick = event.tick as number;
           return {
             ...current,
-            tick: event.tick as number,
+            tick: currentTick,
+            maxTick: currentTick > (current.maxTick ?? 0) ? currentTick : current.maxTick,
             time: event.timestamp,
+            history: {
+              ...current.history,
+              [currentTick]: current.history[currentTick] || { aircrafts: current.aircrafts, aircraftPositions: current.aircraftPositions },
+            }
           };
         });
       } else if (event.type === 'aircraft_state_change') {
@@ -48,7 +64,15 @@ export function useSimulation() {
           const updatedAircrafts = current.aircrafts.map((a) =>
             a.tailNumber === event.tailNumber ? { ...a, ...event.aircraft } : a
           );
-          return { ...current, aircrafts: updatedAircrafts };
+          const currentTick = current.tick ?? 0;
+          return { 
+            ...current, 
+            aircrafts: updatedAircrafts,
+            history: {
+              ...current.history,
+              [currentTick]: { ...current.history[currentTick], aircrafts: updatedAircrafts }
+            }
+          };
         });
       } else if (event.type === 'landing_assignment') {
         setState((current) => {
@@ -56,7 +80,28 @@ export function useSimulation() {
           const updatedAircrafts = current.aircrafts.map((a) =>
             a.tailNumber === event.tailNumber ? { ...a, assignedTo: event.baseId } : a
           );
-          return { ...current, aircrafts: updatedAircrafts };
+          const currentTick = current.tick ?? 0;
+          return { 
+            ...current, 
+            aircrafts: updatedAircrafts,
+            history: {
+              ...current.history,
+              [currentTick]: { ...current.history[currentTick], aircrafts: updatedAircrafts }
+            }
+          };
+        });
+      } else if (event.type === 'all_aircraft_positions') {
+        setState((current) => {
+          if (current.status !== 'running') return current;
+          const currentTick = event.tick ?? current.tick ?? 0;
+          return { 
+            ...current, 
+            aircraftPositions: event.positions,
+            history: {
+              ...current.history,
+              [currentTick]: { ...current.history[currentTick], aircraftPositions: event.positions }
+            }
+          };
         });
       }
     });
@@ -91,6 +136,8 @@ export function useSimulation() {
         simulationId: id,
         airbases,
         aircrafts,
+        history: {},
+        playbackTick: null,
       });
       toast.success('Simulation loaded successfully');
     } catch (error) {
@@ -158,7 +205,7 @@ export function useSimulation() {
     if (state.status !== 'running') return;
     try {
       await clients.simulation.resetSimulation(state.simulationId);
-      await refreshData();
+      setState({ status: 'idle' });
       toast.success('Simulation reset successfully', {
         action: {
           label: 'Undo',
@@ -169,10 +216,26 @@ export function useSimulation() {
       const errorMessage = extractErrorMessage(error);
       toast.error(errorMessage);
     }
-  }, [clients.simulation, state, refreshData]);
+  }, [clients.simulation, state]);
+
+  const setPlaybackTick = useCallback((tick: number | null) => {
+    setState((current) => {
+      if (current.status !== 'running') return current;
+      return { ...current, playbackTick: tick };
+    });
+  }, []);
+
+  const visibleState = state.status === 'running' 
+    ? {
+        ...state,
+        aircrafts: state.playbackTick != null && state.history[state.playbackTick] ? state.history[state.playbackTick].aircrafts : state.aircrafts,
+        aircraftPositions: state.playbackTick != null && state.history[state.playbackTick] ? state.history[state.playbackTick].aircraftPositions : state.aircraftPositions,
+      } 
+    : state;
 
   return {
-    state,
+    state: visibleState,
+    setPlaybackTick,
     simulations,
     isLoadingSimulations,
     loadSimulation,

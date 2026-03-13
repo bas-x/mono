@@ -95,7 +95,7 @@ export function SimulationInfoCard({ simulationState, simulations = [] }: Simula
           <span className="mt-1 text-xs text-emerald-600/70">{dateString}</span>
         </div>
 
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-large bg-black">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg bg-black">
           <div className="flex items-center justify-between border-b border-[color:var(--color-shell-panel-border)] bg-[#111] px-2 py-3">
             <h3 className="m-0 flex items-center gap-2 text-sm font-medium text-white/90">
               <svg
