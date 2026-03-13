@@ -26,30 +26,30 @@ const BaseSimulationID = "base"
 type SimulationServiceConfig struct {
 	Resolution   time.Duration
 	RunnerConfig simulation.ControlledRunnerConfig
-	RunUntilTick int64
 }
 
 type SimulationService struct {
-	mu           sync.RWMutex
-	base         *managedSimulation
-	branches     map[string]*managedSimulation
-	broadcaster  *EventBroadcaster
-	resolution   time.Duration
-	runnerCfg    simulation.ControlledRunnerConfig
-	runUntilTick int64
+	mu          sync.RWMutex
+	base        *managedSimulation
+	branches    map[string]*managedSimulation
+	broadcaster *EventBroadcaster
+	resolution  time.Duration
+	runnerCfg   simulation.ControlledRunnerConfig
 }
 
 type managedSimulation struct {
-	sim     *simulation.Simulation
-	runner  *simulation.ControlledRunner
-	cancel  context.CancelFunc
-	running bool
-	paused  bool
+	sim       *simulation.Simulation
+	runner    *simulation.ControlledRunner
+	cancel    context.CancelFunc
+	running   bool
+	paused    bool
+	untilTick int64
 }
 
 type BaseSimulationConfig struct {
-	Seed    [32]byte
-	Options *simulation.SimulationOptions
+	Seed      [32]byte
+	Options   *simulation.SimulationOptions
+	UntilTick int64
 }
 
 type SimulationInfo struct {
@@ -71,11 +71,10 @@ func NewSimulationService(cfg SimulationServiceConfig) *SimulationService {
 		cfg.RunnerConfig.MaxCatchUpTicks = 5
 	}
 	return &SimulationService{
-		broadcaster:  NewEventBroadcaster(0),
-		branches:     make(map[string]*managedSimulation),
-		resolution:   cfg.Resolution,
-		runnerCfg:    cfg.RunnerConfig,
-		runUntilTick: cfg.RunUntilTick,
+		broadcaster: NewEventBroadcaster(0),
+		branches:    make(map[string]*managedSimulation),
+		resolution:  cfg.Resolution,
+		runnerCfg:   cfg.RunnerConfig,
 	}
 }
 
@@ -110,9 +109,10 @@ func (s *SimulationService) BranchSimulation(simulationID string) (string, error
 	resetSimulationHooks(branchSim)
 	s.registerHooks(branchID, branchSim)
 	s.branches[branchID] = &managedSimulation{
-		sim:     branchSim,
-		running: wasRunning,
-		paused:  wasRunning,
+		sim:       branchSim,
+		running:   wasRunning,
+		paused:    wasRunning,
+		untilTick: base.untilTick,
 	}
 
 	return branchID, nil
@@ -147,7 +147,7 @@ func (s *SimulationService) CreateBaseSimulation(cfg BaseSimulationConfig) (*sim
 	if err := sim.Init(options); err != nil {
 		return nil, err
 	}
-	s.base = &managedSimulation{sim: sim}
+	s.base = &managedSimulation{sim: sim, untilTick: cfg.UntilTick}
 	return sim, nil
 }
 
@@ -474,7 +474,7 @@ func (s *SimulationService) startManagedRunnerLocked(managed *managedSimulation)
 }
 
 func (s *SimulationService) runManagedSimulation(simulationID string, managed *managedSimulation, runner *simulation.ControlledRunner, ctx context.Context, sim *simulation.Simulation) {
-	runner.Run(ctx, sim, s.runUntilTick)
+	runner.Run(ctx, sim, managed.untilTick)
 	finishedNaturally := ctx.Err() == nil
 	finalTick := sim.Tick()
 	finalTime := sim.Now()

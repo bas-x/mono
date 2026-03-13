@@ -147,9 +147,8 @@ func TestSimulationServiceEndToEnd_EmitsSimulationEndedEvent(t *testing.T) {
 
 	svc := services.NewSimulationService(services.SimulationServiceConfig{
 		RunnerConfig: simulation.ControlledRunnerConfig{TicksPerSecond: 128},
-		RunUntilTick: 3,
 	})
-	_, err := svc.CreateBaseSimulation(services.BaseSimulationConfig{Options: safeSimulationOptions(1, 1)})
+	_, err := svc.CreateBaseSimulation(services.BaseSimulationConfig{Options: safeSimulationOptions(1, 1), UntilTick: 3})
 	require.NoError(t, err)
 
 	_, events := svc.Broadcaster().Subscribe()

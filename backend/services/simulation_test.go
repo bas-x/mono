@@ -274,9 +274,8 @@ func TestSimulationService_RunnerStopsWhenUntilTickReached(t *testing.T) {
 
 	svc := NewSimulationService(SimulationServiceConfig{
 		RunnerConfig: simulation.ControlledRunnerConfig{TicksPerSecond: 512},
-		RunUntilTick: 3,
 	})
-	_, err := svc.CreateBaseSimulation(BaseSimulationConfig{Options: testSimulationOptions(1, 1)})
+	_, err := svc.CreateBaseSimulation(BaseSimulationConfig{Options: testSimulationOptions(1, 1), UntilTick: 3})
 	require.NoError(t, err)
 
 	require.NoError(t, svc.StartSimulation(BaseSimulationID))
