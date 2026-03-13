@@ -50,6 +50,7 @@ Optional request fields:
 - `untilTick`
 - `simulationOptions`
   - supports `constellationOpts`, `fleetOpts`, `threatOpts`, and `lifecycleOpts`
+  - each group is optional; omitted groups use backend defaults
 
 Response:
 
@@ -92,7 +93,7 @@ Response:
     "state": "Inbound",
     "needs": [],
     "assignedTo": "3a5f...",
-    "position": {"x": 0, "y": 0}
+    "position": {"x": 132.45, "y": 611.08}
   },
   "assignment": {
     "base": "3a5f...",
@@ -117,6 +118,7 @@ Current event types:
 - `simulation_ended`
 - `aircraft_state_change`
 - `landing_assignment`
+- `all_aircraft_positions`
 
 ## Event Shapes
 
@@ -180,6 +182,27 @@ Current event types:
   "timestamp": "2026-03-11T18:00:08Z"
 }
 ```
+
+### All aircraft positions
+
+```json
+{
+  "type": "all_aircraft_positions",
+  "simulationId": "base",
+  "tick": 42,
+  "timestamp": "2026-03-11T18:00:00Z",
+  "positions": [
+    {
+      "tailNumber": "9b2e...",
+      "position": {"x": 132.45, "y": 611.08},
+      "state": "Ready",
+      "needs": []
+    }
+  ]
+}
+```
+
+`all_aircraft_positions` is emitted every simulation tick and mirrors the simulation state's current aircraft coordinates. Aircraft positions are initialized from generated airbase locations during simulation init, so websocket position snapshots no longer start at `{x:0,y:0}` by default.
 
 Notes:
 

@@ -59,6 +59,7 @@
 - **Behavior**:
   - `untilTick` is optional and stops the created simulation once that tick is reached.
   - `simulationOptions` is optional; if omitted, the backend uses the current default demo options.
+  - `simulationOptions` can be partial; omitted option groups (`constellationOpts`, `fleetOpts`, `threatOpts`, `lifecycleOpts`) inherit backend defaults instead of zero-values.
   - `needsPool` accepts: `fuel`, `charge`, `munitions`, `repairs`, `maintenance`, `mission_configuration`, `crew_support`, `emergency`, `weather_constraint`, `ground_support`, `protection`.
   - `lifecycleOpts.needRates` uses the same need keys as `needsPool`.
 
@@ -234,7 +235,7 @@
     "state": "Inbound",
     "needs": [],
     "assignedTo": "3a5f...",
-    "position": {"x": 0, "y": 0}
+    "position": {"x": 132.45, "y": 611.08}
   },
   "assignment": {
     "base": "3a5f...",
@@ -322,6 +323,23 @@
   "baseId": "3a5f...",
   "source": "algorithm",
   "timestamp": "2026-03-11T18:00:08Z"
+}
+```
+
+```json
+{
+  "type": "all_aircraft_positions",
+  "simulationId": "base",
+  "tick": 42,
+  "timestamp": "2026-03-11T18:00:00Z",
+  "positions": [
+    {
+      "tailNumber": "9b2e...",
+      "position": {"x": 132.45, "y": 611.08},
+      "state": "Ready",
+      "needs": []
+    }
+  ]
 }
 ```
 
