@@ -27,4 +27,25 @@ describe('createMockSimulationStreamClient', () => {
     client.disconnect();
     vi.useRealTimers();
   });
+
+  it('emits a richer mock event stream for the full scenario', () => {
+    vi.useFakeTimers();
+
+    const client = createMockSimulationStreamClient();
+    const eventTypes: string[] = [];
+
+    client.subscribe((event) => {
+      eventTypes.push(event.type);
+    });
+
+    client.connect('mock-full-sortie');
+    vi.advanceTimersByTime(250 + 1_500 * 6);
+
+    expect(eventTypes).toContain('all_aircraft_positions');
+    expect(eventTypes).toContain('landing_assignment');
+    expect(eventTypes).toContain('aircraft_state_change');
+
+    client.disconnect();
+    vi.useRealTimers();
+  });
 });

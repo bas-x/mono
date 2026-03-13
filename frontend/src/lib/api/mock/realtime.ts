@@ -4,34 +4,16 @@ import type {
   SimulationStreamClient,
   Unsubscribe,
 } from '@/lib/api/types';
+import { createMockEventTimestamp, getMockSimulationScenario } from '@/lib/api/mock/scenarios';
 
-const MOCK_RUN_ID = 'mock-run-001';
 const STEP_INTERVAL_MS = 1_500;
-
-type ScriptedSimulationEvent = {
-  type: string;
-  tick: number;
-};
-
-const SCRIPTED_EVENTS: ScriptedSimulationEvent[] = [
-  {
-    type: 'simulation_step',
-    tick: 1,
-  },
-  {
-    type: 'simulation_step',
-    tick: 2,
-  },
-  {
-    type: 'simulation_step',
-    tick: 3,
-  },
-];
 
 export function createMockSimulationStreamClient(): SimulationStreamClient {
   let connectionState: ConnectionState = 'idle';
   let connectTimer: ReturnType<typeof setTimeout> | null = null;
   let intervalTimer: ReturnType<typeof setInterval> | null = null;
+  let currentSimulationId = 'base';
+  let scriptedEvents = getMockSimulationScenario(currentSimulationId).events;
   let scriptIndex = 0;
 
   const eventSubscribers = new Set<(event: SimulationEvent) => void>();
@@ -57,15 +39,17 @@ export function createMockSimulationStreamClient(): SimulationStreamClient {
   }
 
   function emitNextEvent() {
-    const scriptedEvent = SCRIPTED_EVENTS[scriptIndex];
+    const scriptedEvent = scriptedEvents[scriptIndex];
     if (!scriptedEvent) {
+      clearTimers();
       return;
     }
 
     const event: SimulationEvent = {
+      type: String(scriptedEvent.type),
       ...scriptedEvent,
-      simulationId: MOCK_RUN_ID,
-      timestamp: new Date().toISOString(),
+      simulationId: currentSimulationId,
+      timestamp: createMockEventTimestamp(scriptedEvent.tick ?? scriptIndex, scriptIndex),
       sequence: scriptIndex + 1,
     };
 
@@ -73,13 +57,21 @@ export function createMockSimulationStreamClient(): SimulationStreamClient {
       handler(event);
     });
 
-    scriptIndex = (scriptIndex + 1) % SCRIPTED_EVENTS.length;
+    scriptIndex += 1;
+
+    if (scriptIndex >= scriptedEvents.length) {
+      clearTimers();
+    }
   }
 
   function connect(simulationId: string) {
     if (connectTimer || intervalTimer || connectionState === 'open') {
       return;
     }
+
+    currentSimulationId = simulationId;
+    scriptedEvents = getMockSimulationScenario(simulationId).events;
+    scriptIndex = 0;
 
     console.log('Mock: Connecting to simulation stream', simulationId);
     emitState('connecting');
