@@ -5,13 +5,13 @@ export type CheckboxOption = {
 };
 
 type CheckboxGroupProps = {
-  options: CheckboxOption[];
-  values: string[];
+  options: readonly CheckboxOption[];
+  values: readonly string[];
   onChange: (nextValues: string[]) => void;
   name: string;
 };
 
-function toggleValue(values: string[], value: string) {
+function toggleValue(values: readonly string[], value: string) {
   if (values.includes(value)) {
     return values.filter((entry) => entry !== value);
   }
