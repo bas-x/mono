@@ -1,10 +1,12 @@
 package simulation
 
 import (
+	"encoding/binary"
 	"math/rand/v2"
 	"time"
 
 	"github.com/bas-x/basex/assert"
+	"github.com/bas-x/basex/geometry"
 )
 
 type Simulation struct {
@@ -98,8 +100,29 @@ func (s *Simulation) Init(config *SimulationOptions) error {
 	if err := s.fleet.Init(s.env, fleetOpts); err != nil {
 		return err
 	}
+	s.initializeAircraftPositions()
 	s.AssertInvariants()
 	return nil
+}
+
+func (s *Simulation) initializeAircraftPositions() {
+	if s == nil || s.fleet == nil || len(s.fleet.aircrafts) == 0 || s.constellation == nil {
+		return
+	}
+
+	airbases := s.constellation.Airbases()
+	if len(airbases) == 0 {
+		return
+	}
+
+	for i := range s.fleet.aircrafts {
+		aircraft := &s.fleet.aircrafts[i]
+		if aircraft.Position != (geometry.Point{}) {
+			continue
+		}
+		baseIdx := int(binary.BigEndian.Uint64(aircraft.TailNumber[:]) % uint64(len(airbases)))
+		aircraft.Position = airbases[baseIdx].Location
+	}
 }
 
 func (s *Simulation) Step() {

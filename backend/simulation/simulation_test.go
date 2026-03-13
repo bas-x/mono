@@ -182,6 +182,36 @@ func TestSimulationInitFleet(t *testing.T) {
 	}
 }
 
+func TestSimulationInitFleetInitializesAircraftPositionsFromAirbases(t *testing.T) {
+	t.Parallel()
+	ts := New(time.Millisecond, WithEpoch(time.Unix(0, 1)))
+	sim := NewSimulator([32]byte{7, 7, 7}, ts)
+	opts := &SimulationOptions{
+		ConstellationOpts: ConstellationOptions{
+			IncludeRegions:    []string{"Blekinge"},
+			MinPerRegion:      1,
+			MaxPerRegion:      1,
+			MaxTotal:          1,
+			RegionProbability: prng.New(1, 1),
+		},
+		FleetOpts: FleetOptions{
+			AircraftMin: 2,
+			AircraftMax: 2,
+			NeedsMin:    0,
+			NeedsMax:    0,
+		},
+	}
+
+	require.NoError(t, sim.Init(opts))
+	bases := sim.Airbases()
+	require.Len(t, bases, 1)
+	require.NotEqual(t, geometry.Point{}, bases[0].Location)
+
+	for _, aircraft := range sim.Aircrafts() {
+		require.Equal(t, bases[0].Location, aircraft.Position)
+	}
+}
+
 func TestAircraftStateTransitions(t *testing.T) {
 	t.Parallel()
 	ts := New(time.Second, WithEpoch(time.Unix(0, 1)))
