@@ -98,14 +98,14 @@ func TestStartSimulationAndListSimulationsEndpoints(t *testing.T) {
 	_, err = deps.SimulationService.CreateBaseSimulation(services.BaseSimulationConfig{Options: websocketSafeOptions()})
 	require.NoError(t, err)
 
-	req, err := http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/start", nil)
+	req, err := http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/start", nil)
 	require.NoError(t, err)
 	resp, err = http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	resp.Body.Close()
 	require.Equal(t, http.StatusAccepted, resp.StatusCode)
 
-	req, err = http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/start", nil)
+	req, err = http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/start", nil)
 	require.NoError(t, err)
 	resp, err = http.DefaultClient.Do(req)
 	require.NoError(t, err)
@@ -267,14 +267,14 @@ func TestPauseResumeAndThreatEndpoints(t *testing.T) {
 	}})
 	require.NoError(t, err)
 
-	req, err := http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/start", nil)
+	req, err := http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/start", nil)
 	require.NoError(t, err)
 	resp, err := http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	resp.Body.Close()
 	require.Equal(t, http.StatusAccepted, resp.StatusCode)
 
-	req, err = http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/pause", nil)
+	req, err = http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/pause", nil)
 	require.NoError(t, err)
 	resp, err = http.DefaultClient.Do(req)
 	require.NoError(t, err)
@@ -290,14 +290,14 @@ func TestPauseResumeAndThreatEndpoints(t *testing.T) {
 	require.True(t, info.Running)
 	require.True(t, info.Paused)
 
-	req, err = http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/resume", nil)
+	req, err = http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/resume", nil)
 	require.NoError(t, err)
 	resp, err = http.DefaultClient.Do(req)
 	require.NoError(t, err)
 	resp.Body.Close()
 	require.Equal(t, http.StatusAccepted, resp.StatusCode)
 
-	req, err = http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/resume", nil)
+	req, err = http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/resume", nil)
 	require.NoError(t, err)
 	resp, err = http.DefaultClient.Do(req)
 	require.NoError(t, err)
@@ -318,6 +318,100 @@ func TestPauseResumeAndThreatEndpoints(t *testing.T) {
 	require.NoError(t, json.NewDecoder(resp.Body).Decode(&threatsPayload))
 	require.NotEmpty(t, threatsPayload.Threats)
 	require.NotZero(t, threatsPayload.Threats[0].Position.X+threatsPayload.Threats[0].Position.Y)
+}
+
+func TestGlobalLifecycleEndpointsApplyToBaseAndBranch(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	deps.SimulationService = services.NewSimulationService(services.SimulationServiceConfig{
+		RunnerConfig: simulation.ControlledRunnerConfig{TicksPerSecond: 128},
+	})
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	_, err := deps.SimulationService.CreateBaseSimulation(services.BaseSimulationConfig{Options: websocketSafeOptions()})
+	require.NoError(t, err)
+
+	branchID, err := deps.SimulationService.BranchSimulation(services.BaseSimulationID)
+	require.NoError(t, err)
+
+	req, err := http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/start", nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	resp.Body.Close()
+	require.Equal(t, http.StatusAccepted, resp.StatusCode)
+
+	require.Eventually(t, func() bool {
+		baseInfo, err := deps.SimulationService.Simulation(services.BaseSimulationID)
+		if err != nil {
+			return false
+		}
+		branchInfo, err := deps.SimulationService.Simulation(branchID)
+		if err != nil {
+			return false
+		}
+		return baseInfo.Running && !baseInfo.Paused && branchInfo.Running && !branchInfo.Paused
+	}, time.Second, 10*time.Millisecond)
+
+	req, err = http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/pause", nil)
+	require.NoError(t, err)
+	resp, err = http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	resp.Body.Close()
+	require.Equal(t, http.StatusAccepted, resp.StatusCode)
+
+	baseInfo, err := deps.SimulationService.Simulation(services.BaseSimulationID)
+	require.NoError(t, err)
+	branchInfo, err := deps.SimulationService.Simulation(branchID)
+	require.NoError(t, err)
+	require.True(t, baseInfo.Running)
+	require.True(t, baseInfo.Paused)
+	require.True(t, branchInfo.Running)
+	require.True(t, branchInfo.Paused)
+
+	req, err = http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/resume", nil)
+	require.NoError(t, err)
+	resp, err = http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	resp.Body.Close()
+	require.Equal(t, http.StatusAccepted, resp.StatusCode)
+
+	require.Eventually(t, func() bool {
+		baseInfo, err := deps.SimulationService.Simulation(services.BaseSimulationID)
+		if err != nil {
+			return false
+		}
+		branchInfo, err := deps.SimulationService.Simulation(branchID)
+		if err != nil {
+			return false
+		}
+		return baseInfo.Running && !baseInfo.Paused && branchInfo.Running && !branchInfo.Paused
+	}, time.Second, 10*time.Millisecond)
+}
+
+func TestGlobalLifecycleEndpointsReturnNotFoundWithoutBaseSimulation(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	for _, path := range []string{"/simulations/start", "/simulations/pause", "/simulations/resume"} {
+		req, err := http.NewRequest(http.MethodPost, httpServer.URL+path, nil)
+		require.NoError(t, err)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		resp.Body.Close()
+		require.Equal(t, http.StatusNotFound, resp.StatusCode, path)
+	}
 }
 
 func TestBranchSimulationEventsWebSocketFiltersToBranch(t *testing.T) {

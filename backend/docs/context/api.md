@@ -79,30 +79,30 @@
 ### Start a simulation
 
 - **Method**: `POST`
-- **Path**: `/simulations/:simulationId/start`
+- **Path**: `/simulations/start`
 - **Response** `202`: no body
 - **Behavior**:
-  - Validates the addressed simulation ID, then starts all non-running simulations.
+  - Starts all non-running simulations.
 - **Response** `404`: simulation not found
 - **Response** `409`: simulation already running
 
 ### Pause a simulation
 
 - **Method**: `POST`
-- **Path**: `/simulations/:simulationId/pause`
+- **Path**: `/simulations/pause`
 - **Response** `202`: no body
 - **Behavior**:
-  - Validates the addressed simulation ID, then pauses all running simulations.
+  - Pauses all running simulations.
 - **Response** `404`: simulation not found
 - **Response** `409`: simulation not running or already paused
 
 ### Resume a simulation
 
 - **Method**: `POST`
-- **Path**: `/simulations/:simulationId/resume`
+- **Path**: `/simulations/resume`
 - **Response** `202`: no body
 - **Behavior**:
-  - Validates the addressed simulation ID, then resumes all paused running simulations.
+  - Resumes all paused running simulations.
 - **Response** `404`: simulation not found
 - **Response** `409`: simulation not running or not paused
 
