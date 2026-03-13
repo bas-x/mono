@@ -48,7 +48,7 @@ export function Navbar() {
         <div className="flex w-full flex-col items-center gap-3">
           <div
             aria-label="Bas X"
-            className="flex h-12 w-12 items-center justify-center rounded-lg border border-white/[0.08] bg-gradient-to-b from-white/[0.06] to-transparent p-1.5 shadow-[0_0_12px_-3px_rgba(255,255,255,0.1),inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-white/[0.04]"
+            className="flex h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-b from-white/[0.06] to-transparent shadow-[0_0_12px_-3px_rgba(255,255,255,0.1),inset_0_1px_0_rgba(255,255,255,0.06)] ring-1 ring-white/[0.04]"
           >
             <img
               src={logoSrc}
