@@ -62,6 +62,7 @@ type SimulationInfo struct {
 	Paused    bool      `json:"paused"`
 	Tick      uint64    `json:"tick"`
 	Timestamp time.Time `json:"timestamp"`
+	UntilTick int64     `json:"untilTick,omitempty"`
 }
 
 func NewSimulationService(cfg SimulationServiceConfig) *SimulationService {
@@ -459,6 +460,7 @@ func simulationInfoFromManaged(id string, managed *managedSimulation) Simulation
 	}
 	info.Running = managed.running
 	info.Paused = managed.paused
+	info.UntilTick = managed.untilTick
 	if managed.sim != nil {
 		info.Tick = managed.sim.Tick()
 		info.Timestamp = managed.sim.Now()
