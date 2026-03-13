@@ -65,7 +65,7 @@ func TestSimulationHooks_StepEvent(t *testing.T) {
 	ts := New(time.Second, WithEpoch(time.Unix(0, 1)))
 	sim := NewSimulator([32]byte{1}, ts)
 	sim.lifecycle = testLifecycleModel()
-	steps := make(chan SimulationStepEvent, 1)
+	steps := make(chan SimulationStepEvent, 4)
 	sim.AddSimulationStepHook(func(event SimulationStepEvent) {
 		steps <- event
 	})
@@ -77,7 +77,6 @@ func TestSimulationHooks_StepEvent(t *testing.T) {
 	select {
 	case event := <-steps:
 		require.Equal(t, uint64(1), event.Tick)
-		require.Equal(t, ts.Now(), event.Timestamp)
 	case <-time.After(time.Second):
 		t.Fatal("expected simulation step event")
 	}

@@ -250,6 +250,7 @@ func TestSimulationLandingOverrideFlow(t *testing.T) {
 	baseB := BaseID{0, 0, 0, 0, 0, 0, 0, 2}
 	sim.constellation.airbases = []Airbase{{ID: baseA}, {ID: baseB}}
 	sim.dispatcher = NewDispatcher(sim.constellation, &RoundRobinAssigner{})
+	sim.bindInternalHooks()
 
 	tailA := TailNumber{0, 0, 0, 0, 0, 0, 0, 3}
 	tailB := TailNumber{0, 0, 0, 0, 0, 0, 0, 4}
@@ -308,6 +309,125 @@ func TestSimulationLandingOverrideFlow(t *testing.T) {
 	require.False(t, ok)
 	_, ok = sim.Dispatcher().AssignmentFor(tailB)
 	require.False(t, ok)
+}
+
+func TestSimulationLandingOverridePersistsThroughClone(t *testing.T) {
+	t.Parallel()
+	ts := New(time.Second, WithEpoch(time.Unix(0, 1)))
+	sim := NewSimulator([32]byte{9}, ts)
+	sim.lifecycle = testLifecycleModel()
+
+	baseA := BaseID{0, 0, 0, 0, 0, 0, 0, 1}
+	baseB := BaseID{0, 0, 0, 0, 0, 0, 0, 2}
+	sim.constellation.airbases = []Airbase{{ID: baseA}, {ID: baseB}}
+	sim.dispatcher = NewDispatcher(sim.constellation, &RoundRobinAssigner{})
+	sim.bindInternalHooks()
+
+	tail := TailNumber{0, 0, 0, 0, 0, 0, 0, 5}
+	_, err := sim.RequestLanding(tail)
+	require.NoError(t, err)
+
+	override, err := sim.OverrideLandingAssignment(tail, baseB)
+	require.NoError(t, err)
+	require.Equal(t, baseB, override.Base)
+	require.Equal(t, AssignmentSourceHuman, override.Source)
+
+	clone := sim.Clone()
+	require.NotNil(t, clone)
+
+	assignment, ok := clone.Dispatcher().AssignmentFor(tail)
+	require.True(t, ok)
+	require.Equal(t, baseB, assignment.Base)
+	require.Equal(t, AssignmentSourceHuman, assignment.Source)
+}
+
+func TestSimulationLandingOverrideEmitsHumanAssignmentEvent(t *testing.T) {
+	t.Parallel()
+	ts := New(time.Second, WithEpoch(time.Unix(0, 1)))
+	sim := NewSimulator([32]byte{10}, ts)
+	sim.lifecycle = testLifecycleModel()
+
+	baseA := BaseID{0, 0, 0, 0, 0, 0, 0, 1}
+	baseB := BaseID{0, 0, 0, 0, 0, 0, 0, 2}
+	sim.constellation.airbases = []Airbase{{ID: baseA}, {ID: baseB}}
+	sim.dispatcher = NewDispatcher(sim.constellation, &RoundRobinAssigner{})
+	sim.bindInternalHooks()
+
+	tail := TailNumber{0, 0, 0, 0, 0, 0, 0, 6}
+	events := make(chan LandingAssignmentEvent, 4)
+	sim.AddLandingAssignmentHook(func(event LandingAssignmentEvent) {
+		events <- event
+	})
+
+	_, err := sim.RequestLanding(tail)
+	require.NoError(t, err)
+	select {
+	case <-events:
+	case <-time.After(time.Second):
+		t.Fatal("expected initial landing assignment event")
+	}
+
+	override, err := sim.OverrideLandingAssignment(tail, baseB)
+	require.NoError(t, err)
+	require.Equal(t, baseB, override.Base)
+	require.Equal(t, AssignmentSourceHuman, override.Source)
+
+	select {
+	case event := <-events:
+		require.Equal(t, tail, event.TailNumber)
+		require.Equal(t, baseB, event.Base)
+		require.Equal(t, AssignmentSourceHuman, event.Source)
+	case <-time.After(time.Second):
+		t.Fatal("expected human override assignment event")
+	default:
+		t.Fatal("expected human override assignment event")
+	}
+}
+
+func TestSimulationLandingOverrideExecutesCommittedBaseSelection(t *testing.T) {
+	t.Parallel()
+	ts := New(time.Second, WithEpoch(time.Unix(0, 1)))
+	sim := NewSimulator([32]byte{11}, ts)
+	sim.lifecycle = testLifecycleModel()
+
+	baseA := BaseID{0, 0, 0, 0, 0, 0, 0, 1}
+	baseB := BaseID{0, 0, 0, 0, 0, 0, 0, 2}
+	sim.constellation.airbases = []Airbase{{ID: baseA}, {ID: baseB}}
+	sim.dispatcher = NewDispatcher(sim.constellation, &RoundRobinAssigner{})
+
+	tail := TailNumber{0, 0, 0, 0, 0, 0, 0, 7}
+	sim.fleet = &Fleet{aircrafts: []Aircraft{NewAircraft(tail, &OutboundState{}, nil)}}
+	sim.AssertInvariants()
+
+	resolution := sim.ts.Resolution
+	stepsFor := func(d time.Duration) int { return int(d/resolution) + 1 }
+	advance := func(steps int) {
+		for i := 0; i < steps; i++ {
+			sim.Step()
+		}
+	}
+
+	advance(stepsFor(sim.lifecycle.Durations.Outbound))
+	advance(stepsFor(sim.lifecycle.Durations.Engaged))
+	advance(1)
+
+	override, err := sim.OverrideLandingAssignment(tail, baseB)
+	require.NoError(t, err)
+	require.Equal(t, baseB, override.Base)
+
+	advance(stepsFor(sim.lifecycle.Durations.InboundDecision))
+
+	aircrafts := sim.Aircrafts()
+	require.Len(t, aircrafts, 1)
+	require.True(t, aircrafts[0].HasAssignment)
+	require.Equal(t, baseB, aircrafts[0].AssignedBase)
+
+	advance(stepsFor(sim.lifecycle.Durations.CommitApproach))
+
+	aircrafts = sim.Aircrafts()
+	require.Len(t, aircrafts, 1)
+	require.Equal(t, "Servicing", aircrafts[0].State.Name())
+	require.Equal(t, baseB, aircrafts[0].AssignedBase)
 }
 
 func TestSimulation_NeedsDrivenStateTransitions(t *testing.T) {

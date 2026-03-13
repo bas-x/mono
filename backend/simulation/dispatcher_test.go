@@ -59,3 +59,27 @@ func TestDispatcherOverrides(t *testing.T) {
 	require.Equal(t, BaseID{2}, reassigned.Base)
 	require.Equal(t, AssignmentSourceAlgorithm, reassigned.Source)
 }
+
+func TestDispatcherOverridePersistsAcrossRepeatedRegistrations(t *testing.T) {
+	t.Parallel()
+	constellation := &Constellation{
+		airbases: []Airbase{{ID: BaseID{1}}, {ID: BaseID{2}}},
+	}
+	dispatcher := NewDispatcher(constellation, &RoundRobinAssigner{})
+	tail := TailNumber{7}
+
+	assignment, err := dispatcher.RegisterInbound(tail)
+	require.NoError(t, err)
+	require.Equal(t, BaseID{1}, assignment.Base)
+	require.Equal(t, AssignmentSourceAlgorithm, assignment.Source)
+
+	override, err := dispatcher.OverrideAssignment(tail, BaseID{2})
+	require.NoError(t, err)
+	require.Equal(t, BaseID{2}, override.Base)
+	require.Equal(t, AssignmentSourceHuman, override.Source)
+
+	repeated, err := dispatcher.RegisterInbound(tail)
+	require.NoError(t, err)
+	require.Equal(t, BaseID{2}, repeated.Base)
+	require.Equal(t, AssignmentSourceHuman, repeated.Source)
+}
