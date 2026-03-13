@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useApi } from '@/lib/api';
 
@@ -117,6 +117,7 @@ export function ConstellationMap({
 }: ConstellationMapProps) {
   const { clients } = useApi();
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
   const [containerSize, setContainerSize] = useState({ width: 0, height: 0 });
   const [hoveredAirbaseId, setHoveredAirbaseId] = useState<string | null>(null);
   const [uncontrolledSelectedAirbaseId, setUncontrolledSelectedAirbaseId] = useState<string | null>(
@@ -133,45 +134,44 @@ export function ConstellationMap({
     });
   }, []);
 
-  const updateContainerSize = useCallback(() => {
-    const element = containerRef.current;
-    if (!element) {
-      return;
-    }
+  const containerRefCallback = useCallback(
+    (element: HTMLDivElement | null) => {
+      if (resizeObserverRef.current) {
+        resizeObserverRef.current.disconnect();
+        resizeObserverRef.current = null;
+      }
 
-    commitContainerSize(Math.round(element.clientWidth), Math.round(element.clientHeight));
-  }, [commitContainerSize]);
+      containerRef.current = element;
 
-  useLayoutEffect(() => {
-    updateContainerSize();
-  }, [updateContainerSize]);
-
-  useEffect(() => {
-    const element = containerRef.current;
-    if (!element) {
-      return;
-    }
-
-    updateContainerSize();
-
-    const resizeObserver = new ResizeObserver((entries) => {
-      const entry = entries[0];
-      if (!entry) {
+      if (!element) {
         return;
       }
 
-      commitContainerSize(
-        Math.round(entry.contentRect.width),
-        Math.round(entry.contentRect.height),
-      );
-    });
+      commitContainerSize(Math.round(element.clientWidth), Math.round(element.clientHeight));
 
-    resizeObserver.observe(element);
+      const resizeObserver = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (!entry) {
+          return;
+        }
 
+        commitContainerSize(
+          Math.round(entry.contentRect.width),
+          Math.round(entry.contentRect.height),
+        );
+      });
+
+      resizeObserver.observe(element);
+      resizeObserverRef.current = resizeObserver;
+    },
+    [commitContainerSize],
+  );
+
+  useEffect(() => {
     return () => {
-      resizeObserver.disconnect();
+      resizeObserverRef.current?.disconnect();
     };
-  }, [commitContainerSize, updateContainerSize]);
+  }, []);
 
   const isSelectionControlled = selectedAirbaseId !== undefined;
   const effectiveSelectedAirbaseId = isSelectionControlled
@@ -289,7 +289,7 @@ export function ConstellationMap({
 
   return (
     <div
-      ref={containerRef}
+      ref={containerRefCallback}
       className={mergeClassNames(
         'relative h-full min-h-72 overflow-hidden rounded-lg border border-border bg-bg',
         className,

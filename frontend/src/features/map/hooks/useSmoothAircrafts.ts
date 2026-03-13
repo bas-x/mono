@@ -34,8 +34,6 @@ export function useSmoothAircrafts(
     };
   }>({});
 
-  const rafRef = useRef<number>();
-
   const wasEmptyRef = useRef(true);
 
   useEffect(() => {
@@ -127,7 +125,7 @@ export function useSmoothAircrafts(
           });
         });
 
-        console.log("RAF updatedList length:", updatedList.length, updatedList[0]); setRenderedAircrafts(updatedList);
+        setRenderedAircrafts(updatedList);
       } else {
         if (!wasEmptyRef.current) {
           wasEmptyRef.current = true;

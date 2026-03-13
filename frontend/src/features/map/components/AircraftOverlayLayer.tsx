@@ -36,7 +36,14 @@ export function AircraftOverlayLayer({
             height: 40,
           }}
         >
-          <IoMdJet className="h-10 w-10 text-blue-500 drop-shadow-md" />
+          <IoMdJet 
+            className="h-10 w-10 text-white drop-shadow-md" 
+            style={{ 
+              stroke: '#f59e0b',
+              strokeWidth: '24',
+              strokeLinejoin: 'round' 
+            }} 
+          />
         </div>
       ))}
     </div>

@@ -111,8 +111,12 @@ export function TimelineControls({ status, isLoading, onStart, onPause, onResume
         />
         <FilterToggle 
           label="Threats" 
-          isActive={filters.ThreatSpawnedEvent !== false} 
-          onClick={() => onToggleFilter('ThreatSpawnedEvent')} 
+          isActive={filters.threat_spawned !== false} 
+          onClick={() => {
+            onToggleFilter('threat_spawned');
+            onToggleFilter('threat_targeted');
+            onToggleFilter('threat_despawned');
+          }} 
           colorClass="bg-red-500"
         />
       </div>
@@ -156,7 +160,19 @@ export function TimelineControls({ status, isLoading, onStart, onPause, onResume
           </span>
         </button>
       </div>
-      <div className="flex items-center justify-end flex-1">
+      <div className="flex items-center justify-end flex-1 gap-4">
+        <div className="hidden lg:flex items-center gap-1.5 text-[10px] text-white/40">
+          <div className="flex gap-0.5 items-center">
+            <span className="flex h-4 min-w-[16px] items-center justify-center rounded border border-white/10 bg-white/5 px-1 font-sans text-[10px]">←</span>
+            <span className="flex h-4 min-w-[16px] items-center justify-center rounded border border-white/10 bg-white/5 px-1 font-sans text-[10px]">→</span>
+          </div>
+          <span>Scrub</span>
+          <span className="opacity-50 mx-0.5">|</span>
+          <div className="flex gap-0.5 items-center">
+            <span className="flex h-4 items-center justify-center rounded border border-white/10 bg-white/5 px-1 font-sans text-[9px] tracking-wide">SHIFT</span>
+          </div>
+          <span>10x</span>
+        </div>
         <div className="flex items-center gap-1 rounded-lg bg-white/5 p-1">
           <ZoomToggle label="1x" isActive={zoom === 1} onClick={() => onZoomChange(1)} />
           <ZoomToggle label="2x" isActive={zoom === 2} onClick={() => onZoomChange(2)} />

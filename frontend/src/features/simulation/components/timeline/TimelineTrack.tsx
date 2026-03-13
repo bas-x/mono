@@ -18,6 +18,8 @@ export function TimelineTrack({ events, currentTick, maxTick, playbackTick, onSc
   const [selectedEvent, setSelectedEvent] = useState<SimulationEvent | null>(null);
   const dragRef = useRef({ isDown: false, isDragging: false, startX: 0 });
   const [isDraggingUI, setIsDraggingUI] = useState(false);
+  const lastScrubTimeRef = useRef<number>(0);
+  const [localTick, setLocalTick] = useState<number | null>(null);
 
   useEffect(() => {
     if (scrollRef.current && !selectedEvent && playbackTick === null && !isDraggingUI) {
@@ -25,19 +27,27 @@ export function TimelineTrack({ events, currentTick, maxTick, playbackTick, onSc
     }
   }, [events.length, selectedEvent, playbackTick, isDraggingUI, zoom]);
 
-  const updateScrubberPosition = useCallback((clientX: number) => {
+  const updateScrubberPosition = useCallback((clientX: number, isFinal = false) => {
     if (!trackRef.current || maxTick === 0) return;
     
     const rect = trackRef.current.getBoundingClientRect();
     const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
     const percentage = x / rect.width;
     
-    const clickedTick = Math.max(0, Math.round(percentage * maxTick));
+    const targetTick = Math.max(0, Math.round(percentage * maxTick));
+    const finalTick = targetTick >= maxTick ? null : targetTick;
     
-    if (clickedTick >= maxTick) {
-      onScrub(null);
+    if (dragRef.current.isDragging && !isFinal) {
+      setLocalTick(finalTick);
+      
+      const now = performance.now();
+      if (now - lastScrubTimeRef.current > 80) {
+        lastScrubTimeRef.current = now;
+        onScrub(finalTick);
+      }
     } else {
-      onScrub(clickedTick);
+      setLocalTick(null);
+      onScrub(finalTick);
     }
   }, [maxTick, onScrub]);
 
@@ -71,8 +81,9 @@ export function TimelineTrack({ events, currentTick, maxTick, playbackTick, onSc
     if (!dragRef.current.isDown) return;
     
     if (!dragRef.current.isDragging) {
-      updateScrubberPosition(e.clientX);
+      updateScrubberPosition(e.clientX, true);
     } else {
+      updateScrubberPosition(e.clientX, true);
       e.currentTarget.releasePointerCapture(e.pointerId);
     }
 
@@ -86,7 +97,7 @@ export function TimelineTrack({ events, currentTick, maxTick, playbackTick, onSc
     return (tick / maxTick) * 100;
   };
 
-  const activeTick = playbackTick !== null ? playbackTick : currentTick;
+  const activeTick = localTick !== null ? localTick : (playbackTick !== null ? playbackTick : currentTick);
   const progressPercent = getPositionPercent(activeTick);
 
   return (
