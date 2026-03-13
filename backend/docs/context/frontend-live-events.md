@@ -4,7 +4,7 @@ This file is intended to give the frontend implementation agent a compact map of
 
 ## Current Simulation Flow
 
-The backend currently supports a single simulation with ID `base`.
+The backend currently supports a base simulation with ID `base` plus service-generated clone IDs created from the base simulation.
 
 Recommended frontend flow:
 
@@ -155,4 +155,6 @@ Suggested reducer behavior:
 - IDs are opaque lowercase hex strings
 - the simulation package itself does **not** know about `simulationId`; the service injects it into outgoing events
 - slow websocket clients are disconnected by the backend rather than allowed to block simulation progress
-- current implementation is base-simulation-first, but the API paths already include `simulationId` for future branch support
+- current implementation is still service-layer-first for branching: base cloning exists in the service, but no HTTP clone endpoint is documented yet
+- first clone support is base simulation only; checkpoint-based branch creation and branch-from-branch workflows are not implemented
+- determinism guarantee: clone creation copies current simulation state and RNG state, so equivalent future advancement keeps base and clone aligned until a later divergence decision is introduced
