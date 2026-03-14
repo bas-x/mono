@@ -58,6 +58,14 @@ export type SimulationAircraft = {
   needs: SimulationAircraftNeed[];
   state: string;
   assignedTo?: string;
+  assignmentSource?: AssignmentSource;
+};
+
+export type AssignmentSource = 'algorithm' | 'human';
+
+export type Assignment = {
+  base: string;
+  source: AssignmentSource;
 };
 
 export const SIMULATION_TICKS_PER_SECOND = 64;
@@ -139,6 +147,15 @@ export type CreateBranchSimulationRequest = {
   sourceEvent?: SourceEvent;
 };
 
+export type OverrideAssignmentRequest = {
+  baseId: string;
+};
+
+export type OverrideAssignmentResponse = {
+  aircraft: SimulationAircraft;
+  assignment: Assignment;
+};
+
 export type SimulationInfo = {
   id: string;
   running: boolean;
@@ -164,6 +181,12 @@ export interface SimulationServiceClient {
     request?: CreateBranchSimulationRequest,
     signal?: AbortSignal,
   ): Promise<SimulationInfo>;
+  overrideAssignment(
+    simulationId: string,
+    tailNumber: string,
+    request: OverrideAssignmentRequest,
+    signal?: AbortSignal,
+  ): Promise<OverrideAssignmentResponse>;
   startSimulation(simulationId: string, signal?: AbortSignal): Promise<void>;
   pauseSimulation(simulationId: string, signal?: AbortSignal): Promise<void>;
   resumeSimulation(simulationId: string, signal?: AbortSignal): Promise<void>;
@@ -208,6 +231,14 @@ export type BranchCreatedEvent = SimulationEvent & {
   splitTick: number;
   splitTimestamp: string;
   sourceEvent?: SourceEvent;
+};
+
+export type LandingAssignmentEvent = SimulationEvent & {
+  type: 'landing_assignment';
+  tailNumber: string;
+  baseId: string;
+  source: AssignmentSource;
+  tick: number;
 };
 
 export type SimulationEventEnvelope = SimulationEvent;

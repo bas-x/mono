@@ -2,6 +2,8 @@ import type { HttpClient } from '@/lib/api/http/client';
 import type {
   CreateBaseSimulationRequest,
   CreateBranchSimulationRequest,
+  OverrideAssignmentRequest,
+  OverrideAssignmentResponse,
   SimulationAirbase,
   SimulationAircraft,
   SimulationInfo,
@@ -62,6 +64,22 @@ export function createSimulationServiceClient(
         {
           method: 'POST',
           body: request ? JSON.stringify(request) : undefined,
+          signal,
+        },
+      );
+    },
+
+    async overrideAssignment(
+      simulationId: string,
+      tailNumber: string,
+      request: OverrideAssignmentRequest,
+      signal?: AbortSignal,
+    ) {
+      return httpClient.requestJson<OverrideAssignmentResponse>(
+        `/simulations/${encodeURIComponent(simulationId)}/aircraft/${encodeURIComponent(tailNumber)}/assignment-override`,
+        {
+          method: 'POST',
+          body: JSON.stringify(request),
           signal,
         },
       );

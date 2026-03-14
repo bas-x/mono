@@ -104,4 +104,38 @@ describe('createSimulationServiceClient', () => {
       signal: undefined,
     });
   });
+
+  it('posts assignment overrides and returns aircraft plus assignment metadata', async () => {
+    const payload = {
+      aircraft: {
+        tailNumber: 'BX-101',
+        needs: [],
+        state: 'Inbound',
+        assignedTo: '3a5f',
+      },
+      assignment: {
+        base: '3a5f',
+        source: 'human',
+      },
+    };
+    const requestJson = vi.fn().mockResolvedValue(payload);
+    const client = createSimulationServiceClient({
+      requestJson,
+      requestText: async () => {
+        throw new Error('simulation client should not call requestText');
+      },
+    });
+
+    const result = await client.overrideAssignment('branch-123', 'BX-101', { baseId: '3a5f' });
+
+    expect(result).toEqual(payload);
+    expect(requestJson).toHaveBeenCalledWith(
+      '/simulations/branch-123/aircraft/BX-101/assignment-override',
+      {
+        method: 'POST',
+        body: JSON.stringify({ baseId: '3a5f' }),
+        signal: undefined,
+      },
+    );
+  });
 });
