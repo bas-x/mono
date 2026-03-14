@@ -60,8 +60,9 @@ export function AircraftOverlayLayer({
           }}
         >
           <IoMdJet 
-            className="h-10 w-10 text-white drop-shadow-md" 
+            className="h-10 w-10 drop-shadow-md" 
             style={{ 
+              color: getAircraftStrokeColor(aircraft.state),
               stroke: getAircraftStrokeColor(aircraft.state),
               strokeWidth: '24',
               strokeLinejoin: 'round' 
