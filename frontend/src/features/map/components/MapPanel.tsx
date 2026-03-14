@@ -345,6 +345,7 @@ export function MapPanel() {
               viewBox={mapViewBox}
               onSelectAirbase={handleSelectAirbase}
               aircraftPositions={simulationState.status === 'running' ? simulationState.aircraftPositions : undefined}
+              activeThreats={simulationState.status === 'running' ? simulationState.activeThreats : undefined}
             />
 
             <div

@@ -10,6 +10,7 @@ import {
 import { AirbaseTooltip } from '@/features/map/components/AirbaseTooltip';
 import { SwedenMap3DLayer } from '@/features/map/components/SwedenMap3DLayer';
 import { AircraftOverlayLayer } from '@/features/map/components/AircraftOverlayLayer';
+import { ThreatOverlayLayer } from '@/features/map/components/ThreatOverlayLayer';
 import { useAirbaseDetails } from '@/features/map/hooks/useAirbaseDetails';
 import { useAirbases } from '@/features/map/hooks/useAirbases';
 import {
@@ -28,6 +29,7 @@ import {
   type MapViewBox,
 } from '@/features/map/types';
 import type { AircraftPosition } from '@/features/simulation/hooks/useSimulation';
+import type { SimulationThreat } from '@/lib/api/types';
 
 function mergeClassNames(...parts: Array<string | undefined>) {
   return parts.filter(Boolean).join(' ');
@@ -49,6 +51,7 @@ type ConstellationMapProps = {
   viewBox?: MapViewBox;
   placementSources?: AirbasePlacementSource[];
   aircraftPositions?: AircraftPosition[];
+  activeThreats?: SimulationThreat[];
 };
 
 const AIRBASE_CAPACITY_SEQUENCE = ['small', 'medium', 'large'] as const;
@@ -116,6 +119,7 @@ export function ConstellationMap({
   viewBox = DEFAULT_MAP_VIEW_BOX,
   placementSources: externalPlacementSources,
   aircraftPositions,
+  activeThreats,
 }: ConstellationMapProps) {
   const { clients } = useApi();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -348,6 +352,12 @@ export function ConstellationMap({
         viewBox={viewBox}
         onHoverChange={handleHoverChange}
         onSelect={(airbaseId) => handleSelect(airbaseId)}
+      />
+
+      <ThreatOverlayLayer
+        threats={activeThreats}
+        containerSize={containerSize}
+        viewBox={viewBox}
       />
 
       <AircraftOverlayLayer
