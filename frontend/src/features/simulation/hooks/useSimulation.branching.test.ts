@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  applyAircraftAssignment,
   applyBranchCreatedSummary,
+  applyOverrideResponse,
   appendSimulationEvent,
+  buildHistorySnapshot,
   buildBranchSourceEvent,
   getSimulationCloseFallback,
+  mapOverrideErrorMessage,
   mergeSimulationInfos,
   pruneSimulationEventCache,
   rehydrateRunningSimulationState,
@@ -197,5 +201,72 @@ describe('useSimulation branching helpers', () => {
     expect(pruned.get('base')).toHaveLength(1);
     expect(pruned.get('branch-00000001')).toHaveLength(1);
     expect(pruneSimulationEventCache(pruned, ['base']).has('branch-00000001')).toBe(false);
+  });
+
+  it('keeps the latest landing assignment source for repeated events', () => {
+    const afterAlgorithm = applyAircraftAssignment(
+      [{ tailNumber: 'BX-101', needs: [], state: 'Inbound' }],
+      'BX-101',
+      { base: 'base-a', source: 'algorithm' },
+    );
+    const afterHuman = applyAircraftAssignment(afterAlgorithm, 'BX-101', {
+      base: 'base-b',
+      source: 'human',
+    });
+
+    expect(afterHuman[0]).toMatchObject({
+      assignedTo: 'base-b',
+      assignmentSource: 'human',
+    });
+  });
+
+  it('applies override responses synchronously before websocket reconciliation', () => {
+    const updated = applyOverrideResponse(
+      [{ tailNumber: 'BX-101', needs: [], state: 'Inbound', assignedTo: 'base-a' }],
+      {
+        aircraft: {
+          tailNumber: 'BX-101',
+          needs: [],
+          state: 'Inbound',
+          assignedTo: 'base-b',
+        },
+        assignment: {
+          base: 'base-b',
+          source: 'human',
+        },
+      },
+    );
+
+    expect(updated[0]).toMatchObject({
+      assignedTo: 'base-b',
+      assignmentSource: 'human',
+    });
+  });
+
+  it('maps override HTTP errors to specific operator messages', () => {
+    expect(mapOverrideErrorMessage({ status: 409, body: '{"message":"assignment override too late"}' })).toBe('Override too late');
+    expect(mapOverrideErrorMessage({ status: 404, body: '{"message":"simulation or aircraft not found"}' })).toBe('Simulation or aircraft no longer exists');
+    expect(mapOverrideErrorMessage({ status: 400, body: '{"message":"invalid base"}' })).toBe('Invalid assignment target');
+  });
+
+  it('fills aircrafts when building a history snapshot from positions-only updates', () => {
+    const snapshot = buildHistorySnapshot({
+      status: 'running',
+      simulationId: 'base',
+      isRunnerActive: false,
+      isRunnerPaused: true,
+      airbases: [],
+      aircrafts: [{ tailNumber: 'BX-101', needs: [], state: 'Inbound' }],
+      tick: 12,
+      time: '2026-03-12T03:15:05Z',
+      aircraftPositions: [],
+      history: {},
+      playbackTick: 12,
+      maxTick: 12,
+      untilTick: 24,
+    }, 12, { aircraftPositions: [] });
+
+    expect(snapshot.aircrafts).toHaveLength(1);
+    expect(snapshot.aircrafts[0]?.tailNumber).toBe('BX-101');
   });
 });
