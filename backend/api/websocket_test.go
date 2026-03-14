@@ -215,6 +215,187 @@ func TestBranchSimulationEndpointAndBranchReads(t *testing.T) {
 	require.Equal(t, http.StatusNotFound, resp.StatusCode)
 }
 
+func TestListSimulationsSourceEvent(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	_, err := deps.SimulationService.CreateBaseSimulation(services.BaseSimulationConfig{Options: websocketSafeOptions()})
+	require.NoError(t, err)
+
+	legacyBranchID, err := deps.SimulationService.BranchSimulation(services.BaseSimulationID)
+	require.NoError(t, err)
+
+	branchBody := bytes.NewBufferString(`{"sourceEvent":{"id":"evt-list","type":"landing_assignment","tick":7}}`)
+	branchReq, err := http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/branch", branchBody)
+	require.NoError(t, err)
+	branchReq.Header.Set("Content-Type", "application/json")
+
+	branchResp, err := http.DefaultClient.Do(branchReq)
+	require.NoError(t, err)
+	defer branchResp.Body.Close()
+	require.Equal(t, http.StatusCreated, branchResp.StatusCode)
+
+	var created services.SimulationInfo
+	require.NoError(t, json.NewDecoder(branchResp.Body).Decode(&created))
+	require.NotEmpty(t, created.ID)
+	require.NotNil(t, created.SourceEvent)
+	require.Equal(t, "evt-list", created.SourceEvent.ID)
+	require.Equal(t, "landing_assignment", created.SourceEvent.Type)
+	require.Equal(t, uint64(7), created.SourceEvent.Tick)
+
+	resp, err := http.Get(httpServer.URL + "/simulations")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var payload struct {
+		Simulations []map[string]any `json:"simulations"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&payload))
+
+	byID := make(map[string]map[string]any, len(payload.Simulations))
+	for _, item := range payload.Simulations {
+		id, ok := item["id"].(string)
+		require.True(t, ok)
+		byID[id] = item
+	}
+
+	legacyPayload, ok := byID[legacyBranchID]
+	require.True(t, ok)
+	_, hasLegacySourceEvent := legacyPayload["sourceEvent"]
+	require.False(t, hasLegacySourceEvent)
+
+	newPayload, ok := byID[created.ID]
+	require.True(t, ok)
+	sourceEventRaw, hasNewSourceEvent := newPayload["sourceEvent"]
+	require.True(t, hasNewSourceEvent)
+	sourceEvent, ok := sourceEventRaw.(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "evt-list", sourceEvent["id"])
+	require.Equal(t, "landing_assignment", sourceEvent["type"])
+	require.Equal(t, float64(7), sourceEvent["tick"])
+}
+
+func TestBranchSimulationEndpointAcceptsSourceEventRequestBody(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	resp, err := http.Post(httpServer.URL+"/simulations/base", "application/json", bytes.NewBufferString(`{"seed":"demo-seed"}`))
+	require.NoError(t, err)
+	resp.Body.Close()
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	body := bytes.NewBufferString(`{"sourceEvent":{"id":"evt-123","type":"landing_assignment","tick":7}}`)
+	req, err := http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/branch", body)
+	require.NoError(t, err)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err = http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	var payload map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&payload))
+	require.NotEmpty(t, payload["id"])
+	require.Equal(t, services.BaseSimulationID, payload["parentId"])
+	require.NotNil(t, payload["splitTick"])
+	require.NotNil(t, payload["splitTimestamp"])
+
+	sourceEventRaw, ok := payload["sourceEvent"]
+	require.True(t, ok)
+	sourceEvent, ok := sourceEventRaw.(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "evt-123", sourceEvent["id"])
+	require.Equal(t, "landing_assignment", sourceEvent["type"])
+	require.Equal(t, float64(7), sourceEvent["tick"])
+}
+
+func TestBranchSimulationEndpointSourceEventAbsentRemainsBackwardCompatible(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	resp, err := http.Post(httpServer.URL+"/simulations/base", "application/json", bytes.NewBufferString(`{"seed":"demo-seed"}`))
+	require.NoError(t, err)
+	resp.Body.Close()
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	req, err := http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/branch", nil)
+	require.NoError(t, err)
+
+	resp, err = http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	var payload map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&payload))
+	require.NotEmpty(t, payload["id"])
+	require.Equal(t, services.BaseSimulationID, payload["parentId"])
+	_, hasSourceEvent := payload["sourceEvent"]
+	require.False(t, hasSourceEvent)
+}
+
+func TestBranchSimulationEndpointRejectsMalformedSourceEventRequests(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	resp, err := http.Post(httpServer.URL+"/simulations/base", "application/json", bytes.NewBufferString(`{"seed":"demo-seed"}`))
+	require.NoError(t, err)
+	resp.Body.Close()
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+
+	invalidBodies := []string{
+		`{"sourceEvent":{}}`,
+		`{"sourceEvent":{"id":"evt-only"}}`,
+		`{"sourceEvent":{"type":"landing_assignment"}}`,
+		`{"sourceEvent":{"tick":9}}`,
+		`{"sourceEvent":{"id":"evt-123","type":"landing_assignment"}}`,
+		`{"sourceEvent":{"id":"evt-123","tick":9}}`,
+		`{"sourceEvent":{"type":"landing_assignment","tick":9}}`,
+		`{"sourceEvent":{"id":"","type":"landing_assignment","tick":9}}`,
+		`{"sourceEvent":{"id":"evt-123","type":"","tick":9}}`,
+	}
+
+	for _, body := range invalidBodies {
+		body := body
+		t.Run(body, func(t *testing.T) {
+			req, err := http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/branch", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			resp, err := http.DefaultClient.Do(req)
+			require.NoError(t, err)
+			resp.Body.Close()
+			require.Equal(t, http.StatusBadRequest, resp.StatusCode)
+		})
+	}
+}
+
 func TestGetSimulationEndpoint(t *testing.T) {
 	t.Parallel()
 
@@ -269,6 +450,63 @@ func TestGetSimulationEndpoint(t *testing.T) {
 	require.NoError(t, err)
 	resp.Body.Close()
 	require.Equal(t, http.StatusNotFound, resp.StatusCode)
+}
+
+func TestGetSimulationSourceEvent(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	_, err := deps.SimulationService.CreateBaseSimulation(services.BaseSimulationConfig{Options: websocketSafeOptions()})
+	require.NoError(t, err)
+
+	legacyBranchID, err := deps.SimulationService.BranchSimulation(services.BaseSimulationID)
+	require.NoError(t, err)
+
+	branchBody := bytes.NewBufferString(`{"sourceEvent":{"id":"evt-detail","type":"landing_assignment","tick":11}}`)
+	branchReq, err := http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/branch", branchBody)
+	require.NoError(t, err)
+	branchReq.Header.Set("Content-Type", "application/json")
+
+	branchResp, err := http.DefaultClient.Do(branchReq)
+	require.NoError(t, err)
+	defer branchResp.Body.Close()
+	require.Equal(t, http.StatusCreated, branchResp.StatusCode)
+
+	var created services.SimulationInfo
+	require.NoError(t, json.NewDecoder(branchResp.Body).Decode(&created))
+	require.NotEmpty(t, created.ID)
+
+	resp, err := http.Get(httpServer.URL + "/simulations/" + created.ID)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var detailPayload map[string]any
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&detailPayload))
+
+	sourceEventRaw, hasSourceEvent := detailPayload["sourceEvent"]
+	require.True(t, hasSourceEvent)
+	sourceEvent, ok := sourceEventRaw.(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "evt-detail", sourceEvent["id"])
+	require.Equal(t, "landing_assignment", sourceEvent["type"])
+	require.Equal(t, float64(11), sourceEvent["tick"])
+
+	legacyResp, err := http.Get(httpServer.URL + "/simulations/" + legacyBranchID)
+	require.NoError(t, err)
+	defer legacyResp.Body.Close()
+	require.Equal(t, http.StatusOK, legacyResp.StatusCode)
+
+	var legacyPayload map[string]any
+	require.NoError(t, json.NewDecoder(legacyResp.Body).Decode(&legacyPayload))
+	_, hasLegacySourceEvent := legacyPayload["sourceEvent"]
+	require.False(t, hasLegacySourceEvent)
 }
 
 func TestPauseResumeAndThreatEndpoints(t *testing.T) {
@@ -529,6 +767,71 @@ func TestBranchCreatedEventOverWebSocket(t *testing.T) {
 		require.Equal(t, *branchInfo.SplitTimestamp, parsedSplitTimestamp)
 		break
 	}
+}
+
+func TestBranchCreatedEventSourceEventOverWebSocket(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	_, err := deps.SimulationService.CreateBaseSimulation(services.BaseSimulationConfig{Options: websocketSafeOptions()})
+	require.NoError(t, err)
+
+	wsURL := "ws" + strings.TrimPrefix(httpServer.URL, "http") + "/ws/simulations/base/events"
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	legacyBranchID, err := deps.SimulationService.BranchSimulation(services.BaseSimulationID)
+	require.NoError(t, err)
+
+	branchBody := bytes.NewBufferString(`{"sourceEvent":{"id":"evt-ws","type":"landing_assignment","tick":13}}`)
+	branchReq, err := http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/branch", branchBody)
+	require.NoError(t, err)
+	branchReq.Header.Set("Content-Type", "application/json")
+
+	branchResp, err := http.DefaultClient.Do(branchReq)
+	require.NoError(t, err)
+	defer branchResp.Body.Close()
+	require.Equal(t, http.StatusCreated, branchResp.StatusCode)
+
+	var created services.SimulationInfo
+	require.NoError(t, json.NewDecoder(branchResp.Body).Decode(&created))
+	require.NotEmpty(t, created.ID)
+
+	require.NoError(t, conn.SetReadDeadline(time.Now().Add(2*time.Second)))
+	branchCreatedEvents := make(map[string]map[string]any, 2)
+	for len(branchCreatedEvents) < 2 {
+		var payload map[string]any
+		err := conn.ReadJSON(&payload)
+		require.NoError(t, err)
+		if payload["type"] != services.EventTypeBranchCreated {
+			continue
+		}
+		branchID, ok := payload["branchId"].(string)
+		require.True(t, ok)
+		branchCreatedEvents[branchID] = payload
+	}
+
+	legacyPayload, ok := branchCreatedEvents[legacyBranchID]
+	require.True(t, ok)
+	_, hasLegacySourceEvent := legacyPayload["sourceEvent"]
+	require.False(t, hasLegacySourceEvent)
+
+	newPayload, ok := branchCreatedEvents[created.ID]
+	require.True(t, ok)
+	sourceEventRaw, hasNewSourceEvent := newPayload["sourceEvent"]
+	require.True(t, hasNewSourceEvent)
+	sourceEvent, ok := sourceEventRaw.(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, "evt-ws", sourceEvent["id"])
+	require.Equal(t, "landing_assignment", sourceEvent["type"])
+	require.Equal(t, float64(13), sourceEvent["tick"])
 }
 
 func TestBranchCreatedEventIsDeliveredOnlyToBaseStream(t *testing.T) {

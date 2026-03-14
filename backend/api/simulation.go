@@ -76,6 +76,12 @@ type simulationOptionsRequest struct {
 	LifecycleOpts     *lifecycleOptionsRequest     `json:"lifecycleOpts"`
 }
 
+type branchSourceEventRequest struct {
+	ID   string  `json:"id"`
+	Type string  `json:"type"`
+	Tick *uint64 `json:"tick"`
+}
+
 func PostCreateBaseSimulation(logger *log.Logger, deps *ServerDependencies) echo.HandlerFunc {
 	type request struct {
 		Seed              string                    `json:"seed"`
@@ -160,7 +166,8 @@ func GetSimulation(logger *log.Logger, deps *ServerDependencies) echo.HandlerFun
 
 func PostBranchSimulation(logger *log.Logger, deps *ServerDependencies) echo.HandlerFunc {
 	type request struct {
-		SimulationID string `param:"simulationId"`
+		SimulationID string                    `param:"simulationId"`
+		SourceEvent  *branchSourceEventRequest `json:"sourceEvent"`
 	}
 
 	return func(c echo.Context) error {
@@ -169,7 +176,12 @@ func PostBranchSimulation(logger *log.Logger, deps *ServerDependencies) echo.Han
 			return err
 		}
 
-		branchID, err := deps.SimulationService.BranchSimulation(req.SimulationID)
+		sourceEvent, err := mapBranchSourceEventRequest(req.SourceEvent)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+		}
+
+		branchID, err := branchSimulation(req.SimulationID, sourceEvent, deps)
 		if err != nil {
 			if errors.Is(err, services.ErrBaseNotFound) || errors.Is(err, services.ErrSimulationNotFound) {
 				return echo.NewHTTPError(http.StatusNotFound, "simulation not found")
@@ -183,9 +195,47 @@ func PostBranchSimulation(logger *log.Logger, deps *ServerDependencies) echo.Han
 			logger.Error("load branched simulation", "branchId", branchID, "err", err)
 			return echo.NewHTTPError(http.StatusInternalServerError, "failed to load branched simulation")
 		}
+		if sourceEvent != nil && simulationInfo.SourceEvent == nil {
+			simulationInfo.SourceEvent = sourceEvent
+		}
 
 		return c.JSON(http.StatusCreated, simulationInfo)
 	}
+}
+
+type sourceEventBrancher interface {
+	BranchSimulationWithSourceEvent(simulationID string, sourceEvent *services.SourceEvent) (string, error)
+}
+
+func mapBranchSourceEventRequest(req *branchSourceEventRequest) (*services.SourceEvent, error) {
+	if req == nil {
+		return nil, nil
+	}
+	if strings.TrimSpace(req.ID) == "" {
+		return nil, errors.New("sourceEvent.id is required")
+	}
+	if strings.TrimSpace(req.Type) == "" {
+		return nil, errors.New("sourceEvent.type is required")
+	}
+	if req.Tick == nil {
+		return nil, errors.New("sourceEvent.tick is required")
+	}
+
+	return &services.SourceEvent{
+		ID:   req.ID,
+		Type: req.Type,
+		Tick: *req.Tick,
+	}, nil
+}
+
+func branchSimulation(simulationID string, sourceEvent *services.SourceEvent, deps *ServerDependencies) (string, error) {
+	if sourceEvent == nil {
+		return deps.SimulationService.BranchSimulation(simulationID)
+	}
+	if brancher, ok := any(deps.SimulationService).(sourceEventBrancher); ok {
+		return brancher.BranchSimulationWithSourceEvent(simulationID, sourceEvent)
+	}
+	return deps.SimulationService.BranchSimulation(simulationID)
 }
 
 func PostStartSimulation(logger *log.Logger, deps *ServerDependencies) echo.HandlerFunc {
