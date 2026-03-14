@@ -46,7 +46,7 @@ func (r *ReadyState) Step(a *Aircraft, ctx FlightContext) AircraftState {
 		a.ThreatCentroid = threat.Position
 		a.ResetNeedRemainders()
 		if ctx.OnThreatTargeted != nil {
-			ctx.OnThreatTargeted(ThreatTargetedEvent{Threat: threat, TailNumber: a.TailNumber, Timestamp: ctx.Clock.Now()})
+			ctx.OnThreatTargeted(ThreatTargetedEvent{Threat: threat, TailNumber: a.TailNumber, Tick: ctx.Clock.Ticks(), Timestamp: ctx.Clock.Now()})
 		}
 		return &OutboundState{}
 	}
