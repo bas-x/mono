@@ -27,18 +27,22 @@ function createAirbaseAreaFromSvgCenter(centerX: number, centerY: number, width 
 export const MOCK_AIRBASES: ApiAirbase[] = [
   {
     id: 'lulea',
+    name: 'Lulea Airbase',
     area: createAirbaseAreaFromSvgCenter(287, 178),
   },
   {
     id: 'arlanda',
+    name: 'Arlanda Airbase',
     area: createAirbaseAreaFromSvgCenter(211.004 - 24, 621.203 - 34),
   },
   {
     id: 'visby',
+    name: 'Visby Airbase',
     area: createAirbaseAreaFromSvgCenter(194, 682),
   },
   {
     id: 'goteborg',
+    name: 'Goteborg Airbase',
     area: createAirbaseAreaFromSvgCenter(32, 656),
   },
 ];
@@ -48,29 +52,21 @@ export const MOCK_AIRBASE_DETAILS: Record<string, ApiAirbaseDetails> = {
     id: 'lulea',
     name: 'Lulea Airbase',
     region: 'Norrbotten',
-    status: 'Operational',
-    queue: 1,
   },
   arlanda: {
     id: 'arlanda',
     name: 'Arlanda Airbase',
     region: 'sweden',
-    status: 'Busy',
-    queue: 3,
   },
   visby: {
     id: 'visby',
     name: 'Visby Airbase',
     region: 'Gotland',
-    status: 'Operational',
-    queue: 2,
   },
   goteborg: {
     id: 'goteborg',
     name: 'Goteborg Airbase',
     region: 'Vastra Gotaland',
-    status: 'Standby',
-    queue: 0,
   },
 };
 
@@ -108,7 +104,6 @@ export function getMockAirbaseDetails(idOrUrl: string): ApiAirbaseDetails {
   return {
     id: lookupKey,
     name: lookupKey.toUpperCase(),
-    status: 'Unknown',
-    queue: 0,
+    region: 'Unknown region',
   };
 }
