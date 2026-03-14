@@ -23,8 +23,11 @@ import type {
   SimulationAircraftNeed,
   SimulationEvent,
   SimulationInfo,
+  SimulationThreat,
   SimulationStreamClient,
   SourceEvent,
+  ThreatDespawnedEvent,
+  ThreatSpawnedEvent,
 } from '@/lib/api/types';
 
 import {
@@ -298,6 +301,41 @@ export type TerminalSimulationRecord = {
   summary: ServicingSummary;
 };
 
+function upsertThreat(threats: SimulationThreat[], threat: SimulationThreat): SimulationThreat[] {
+  const existingIndex = threats.findIndex((candidate) => candidate.id === threat.id);
+  if (existingIndex === -1) {
+    return [...threats, threat];
+  }
+
+  return threats.map((candidate) => (candidate.id === threat.id ? threat : candidate));
+}
+
+function removeThreat(threats: SimulationThreat[], threatId: string): SimulationThreat[] {
+  return threats.filter((candidate) => candidate.id !== threatId);
+}
+
+function isSimulationThreat(value: unknown): value is SimulationThreat {
+  return typeof value === 'object'
+    && value !== null
+    && typeof (value as SimulationThreat).id === 'string'
+    && typeof (value as SimulationThreat).position?.x === 'number'
+    && typeof (value as SimulationThreat).position?.y === 'number'
+    && typeof (value as SimulationThreat).createdAt === 'string'
+    && typeof (value as SimulationThreat).createdTick === 'number';
+}
+
+function isThreatSpawnedEvent(event: SimulationEvent): event is ThreatSpawnedEvent {
+  return event.type === 'threat_spawned'
+    && typeof event.tick === 'number'
+    && isSimulationThreat(event.threat);
+}
+
+function isThreatDespawnedEvent(event: SimulationEvent): event is ThreatDespawnedEvent {
+  return event.type === 'threat_despawned'
+    && typeof event.tick === 'number'
+    && isSimulationThreat(event.threat);
+}
+
 export type SimulationState =
   | { status: 'idle' }
   | { status: 'creating' }
@@ -308,10 +346,15 @@ export type SimulationState =
       isRunnerPaused: boolean;
       airbases: SimulationAirbase[];
       aircrafts: SimulationAircraft[];
+      activeThreats: SimulationThreat[];
       tick?: number;
       time?: string;
       aircraftPositions?: AircraftPosition[];
-      history: Record<number, { aircraftPositions?: AircraftPosition[]; aircrafts: SimulationAircraft[] }>;
+      history: Record<number, {
+        aircraftPositions?: AircraftPosition[];
+        aircrafts: SimulationAircraft[];
+        activeThreats: SimulationThreat[];
+      }>;
       playbackTick?: number | null;
       maxTick?: number;
       untilTick?: number;
@@ -336,6 +379,7 @@ export function buildHistorySnapshot(
     aircrafts: overrides.aircrafts ?? existingSnapshot?.aircrafts ?? current.aircrafts,
     aircraftPositions:
       overrides.aircraftPositions ?? existingSnapshot?.aircraftPositions ?? current.aircraftPositions,
+    activeThreats: overrides.activeThreats ?? existingSnapshot?.activeThreats ?? current.activeThreats,
   };
 }
 
@@ -345,6 +389,14 @@ export function getVisibleAircraftsForPlayback(state: RunningSimulationState): S
   }
 
   return state.history[state.playbackTick]?.aircrafts ?? state.aircrafts;
+}
+
+export function getVisibleThreatsForPlayback(state: RunningSimulationState): SimulationThreat[] {
+  if (state.playbackTick == null) {
+    return state.activeThreats;
+  }
+
+  return state.history[state.playbackTick]?.activeThreats ?? state.activeThreats;
 }
 
 export function rehydrateRunningSimulationState(
@@ -360,6 +412,7 @@ export function rehydrateRunningSimulationState(
     isRunnerPaused: simulationInfo.paused,
     airbases,
     aircrafts,
+    activeThreats: cachedState?.activeThreats ?? [],
     tick: simulationInfo.tick,
     time: simulationInfo.timestamp,
     aircraftPositions: cachedState?.aircraftPositions,
@@ -730,6 +783,34 @@ export function useSimulation() {
             },
           };
         });
+      } else if (isThreatSpawnedEvent(event)) {
+        setState((current) => {
+          if (current.status !== 'running') return current;
+          const updatedThreats = upsertThreat(current.activeThreats, event.threat);
+          const currentTick = event.tick ?? current.tick ?? 0;
+          return {
+            ...current,
+            activeThreats: updatedThreats,
+            history: {
+              ...current.history,
+              [currentTick]: buildHistorySnapshot(current, currentTick, { activeThreats: updatedThreats }),
+            },
+          };
+        });
+      } else if (isThreatDespawnedEvent(event)) {
+        setState((current) => {
+          if (current.status !== 'running') return current;
+          const updatedThreats = removeThreat(current.activeThreats, event.threat.id);
+          const currentTick = event.tick ?? current.tick ?? 0;
+          return {
+            ...current,
+            activeThreats: updatedThreats,
+            history: {
+              ...current.history,
+              [currentTick]: buildHistorySnapshot(current, currentTick, { activeThreats: updatedThreats }),
+            },
+          };
+        });
       } else if (isSimulationEndedEvent(event)) {
         const terminalRecord = terminalRecordsRef.current.get(event.simulationId)
           ?? createTerminalSimulationRecord(event);
@@ -925,6 +1006,7 @@ export function useSimulation() {
     ? {
         ...state,
         aircrafts: getVisibleAircraftsForPlayback(state),
+        activeThreats: getVisibleThreatsForPlayback(state),
         aircraftPositions: state.playbackTick != null && state.history[state.playbackTick]
           ? state.history[state.playbackTick].aircraftPositions ?? state.aircraftPositions
           : state.aircraftPositions,

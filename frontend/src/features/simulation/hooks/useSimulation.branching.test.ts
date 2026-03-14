@@ -7,6 +7,7 @@ import {
   appendSimulationEvent,
   buildHistorySnapshot,
   buildBranchSourceEvent,
+  getVisibleThreatsForPlayback,
   getSimulationCloseFallback,
   mapOverrideErrorMessage,
   mergeSimulationInfos,
@@ -157,12 +158,13 @@ describe('useSimulation branching helpers', () => {
         isRunnerPaused: true,
         airbases: [],
         aircrafts: [],
+        activeThreats: [],
         tick: 48,
         time: '2026-03-12T03:18:05Z',
         aircraftPositions: [{ tailNumber: 'BX-101', position: { x: 1, y: 2 }, state: 'Ready', needs: [] }],
         history: {
-          41: { aircrafts: [], aircraftPositions: [] },
-          48: { aircrafts: [], aircraftPositions: [{ tailNumber: 'BX-101', position: { x: 1, y: 2 }, state: 'Ready', needs: [] }] },
+          41: { aircrafts: [], aircraftPositions: [], activeThreats: [] },
+          48: { aircrafts: [], aircraftPositions: [{ tailNumber: 'BX-101', position: { x: 1, y: 2 }, state: 'Ready', needs: [] }], activeThreats: [] },
         },
         playbackTick: 41,
         maxTick: 80,
@@ -264,6 +266,7 @@ describe('useSimulation branching helpers', () => {
       isRunnerPaused: true,
       airbases: [],
       aircrafts: [{ tailNumber: 'BX-101', model: 'Falcon HX-12', needs: [], state: 'Inbound' }],
+      activeThreats: [],
       tick: 12,
       time: '2026-03-12T03:15:05Z',
       aircraftPositions: [],
@@ -275,5 +278,49 @@ describe('useSimulation branching helpers', () => {
 
     expect(snapshot.aircrafts).toHaveLength(1);
     expect(snapshot.aircrafts[0]?.tailNumber).toBe('BX-101');
+  });
+
+  it('preserves active threats in history snapshots and playback selection', () => {
+    const threat = {
+      id: 'threat-1',
+      position: { x: 210, y: 420 },
+      createdAt: '2026-03-12T03:15:05Z',
+      createdTick: 8,
+    };
+
+    const snapshot = buildHistorySnapshot({
+      status: 'running',
+      simulationId: 'base',
+      isRunnerActive: false,
+      isRunnerPaused: true,
+      airbases: [],
+      aircrafts: [{ tailNumber: 'BX-101', model: 'Falcon HX-12', needs: [], state: 'Inbound' }],
+      activeThreats: [threat],
+      tick: 12,
+      time: '2026-03-12T03:15:05Z',
+      aircraftPositions: [],
+      history: {},
+      playbackTick: 12,
+      maxTick: 12,
+      untilTick: 24,
+    }, 12, { activeThreats: [threat] });
+
+    expect(snapshot.activeThreats).toEqual([threat]);
+    expect(getVisibleThreatsForPlayback({
+      status: 'running',
+      simulationId: 'base',
+      isRunnerActive: false,
+      isRunnerPaused: true,
+      airbases: [],
+      aircrafts: [],
+      activeThreats: [],
+      tick: 12,
+      time: '2026-03-12T03:15:05Z',
+      aircraftPositions: [],
+      history: { 12: snapshot },
+      playbackTick: 12,
+      maxTick: 12,
+      untilTick: 24,
+    })).toEqual([threat]);
   });
 });
