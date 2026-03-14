@@ -109,6 +109,7 @@ describe('createSimulationServiceClient', () => {
     const payload = {
       aircraft: {
         tailNumber: 'BX-101',
+        model: 'Falcon HX-12',
         needs: [],
         state: 'Inbound',
         assignedTo: '3a5f',

@@ -24,6 +24,7 @@ export type ApiAirbasePoint = {
 
 export type ApiAirbase = {
   id: string;
+  name: string;
   area: ApiAirbasePoint[];
   infoUrl?: string;
 };
@@ -40,6 +41,7 @@ export interface MapServiceClient {
 
 export type SimulationAirbase = {
   id: string;
+  name: string;
   location: { x: number; y: number };
   regionId: string;
   region: string;
@@ -61,6 +63,7 @@ export type AirbaseCapabilityMap = Record<string, AirbaseCapability>;
 
 export type SimulationAircraft = {
   tailNumber: string;
+  model: string;
   needs: SimulationAircraftNeed[];
   state: string;
   assignedTo?: string;

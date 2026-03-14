@@ -17,6 +17,7 @@ describe('createMapServiceClient', () => {
 
     expect(result).toHaveLength(4);
     expect(result[0]?.id).toBe('lulea');
+    expect(result[0]?.name).toBe('Lulea Airbase');
     expect(result[0]?.area).toHaveLength(4);
   });
 
