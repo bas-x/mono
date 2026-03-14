@@ -21,14 +21,6 @@ type AirbaseOptionProps = {
   onSelectAirbase: (airbaseId: string) => void;
 };
 
-function toDisplayName(airbaseId: string): string {
-  return airbaseId
-    .split(/[-_]/)
-    .filter(Boolean)
-    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
-    .join(' ');
-}
-
 function ClearSelectionOption({ disabled, onClearSelection }: ClearSelectionOptionProps) {
   return (
     <li>
@@ -64,7 +56,7 @@ function AirbaseOption({
   onClearSelection,
   onSelectAirbase,
 }: AirbaseOptionProps) {
-  const label = toDisplayName(airbase.id);
+  const label = airbase.name;
 
   return (
     <li>
@@ -108,7 +100,7 @@ export function AirbaseList({
   onSelectAirbase,
 }: AirbaseListProps) {
   const sortedAirbases = useMemo(() => {
-    return [...airbases].sort((left, right) => left.id.localeCompare(right.id));
+    return [...airbases].sort((left, right) => left.name.localeCompare(right.name));
   }, [airbases]);
 
   return (

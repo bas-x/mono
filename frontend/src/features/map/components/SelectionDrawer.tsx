@@ -46,20 +46,27 @@ function renderDetailsContent(
     );
   }
 
-  const entries = Object.entries(state.details).filter(([key]) => key !== 'id');
+  const name = typeof state.details.name === 'string' ? state.details.name : null;
+  const region = typeof state.details.region === 'string' ? state.details.region : null;
 
-  if (entries.length === 0) {
+  if (!name && !region) {
     return <p className="shell-text-muted m-0 text-xs">No additional details available.</p>;
   }
 
   return (
     <dl className="m-0 grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-xs">
-      {entries.map(([key, value]) => (
-        <div key={key} className="contents">
-          <dt className="font-semibold text-[color:var(--color-shell-text)]">{key}</dt>
-          <dd className="shell-text-muted m-0 truncate">{String(value)}</dd>
+      {name ? (
+        <div className="contents">
+          <dt className="font-semibold text-[color:var(--color-shell-text)]">Name</dt>
+          <dd className="shell-text-muted m-0 truncate">{name}</dd>
         </div>
-      ))}
+      ) : null}
+      {region ? (
+        <div className="contents">
+          <dt className="font-semibold text-[color:var(--color-shell-text)]">Region</dt>
+          <dd className="shell-text-muted m-0 truncate">{region}</dd>
+        </div>
+      ) : null}
     </dl>
   );
 }
@@ -69,6 +76,11 @@ function SelectionDrawerContent({
   selectedAirbaseDetailsState,
   onClearSelection,
 }: Omit<SelectionDrawerProps, 'viewMode'>) {
+  const displayName = selectedAirbaseDetailsState.status === 'success'
+    && typeof selectedAirbaseDetailsState.details.name === 'string'
+    ? selectedAirbaseDetailsState.details.name
+    : selectedAirbaseId;
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-4">
       <div className="shell-divider space-y-2 border-b pb-4">
@@ -77,7 +89,7 @@ function SelectionDrawerContent({
         </p>
         <div className="space-y-1">
           <p className="m-0 text-lg font-semibold text-[color:var(--color-shell-text)]">
-            {selectedAirbaseId ?? 'No base selected'}
+            {displayName ?? 'No base selected'}
           </p>
           <p className="shell-text-muted m-0 text-xs">
             Inspect current base details while keeping map controls in the sidebar.

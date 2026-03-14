@@ -16,7 +16,7 @@ import {
   projectPointToPercent,
   toAriaLabel,
 } from '@/features/map/lib/geometry';
-import { getPlacementAnchor, getPlacementBounds } from '@/features/map/lib/placement';
+import { getPlacementAnchor } from '@/features/map/lib/placement';
 import { applyCoordinateTransform, resolveCoordinateTransform } from '@/features/map/lib/transform';
 import {
   DEFAULT_MAP_VIEW_BOX,
@@ -85,17 +85,18 @@ function asRenderableAirbase(
   transform: MapCoordinateTransform,
 ): RenderableAirbase {
   const transformedAnchor = applyCoordinateTransform(getPlacementAnchor(source), transform);
-  const bounds = getPlacementBounds(source);
   const capacity = resolveAirbaseCapacity(source.id);
 
   return {
     id: source.id,
+    name: source.name,
     infoUrl:
       'infoUrl' in source && typeof source.infoUrl === 'string' ? source.infoUrl : undefined,
     centroid: transformedAnchor,
     regionId: 'regionId' in source ? source.regionId : undefined,
+    region: 'region' in source ? source.region : undefined,
     markerSizePx: resolveMarkerSizePx(capacity),
-    ariaLabel: `${toAriaLabel(source)} ${capacity} capacity (${Math.round(bounds.maxX - bounds.minX)}x${Math.round(bounds.maxY - bounds.minY)})`,
+    ariaLabel: `${toAriaLabel(source)} (${source.id})`,
   };
 }
 
@@ -187,6 +188,7 @@ export function ConstellationMap({
       externalPlacementSources ??
       airbaseState.airbases.map((airbase: Airbase) => ({
         id: airbase.id,
+        name: airbase.name,
         area: airbase.area,
         infoUrl: airbase.infoUrl,
       })),
@@ -355,15 +357,15 @@ export function ConstellationMap({
       />
 
       {hoveredAirbase && hoveredPointPercent ? (
-        <AirbaseTooltip
-          airbaseId={hoveredAirbase.id}
-          leftPercent={hoveredPointPercent.x}
-          topPercent={hoveredPointPercent.y}
-          regionId={hoveredAirbase.regionId}
-          coordinates={hoveredAirbase.centroid}
-          detailsState={detailsState}
-        />
-      ) : null}
+            <AirbaseTooltip
+              airbaseId={hoveredAirbase.id}
+              airbaseName={hoveredAirbase.name}
+              leftPercent={hoveredPointPercent.x}
+              topPercent={hoveredPointPercent.y}
+              region={hoveredAirbase.region}
+              detailsState={detailsState}
+            />
+          ) : null}
     </div>
   );
 }
