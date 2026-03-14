@@ -45,7 +45,37 @@ describe('createMockSimulationStreamClient', () => {
     expect(eventTypes).toContain('all_aircraft_positions');
     expect(eventTypes).toContain('landing_assignment');
     expect(eventTypes).toContain('aircraft_state_change');
+    expect(eventTypes).toContain('threat_spawned');
+    expect(eventTypes).toContain('threat_despawned');
     expect(eventTypes).toContain('simulation_ended');
+
+    client.disconnect();
+    vi.useRealTimers();
+  });
+
+  it('emits threat events with positioned threat payloads in mock mode', () => {
+    vi.useFakeTimers();
+
+    const client = createMockSimulationStreamClient();
+    const threats: Array<Record<string, unknown>> = [];
+
+    client.subscribe((event) => {
+      if (event.type === 'threat_spawned' || event.type === 'threat_despawned') {
+        threats.push(event as Record<string, unknown>);
+      }
+    });
+
+    client.connect('mock-full-sortie');
+    vi.advanceTimersByTime(250 + 1_500 * 14);
+
+    expect(threats.some((event) => event.type === 'threat_spawned')).toBe(true);
+    expect(threats.some((event) => event.type === 'threat_despawned')).toBe(true);
+    expect(threats[0]?.threat).toEqual(expect.objectContaining({
+      id: expect.any(String),
+      position: expect.objectContaining({ x: expect.any(Number), y: expect.any(Number) }),
+      createdAt: expect.any(String),
+      createdTick: expect.any(Number),
+    }));
 
     client.disconnect();
     vi.useRealTimers();

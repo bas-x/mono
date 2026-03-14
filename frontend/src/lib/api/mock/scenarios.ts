@@ -187,6 +187,16 @@ const FULL_AIRCRAFTS: SimulationAircraft[] = [
 const LIGHT_EVENTS: MockSimulationScenario['events'] = [
   { type: 'simulation_step', tick: 0 },
   {
+    type: 'threat_spawned',
+    tick: 0,
+    threat: {
+      id: 'threat-light-01',
+      position: { x: 145.5, y: 618.2 },
+      createdAt: createIsoAtTick(0),
+      createdTick: 0,
+    },
+  },
+  {
     type: 'all_aircraft_positions',
     tick: 0,
     positions: [
@@ -236,6 +246,16 @@ const LIGHT_EVENTS: MockSimulationScenario['events'] = [
       needs: [],
     },
   },
+  {
+    type: 'threat_despawned',
+    tick: 6,
+    threat: {
+      id: 'threat-light-01',
+      position: { x: 145.5, y: 618.2 },
+      createdAt: createIsoAtTick(0),
+      createdTick: 0,
+    },
+  },
   { type: 'simulation_step', tick: 6 },
   {
     type: 'simulation_ended',
@@ -250,6 +270,26 @@ const LIGHT_EVENTS: MockSimulationScenario['events'] = [
 
 const FULL_EVENTS: MockSimulationScenario['events'] = [
   { type: 'simulation_step', tick: 0 },
+  {
+    type: 'threat_spawned',
+    tick: 0,
+    threat: {
+      id: 'threat-full-01',
+      position: { x: 206.8, y: 454.4 },
+      createdAt: createIsoAtTick(0),
+      createdTick: 0,
+    },
+  },
+  {
+    type: 'threat_spawned',
+    tick: 0,
+    threat: {
+      id: 'threat-full-02',
+      position: { x: 260.9, y: 278.1 },
+      createdAt: createIsoAtTick(0),
+      createdTick: 0,
+    },
+  },
   {
     type: 'all_aircraft_positions',
     tick: 0,
@@ -333,6 +373,16 @@ const FULL_EVENTS: MockSimulationScenario['events'] = [
       state: 'Taxi',
       assignedTo: '77d0b19d42cb68a1',
       needs: [createNeed('repairs', 18)],
+    },
+  },
+  {
+    type: 'threat_despawned',
+    tick: 6,
+    threat: {
+      id: 'threat-full-01',
+      position: { x: 206.8, y: 454.4 },
+      createdAt: createIsoAtTick(0),
+      createdTick: 0,
     },
   },
   { type: 'simulation_step', tick: 6 },
