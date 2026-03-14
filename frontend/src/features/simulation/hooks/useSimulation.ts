@@ -535,7 +535,7 @@ export function useSimulation() {
   const streamClientsRef = useRef<
     Map<string, { client: SimulationStreamClient; unsubscribe: () => void; unsubscribeState: () => void }>
   >(new Map());
-  const [, setEventVersion] = useState(0);
+  const [eventVersion, setEventVersion] = useState(0);
 
   const activeSimulationId = state.status === 'running' ? state.simulationId : undefined;
   const stream = useSimulationStream(activeSimulationId);
@@ -550,6 +550,14 @@ export function useSimulation() {
     ? (terminalRecordsRef.current.get(state.simulationId) ?? state.terminalRecord ?? null)
     : latestTerminalRecord;
   const terminalRecords = sortTerminalSimulationRecords(Array.from(terminalRecordsRef.current.values()));
+  const timelineEventsBySimulation = useMemo(
+    () => new Map(eventsBySimulationRef.current),
+    [eventVersion],
+  );
+  const timelineTerminalRecordsBySimulation = useMemo(
+    () => new Map(terminalRecordsRef.current),
+    [terminalRecords, latestTerminalRecord],
+  );
 
   const registerTerminalRecord = useCallback((record: TerminalSimulationRecord) => {
     terminalRecordsRef.current.set(record.simulationId, record);
@@ -862,7 +870,7 @@ export function useSimulation() {
   }, [clients.simulation, fetchSimulations, loadSimulation]);
 
   const createBranchFromEvent = useCallback(async (event: SimulationEvent): Promise<boolean> => {
-    if (state.status !== 'running' || state.simulationId !== BASE_SIMULATION_ID) {
+    if (event.simulationId !== BASE_SIMULATION_ID) {
       return false;
     }
 
@@ -1015,10 +1023,13 @@ export function useSimulation() {
 
   return {
     state: visibleState,
+    activeSimulationId,
     events: currentEvents,
     terminalRecord: currentTerminalRecord,
     latestTerminalRecord,
     terminalRecords,
+    timelineEventsBySimulation,
+    timelineTerminalRecordsBySimulation,
     activeTerminalModalRecord,
     dismissTerminalModal,
     setPlaybackTick,

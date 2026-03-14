@@ -85,10 +85,13 @@ export function MapPanel() {
     useState<SelectedAirbaseDetailsState>({ status: 'idle' });
   const {
     state: simulationState,
+    activeSimulationId,
     events: simulationEvents,
     terminalRecord,
     latestTerminalRecord,
     terminalRecords,
+    timelineEventsBySimulation,
+    timelineTerminalRecordsBySimulation,
     setPlaybackTick,
     simulations,
     loadSimulation,
@@ -420,12 +423,15 @@ export function MapPanel() {
           <div className="shrink-0 border-t border-border bg-bg">
             <SimulationTimeline
               simulationId={simulationState.simulationId}
+              activeSimulationId={activeSimulationId}
               simulationState={simulationState}
               events={simulationEvents}
-              terminalRecord={terminalRecord}
-              latestTerminalRecord={latestTerminalRecord}
+              simulations={simulations}
+              timelineEventsBySimulation={timelineEventsBySimulation}
+              timelineTerminalRecordsBySimulation={timelineTerminalRecordsBySimulation}
               setPlaybackTick={setPlaybackTick}
               onRefresh={refreshData}
+              onSelectSimulation={loadSimulation}
               onBranchFromEvent={createBranchFromEvent}
             />
           </div>
