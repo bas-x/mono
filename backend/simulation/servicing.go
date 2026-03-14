@@ -27,8 +27,8 @@ func (s *ServicingState) Step(a *Aircraft, ctx FlightContext) AircraftState {
 		a.ApplyNeedPhase(s.consumeElapsed(now), NeedPhaseServicing, ctx.Lifecycle, nil)
 	}
 	if now.Sub(s.enteredAt) >= ctx.Lifecycle.Durations.Servicing {
-		a.ResetNeeds()
-		a.ResetNeedRemainders()
+		// a.ResetNeeds()
+		// a.ResetNeedRemainders()
 		return &ReadyState{}
 	}
 	return s

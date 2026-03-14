@@ -153,7 +153,6 @@ type textShell struct {
 	threatDirty             bool
 	lastAircraftPollTabID   string
 	lastAircraftPollTail    string
-	lastAircraftPollTick    uint64
 	qaFrameArmed            bool
 	qaFrameCaptured         bool
 	qaErr                   error
@@ -215,7 +214,7 @@ func (s *textShell) Update() error {
 	s.drainEvents()
 	if info, err := s.service.Simulation(s.workspace.activeTabID); err == nil {
 		s.refreshInfoLabel(info)
-		s.refreshSelectedAircraftFromService(info.Tick)
+		s.refreshSelectedAircraftFromService()
 	}
 	s.refreshAircraftList()
 	s.refreshAirbaseList()
@@ -233,7 +232,6 @@ func (s *textShell) Update() error {
 		s.workspace = workspace
 		s.lastAircraftPollTabID = ""
 		s.lastAircraftPollTail = ""
-		s.lastAircraftPollTick = 0
 		s.seedAircraftMap()
 		s.seedAirbaseMap()
 		s.seedThreatMap()
@@ -254,7 +252,6 @@ func (s *textShell) Update() error {
 		s.subID, s.eventCh = s.service.Broadcaster().Subscribe()
 		s.lastAircraftPollTabID = ""
 		s.lastAircraftPollTail = ""
-		s.lastAircraftPollTick = 0
 		s.seedAircraftMap()
 		s.seedAirbaseMap()
 		s.seedThreatMap()
@@ -277,7 +274,6 @@ func (s *textShell) Update() error {
 		s.workspace = workspace
 		s.lastAircraftPollTabID = ""
 		s.lastAircraftPollTail = ""
-		s.lastAircraftPollTick = 0
 		s.seedAircraftMap()
 		s.seedAirbaseMap()
 		s.seedThreatMap()
@@ -1077,28 +1073,24 @@ func (s *textShell) refreshInfoLabel(info services.SimulationInfo) {
 	s.workspace.activeSummary.timestamp = ts
 	s.workspace.activeSummary.running = info.Running
 	s.workspace.activeSummary.paused = info.Paused
+	s.workspace.activeSummary.aircraftCount = len(s.aircraftMap)
+	s.workspace.activeSummary.airbaseCount = len(s.airbaseMap)
+	s.workspace.activeSummary.threatCount = len(s.threatMap)
 	s.infoLabel.Label = fmt.Sprintf(
 		"Tick: %d    Time: %s    Aircraft: %d    Airbases: %d    Threats: %d",
 		info.Tick, ts,
-		s.workspace.activeSummary.aircraftCount,
-		s.workspace.activeSummary.airbaseCount,
-		s.workspace.activeSummary.threatCount,
+		len(s.aircraftMap),
+		len(s.airbaseMap),
+		len(s.threatMap),
 	)
 }
 
-func (s *textShell) refreshSelectedAircraftFromService(currentTick uint64) {
+func (s *textShell) refreshSelectedAircraftFromService() {
 	if s.selectedAircraft == "" {
 		s.lastAircraftPollTabID = s.workspace.activeTabID
 		s.lastAircraftPollTail = ""
-		s.lastAircraftPollTick = currentTick
 		return
 	}
-	if s.lastAircraftPollTabID == s.workspace.activeTabID &&
-		s.lastAircraftPollTail == s.selectedAircraft &&
-		s.lastAircraftPollTick == currentTick {
-		return
-	}
-
 	aircrafts, err := s.service.Aircrafts(s.workspace.activeTabID)
 	if err != nil {
 		return
@@ -1121,7 +1113,6 @@ func (s *textShell) refreshSelectedAircraftFromService(currentTick uint64) {
 
 	s.lastAircraftPollTabID = s.workspace.activeTabID
 	s.lastAircraftPollTail = s.selectedAircraft
-	s.lastAircraftPollTick = currentTick
 }
 
 func (s *textShell) seedAircraftMap() {
@@ -1210,8 +1201,10 @@ func (s *textShell) drainEvents() {
 						existing.posX = snap.Position.X
 						existing.posY = snap.Position.Y
 						existing.state = snap.State
-						existing.needCount = len(snap.Needs)
-						existing.needs = snap.Needs
+						if snap.TailNumber != s.selectedAircraft {
+							existing.needCount = len(snap.Needs)
+							existing.needs = snap.Needs
+						}
 						s.aircraftMap[snap.TailNumber] = existing
 					}
 				}
