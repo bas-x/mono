@@ -1,9 +1,11 @@
 import { createPortal } from 'react-dom';
 
-import type { LandingAssignmentEvent, SimulationEvent } from '@/lib/api/types';
+import type { LandingAssignmentEvent, SimulationAirbase, SimulationAircraft, SimulationEvent } from '@/lib/api/types';
 
 type LandingAssignmentStackProps = {
   events: SimulationEvent[];
+  aircrafts: SimulationAircraft[];
+  airbases: SimulationAirbase[];
   portalRoot: Element | null;
 };
 
@@ -129,6 +131,15 @@ function formatBaseId(baseId: string) {
   return baseId.slice(0, 6);
 }
 
+function getAircraftModel(aircrafts: SimulationAircraft[], tailNumber: string) {
+  return aircrafts.find((aircraft) => aircraft.tailNumber === tailNumber)?.model ?? 'Aircraft';
+}
+
+function getAirbaseLabel(airbases: SimulationAirbase[], baseId: string) {
+  const airbase = airbases.find((candidate) => candidate.id === baseId);
+  return airbase ? `${airbase.name} (${formatBaseId(baseId)})` : `Base ${formatBaseId(baseId)}`;
+}
+
 function formatNeedCount(count: number) {
   if (count === 0) {
     return 'No active service needs recorded';
@@ -141,7 +152,7 @@ function formatNeedCount(count: number) {
   return `${count} active service needs`;
 }
 
-export function LandingAssignmentStack({ events, portalRoot }: LandingAssignmentStackProps) {
+export function LandingAssignmentStack({ events, aircrafts, airbases, portalRoot }: LandingAssignmentStackProps) {
   if (typeof document === 'undefined' || !portalRoot) {
     return null;
   }
@@ -169,8 +180,8 @@ export function LandingAssignmentStack({ events, portalRoot }: LandingAssignment
                   <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-white/60">
                     Landing assignment
                   </div>
-                  <div className="mt-1 text-sm font-semibold text-white/95">
-                    {formatTailNumber(event.tailNumber)} {'->'} Base {formatBaseId(event.baseId)}
+                    <div className="mt-1 text-sm font-semibold text-white/95">
+                    {getAircraftModel(aircrafts, event.tailNumber)} · {formatTailNumber(event.tailNumber)} {'->'} {getAirbaseLabel(airbases, event.baseId)}
                   </div>
                   <div className="mt-1 text-xs text-white/70">
                     {event.source === 'human'

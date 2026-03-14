@@ -67,6 +67,10 @@ export function SimulationInfoCard({
       : simulation.parentId ?? 'No metadata',
   }));
 
+  const formatAircraftLabel = (model: string, tailNumber: string) => {
+    return `${model} · ${tailNumber.slice(0, 8)}`;
+  };
+
   return createPortal(
     <div className="pointer-events-none absolute inset-4 z-20 flex items-start justify-start">
       <div className="pointer-events-auto flex w-full max-w-96 flex-col gap-4">
@@ -235,7 +239,7 @@ export function SimulationInfoCard({
         </AccordionCard>
 
         <AccordionCard
-          title="Aircrafts"
+          title="Aircraft"
           isOpen={isAirOpen}
           onToggle={() => setIsAirOpen(!isAirOpen)}
           flexRatio={3}
@@ -253,7 +257,7 @@ export function SimulationInfoCard({
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3 transition-transform duration-400 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:translate-x-2">
                   <span className="font-mono text-sm font-semibold text-[color:var(--color-shell-text)] transition-colors duration-300 group-hover:text-[color:var(--color-primary)]">
-                    {ac.tailNumber.substring(0, 8)}
+                    {formatAircraftLabel(ac.model, ac.tailNumber)}
                   </span>
                   <span className="rounded-full border border-[color:var(--color-shell-button-border)] bg-[color:var(--color-shell-button-bg)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[color:var(--color-shell-text-muted)] transition-all duration-300 group-hover:border-[color:var(--color-primary)]/40 group-hover:bg-[color:var(--color-shell-button-hover)] group-hover:text-[color:var(--color-shell-text)]">
                     {ac.state}
@@ -281,7 +285,7 @@ export function SimulationInfoCard({
                 >
                   {simulationState.airbases.map((airbase) => (
                     <option key={airbase.id} value={airbase.id}>
-                      {airbase.region} ({airbase.id.slice(0, 6)})
+                      {airbase.name} ({airbase.id.slice(0, 6)})
                     </option>
                   ))}
                 </select>

@@ -5,7 +5,7 @@ import {
   getLandingAssignmentPrimaryCapability,
   getLandingAssignmentTone,
 } from '@/features/simulation/components/LandingAssignmentStack';
-import type { LandingAssignmentEvent } from '@/lib/api/types';
+import type { LandingAssignmentEvent, SimulationAirbase, SimulationAircraft } from '@/lib/api/types';
 
 describe('LandingAssignmentStack helpers', () => {
   it('prefers the first required capability from needs for the card tone', () => {
@@ -77,5 +77,28 @@ describe('LandingAssignmentStack helpers', () => {
       { capability: 'munitions', severity: 54 },
       { capability: 'fuel', severity: 42 },
     ]);
+  });
+
+  it('can resolve model and name-backed labels from the contract fields', () => {
+    const aircrafts: SimulationAircraft[] = [
+      {
+        tailNumber: 'BX-101',
+        model: 'Falcon HX-12',
+        needs: [],
+        state: 'Inbound',
+      },
+    ];
+    const airbases: SimulationAirbase[] = [
+      {
+        id: 'base-a',
+        name: 'Blekinge Forward Strip',
+        location: { x: 0, y: 0 },
+        regionId: 'SE-K',
+        region: 'Blekinge',
+      },
+    ];
+
+    expect(aircrafts[0]?.model).toBe('Falcon HX-12');
+    expect(airbases[0]?.name).toBe('Blekinge Forward Strip');
   });
 });

@@ -205,7 +205,7 @@ describe('useSimulation branching helpers', () => {
 
   it('keeps the latest landing assignment source for repeated events', () => {
     const afterAlgorithm = applyAircraftAssignment(
-      [{ tailNumber: 'BX-101', needs: [], state: 'Inbound' }],
+      [{ tailNumber: 'BX-101', model: 'Falcon HX-12', needs: [], state: 'Inbound' }],
       'BX-101',
       { base: 'base-a', source: 'algorithm' },
       [
@@ -228,10 +228,11 @@ describe('useSimulation branching helpers', () => {
 
   it('applies override responses synchronously before websocket reconciliation', () => {
     const updated = applyOverrideResponse(
-      [{ tailNumber: 'BX-101', needs: [], state: 'Inbound', assignedTo: 'base-a' }],
+      [{ tailNumber: 'BX-101', model: 'Falcon HX-12', needs: [], state: 'Inbound', assignedTo: 'base-a' }],
       {
         aircraft: {
           tailNumber: 'BX-101',
+          model: 'Falcon HX-12',
           needs: [],
           state: 'Inbound',
           assignedTo: 'base-b',
@@ -262,7 +263,7 @@ describe('useSimulation branching helpers', () => {
       isRunnerActive: false,
       isRunnerPaused: true,
       airbases: [],
-      aircrafts: [{ tailNumber: 'BX-101', needs: [], state: 'Inbound' }],
+      aircrafts: [{ tailNumber: 'BX-101', model: 'Falcon HX-12', needs: [], state: 'Inbound' }],
       tick: 12,
       time: '2026-03-12T03:15:05Z',
       aircraftPositions: [],
