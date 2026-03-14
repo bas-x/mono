@@ -32,6 +32,7 @@ function isPointBackedPlacement(
 export function normalizeLiveAirbase(airbase: Airbase): PolygonBackedAirbasePlacement {
   return {
     id: airbase.id,
+    name: airbase.name,
     area: airbase.area,
   };
 }
@@ -41,8 +42,10 @@ export function normalizeSimulationAirbase(
 ): PointBackedAirbasePlacement {
   return {
     id: airbase.id,
+    name: airbase.name,
     point: airbase.location,
     regionId: airbase.regionId,
+    region: airbase.region,
   };
 }
 

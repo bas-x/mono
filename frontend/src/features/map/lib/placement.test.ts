@@ -15,6 +15,7 @@ describe('placement', () => {
   it('uses centroid math for polygon-backed anchors', () => {
     const source = normalizeLiveAirbase({
       id: 'skewed-live-base',
+      name: 'Skewed Live Base',
       area: [
         { x: 0, y: 0 },
         { x: 8, y: 0 },

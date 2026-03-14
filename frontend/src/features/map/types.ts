@@ -22,11 +22,13 @@ export type MapViewBox = {
 export type AirbasePoint = ApiAirbasePoint;
 export type Airbase = ApiAirbase;
 export type AirbaseDetails = ApiAirbaseDetails;
-export type PolygonBackedAirbasePlacement = Pick<Airbase, 'id' | 'area'>;
+export type PolygonBackedAirbasePlacement = Pick<Airbase, 'id' | 'name' | 'area'>;
 export type PointBackedAirbasePlacement = {
   id: SimulationAirbase['id'];
+  name: SimulationAirbase['name'];
   point: AirbasePoint;
   regionId?: SimulationAirbase['regionId'];
+  region?: SimulationAirbase['region'];
 };
 export type AirbasePlacementSource =
   | PolygonBackedAirbasePlacement
