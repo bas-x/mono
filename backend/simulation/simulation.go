@@ -20,6 +20,7 @@ type Simulation struct {
 	threats       *ThreatSet
 	threatOpts    ThreatOptions
 	lifecycle     LifecycleModel
+	servicing     *servicingSummaryAccumulator
 
 	aircraftStateChangeHooks  []AircraftStateChangeHook
 	landingAssignmentHooks    []LandingAssignmentHook
@@ -41,6 +42,7 @@ func (s *Simulation) AssertInvariants() {
 	s.fleet.AssertInvariants()
 	assert.NotNil(s.dispatcher, "dispatcher")
 	s.dispatcher.AssertInvariants()
+	assert.NotNil(s.servicing, "servicing summary accumulator")
 }
 
 func NewSimulator(seed [32]byte, ts *TimeSim) *Simulation {
@@ -62,6 +64,7 @@ func NewSimulator(seed [32]byte, ts *TimeSim) *Simulation {
 		dispatcher:                NewDispatcher(constellation, assigner),
 		threats:                   NewThreatSet(),
 		lifecycle:                 DefaultLifecycleModel(),
+		servicing:                 newServicingSummaryAccumulator(),
 		aircraftStateChangeHooks:  make([]AircraftStateChangeHook, 0),
 		landingAssignmentHooks:    make([]LandingAssignmentHook, 0),
 		simulationStepHooks:       make([]SimulationStepHook, 0),
@@ -145,6 +148,9 @@ func (s *Simulation) Step() {
 		Threats:       s.threats,
 		ActiveThreats: s.threats,
 		OnAircraftStateChange: func(event AircraftStateChangeEvent) {
+			if s.servicing != nil {
+				s.servicing.Record(event, s.ts.Resolution)
+			}
 			safeInvoke(s.aircraftStateChangeHooks, event)
 		},
 		OnThreatTargeted: func(event ThreatTargetedEvent) {
@@ -205,6 +211,7 @@ func (s *Simulation) Clone() *Simulation {
 		threats:                   s.threats.Clone(),
 		threatOpts:                s.threatOpts,
 		lifecycle:                 s.lifecycle,
+		servicing:                 s.servicing.Clone(),
 		aircraftStateChangeHooks:  append([]AircraftStateChangeHook(nil), s.aircraftStateChangeHooks...),
 		landingAssignmentHooks:    append([]LandingAssignmentHook(nil), s.landingAssignmentHooks...),
 		simulationStepHooks:       append([]SimulationStepHook(nil), s.simulationStepHooks...),
@@ -304,6 +311,16 @@ func (s *Simulation) AddThreatDespawnedHook(hook ThreatDespawnedHook) {
 func (s *Simulation) AddAllAircraftPositionsHook(hook AllAircraftPositionsHook) {
 	assert.NotNil(hook, "all aircraft positions hook")
 	s.allAircraftPositionsHooks = append(s.allAircraftPositionsHooks, hook)
+}
+
+func (s *Simulation) ServicingSummary() ServicingSummary {
+	if s == nil {
+		return ServicingSummary{}
+	}
+	if s.servicing == nil {
+		return ServicingSummary{}
+	}
+	return s.servicing.Summary()
 }
 
 func (s *Simulation) bindInternalHooks() {

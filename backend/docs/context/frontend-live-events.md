@@ -191,9 +191,13 @@ Current event types:
 
 - `simulation_step`
 - `simulation_ended`
+- `simulation_closed`
 - `aircraft_state_change`
 - `landing_assignment`
 - `all_aircraft_positions`
+- `threat_spawned`
+- `threat_targeted`
+- `threat_despawned`
 - `branch_created` (base stream only)
 
 ## Event Shapes
@@ -242,9 +246,33 @@ Current event types:
   "type": "simulation_ended",
   "simulationId": "base",
   "tick": 3,
-  "timestamp": "2026-03-11T18:00:15Z"
+  "timestamp": "2026-03-11T18:00:15Z",
+  "summary": {
+    "completedVisitCount": 0,
+    "totalDurationMs": 0,
+    "averageDurationMs": null
+  }
 }
 ```
+
+### Simulation closed
+
+```json
+{
+  "type": "simulation_closed",
+  "simulationId": "base",
+  "tick": 1,
+  "timestamp": "2026-03-11T18:00:05Z",
+  "reason": "reset",
+  "summary": {
+    "completedVisitCount": 0,
+    "totalDurationMs": 0,
+    "averageDurationMs": null
+  }
+}
+```
+
+Both terminal event types use the same direct `summary` object. `totalDurationMs` and `averageDurationMs` are milliseconds. `averageDurationMs` is `null` until at least one servicing visit completes. `simulation_closed` always carries `reason`, `reset` for base reset and `cancel` for branch reset. Use event type, not summary shape, to distinguish natural completion (`simulation_ended`) from non-natural closure (`simulation_closed`).
 
 ### Landing assignment
 
@@ -336,7 +364,9 @@ Suggested reducer behavior:
 - `simulation_step`
   - update current tick / time cursor
 - `simulation_ended`
-  - mark the simulation as completed and stop assuming further live updates will arrive unless restarted
+  - mark the simulation as completed naturally, persist `summary`, and stop assuming further live updates will arrive unless restarted
+- `simulation_closed`
+  - treat the simulation as non-natural removal/closure, persist required `reason` plus `summary`, and stop assuming further live updates will arrive unless the simulation is recreated
 
 ## Operational Notes
 
@@ -345,6 +375,8 @@ Suggested reducer behavior:
 - slow websocket clients are disconnected by the backend rather than allowed to block simulation progress
 - branch creation is available via `POST /simulations/:simulationId/branch`
 - branch lineage metadata (`parentId`, `splitTick`, `splitTimestamp`, optional `sourceEvent`) comes from REST simulation reads, the branch creation response, and the base-stream `branch_created` event
+- `simulation_closed` is the websocket-only terminal non-natural removal event emitted by reset semantics; `reason=reset` is used for base removal and `reason=cancel` for branch removal
+- terminal servicing summaries are shipped directly as `summary.completedVisitCount`, `summary.totalDurationMs`, and nullable `summary.averageDurationMs`
 - `sourceEvent` is metadata-only clicked-anchor data. It does not change branch snapshot semantics, and it is only kept for the current backend runtime
 - `branch_created` is emitted only on `/ws/simulations/base/events`; branch streams continue to receive only events tagged with their own `simulationId`
 - first branch support is base simulation only; checkpoint-based branch creation and branch-from-branch workflows are not implemented

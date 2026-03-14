@@ -2,6 +2,8 @@ package services_test
 
 import (
 	"encoding/hex"
+	"math/rand/v2"
+	"reflect"
 	"sort"
 	"testing"
 	"time"
@@ -427,6 +429,129 @@ func TestSimulationServiceEndToEnd_EmitsSimulationEndedEvent(t *testing.T) {
 	require.Equal(t, uint64(3), ended.Tick)
 }
 
+func TestSimulationServiceEndToEnd_SummaryNaturalEnd_ZeroCaseContract(t *testing.T) {
+	t.Parallel()
+
+	svc := newControlledRunnerService()
+	_, err := svc.CreateBaseSimulation(deterministicBaseUntilTickConfig(1, 1, 3))
+	require.NoError(t, err)
+
+	events := subscribeToServiceEvents(t, svc)
+	require.NoError(t, svc.StartSimulation(services.BaseSimulationID))
+
+	ended := requireNextSimulationEndedEvent(t, events, 2*time.Second, services.BaseSimulationID)
+	require.Equal(t, services.EventTypeSimulationEnded, ended.Type)
+	require.Equal(t, services.BaseSimulationID, ended.SimulationID)
+	require.Equal(t, uint64(3), ended.Tick)
+	requireSimulationEndedSummaryContract(t, ended, servicingSummaryExpectation{
+		completedVisitCount: 0,
+		totalDurationMs:     0,
+		averageDurationMs:   nil,
+	})
+}
+
+func TestSimulationServiceEndToEnd_SummaryNaturalEnd_ContainsExactServicingSummaryFields(t *testing.T) {
+	t.Parallel()
+
+	svc := newControlledRunnerService()
+	_, err := svc.CreateBaseSimulation(deterministicBaseUntilTickConfig(1, 1, 3))
+	require.NoError(t, err)
+
+	events := subscribeToServiceEvents(t, svc)
+	require.NoError(t, svc.StartSimulation(services.BaseSimulationID))
+
+	ended := requireNextSimulationEndedEvent(t, events, 2*time.Second, services.BaseSimulationID)
+	require.Equal(t, services.BaseSimulationID, ended.SimulationID)
+	requireSimulationEndedSummaryContract(t, ended, servicingSummaryExpectation{
+		completedVisitCount: 0,
+		totalDurationMs:     0,
+		averageDurationMs:   nil,
+	})
+}
+
+func TestSimulationServiceEndToEnd_BranchSummary_InheritsCompletedVisitsVisibleAtFork(t *testing.T) {
+	t.Parallel()
+
+	svc := newBranchSummaryService()
+	_, err := svc.CreateBaseSimulation(branchSummaryBaseConfig())
+	require.NoError(t, err)
+
+	events := subscribeToServiceEvents(t, svc)
+	baseEventsAtFork := advanceBranchSummaryScenarioToFork(t, svc, events)
+
+	branchID, err := svc.BranchSimulation(services.BaseSimulationID)
+	require.NoError(t, err)
+
+	baseInfoAtFork := requireSimulationInfo(t, svc, services.BaseSimulationID)
+	branchInfo := requireSimulationInfo(t, svc, branchID)
+	require.NotNil(t, branchInfo.SplitTick)
+	require.NotNil(t, branchInfo.SplitTimestamp)
+	require.Equal(t, baseInfoAtFork.Tick, *branchInfo.SplitTick)
+	require.Equal(t, baseInfoAtFork.Timestamp, *branchInfo.SplitTimestamp)
+
+	baseSummaryAtFork := summarizeCompletedServicingVisitsFromEvents(baseEventsAtFork, branchSummaryResolution)
+	branchSummaryAtFork := summarizeBranchCompletedServicingVisitsAtSplit(baseEventsAtFork, *branchInfo.SplitTimestamp, nil, branchSummaryResolution)
+
+	requireServicingSummaryExpectation(t, baseSummaryAtFork, servicingSummaryExpectation{
+		completedVisitCount: 1,
+		totalDurationMs:     5000,
+		averageDurationMs:   ptr(int64(5000)),
+	})
+	requireServicingSummaryExpectation(t, branchSummaryAtFork, servicingSummaryExpectation{
+		completedVisitCount: 1,
+		totalDurationMs:     5000,
+		averageDurationMs:   ptr(int64(5000)),
+	})
+}
+
+func TestSimulationServiceEndToEnd_BranchSummary_DivergenceKeepsBranchOnlyCompletedVisitsScoped(t *testing.T) {
+	t.Parallel()
+
+	svc := newBranchSummaryService()
+	_, err := svc.CreateBaseSimulation(branchSummaryBaseConfig())
+	require.NoError(t, err)
+
+	events := subscribeToServiceEvents(t, svc)
+	baseEventsAtFork := advanceBranchSummaryScenarioToFork(t, svc, events)
+
+	branchID, err := svc.BranchSimulation(services.BaseSimulationID)
+	require.NoError(t, err)
+
+	baseInfoAtFork := requireSimulationInfo(t, svc, services.BaseSimulationID)
+	branchInfoAtFork := requireSimulationInfo(t, svc, branchID)
+	require.NotNil(t, branchInfoAtFork.SplitTimestamp)
+
+	branchEventsAfterFork := advanceBranchSummaryScenarioToBranchOnlyCompletion(t, svc, events, branchID)
+	require.Len(t, branchEventsAfterFork, 3)
+	branchExitEvent := branchEventsAfterFork[len(branchEventsAfterFork)-1]
+	require.Equal(t, "Servicing", branchExitEvent.OldState)
+	require.Equal(t, "Ready", branchExitEvent.NewState)
+	requireNoAircraftStateChangeEvent(t, events, 150*time.Millisecond, services.BaseSimulationID)
+
+	baseInfoAfterBranchOnlyVisit := requireSimulationInfo(t, svc, services.BaseSimulationID)
+	require.Equal(t, baseInfoAtFork.Tick, baseInfoAfterBranchOnlyVisit.Tick)
+	require.Equal(t, baseInfoAtFork.Timestamp, baseInfoAfterBranchOnlyVisit.Timestamp)
+
+	baseSummaryAfterBranchDivergence := summarizeCompletedServicingVisitsFromEvents(baseEventsAtFork, branchSummaryResolution)
+	branchSummaryAfterBranchDivergence := summarizeBranchCompletedServicingVisitsAtSplit(
+		baseEventsAtFork,
+		*branchInfoAtFork.SplitTimestamp,
+		branchEventsAfterFork,
+		branchSummaryResolution,
+	)
+
+	requireServicingSummaryExpectation(t, baseSummaryAfterBranchDivergence, servicingSummaryExpectation{
+		completedVisitCount: 1,
+		totalDurationMs:     5000,
+		averageDurationMs:   ptr(int64(5000)),
+	})
+	requireServicingSummaryExpectation(t, branchSummaryAfterBranchDivergence, servicingSummaryExpectation{
+		completedVisitCount: 2,
+		totalDurationMs:     10000,
+		averageDurationMs:   ptr(int64(5000)),
+	})
+}
+
 func TestSimulationServiceEndToEnd_BranchInheritsUntilTickAsObservedAbsoluteLimit(t *testing.T) {
 	t.Parallel()
 
@@ -755,7 +880,7 @@ func TestSimulationServiceEndToEnd_StepSimulationPausedBaseAndBranchAdvanceDeter
 	requireNoSimulationStepEvent(t, events, 150*time.Millisecond, branchID)
 }
 
-func TestSimulationServiceEndToEnd_ResetRunningBaseDoesNotEmitSimulationEndedEvent(t *testing.T) {
+func TestSimulationServiceEndToEnd_ResetRunningBaseEmitsResetCloseSummaryAndDoesNotEmitSimulationEndedEvent(t *testing.T) {
 	t.Parallel()
 
 	svc := newControlledRunnerService()
@@ -767,14 +892,30 @@ func TestSimulationServiceEndToEnd_ResetRunningBaseDoesNotEmitSimulationEndedEve
 	requireNextSimulationStepEvent(t, events, 2*time.Second, services.BaseSimulationID)
 
 	require.NoError(t, svc.ResetSimulation(services.BaseSimulationID))
+	closed := requireNextSimulationClosedEventPayload(t, events, 2*time.Second, services.BaseSimulationID)
+	require.Equal(t, "simulation_closed", closed["type"])
+	require.Equal(t, services.BaseSimulationID, closed["simulationId"])
+	require.Equal(t, "reset", closed["reason"])
+
+	summaryRaw, ok := closed["summary"]
+	require.True(t, ok)
+	summary, ok := summaryRaw.(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, float64(0), summary["completedVisitCount"])
+	require.Equal(t, float64(0), summary["totalDurationMs"])
+	require.Nil(t, summary["averageDurationMs"])
+	_, hasNestedServicing := summary["servicing"]
+	require.False(t, hasNestedServicing)
+
 	requireNoSimulationEndedEvent(t, events, 200*time.Millisecond, services.BaseSimulationID)
+	requireNoSimulationClosedEventPayload(t, events, 200*time.Millisecond, services.BaseSimulationID)
 
 	_, err = svc.Simulation(services.BaseSimulationID)
 	require.ErrorIs(t, err, services.ErrBaseNotFound)
 	require.Empty(t, svc.Simulations())
 }
 
-func TestSimulationServiceEndToEnd_ResetBranchDoesNotEmitSimulationEndedEventAndPreservesOtherSimulations(t *testing.T) {
+func TestSimulationServiceEndToEnd_ResetBranchEmitsCancelCloseSummaryDoesNotEmitSimulationEndedEventAndPreservesOtherSimulations(t *testing.T) {
 	t.Parallel()
 
 	svc := newControlledRunnerService()
@@ -799,7 +940,23 @@ func TestSimulationServiceEndToEnd_ResetBranchDoesNotEmitSimulationEndedEventAnd
 	require.NoError(t, err)
 
 	require.NoError(t, svc.ResetSimulation(branchToReset))
+	closed := requireNextSimulationClosedEventPayload(t, events, 2*time.Second, branchToReset)
+	require.Equal(t, "simulation_closed", closed["type"])
+	require.Equal(t, branchToReset, closed["simulationId"])
+	require.Equal(t, "cancel", closed["reason"])
+
+	summaryRaw, ok := closed["summary"]
+	require.True(t, ok)
+	summary, ok := summaryRaw.(map[string]any)
+	require.True(t, ok)
+	require.Equal(t, float64(0), summary["completedVisitCount"])
+	require.Equal(t, float64(0), summary["totalDurationMs"])
+	require.Nil(t, summary["averageDurationMs"])
+	_, hasNestedServicing := summary["servicing"]
+	require.False(t, hasNestedServicing)
+
 	requireNoSimulationEndedEvent(t, events, 200*time.Millisecond, branchToReset)
+	requireNoSimulationClosedEventPayload(t, events, 200*time.Millisecond, branchToReset)
 
 	_, err = svc.Simulation(branchToReset)
 	require.ErrorIs(t, err, services.ErrSimulationNotFound)
@@ -825,7 +982,7 @@ func TestSimulationServiceEndToEnd_ResetBranchDoesNotEmitSimulationEndedEventAnd
 	require.Len(t, listed, 2)
 	listedByID := simulationInfoIndexByID(t, listed)
 	require.Len(t, listedByID, 2)
-	_, ok := listedByID[services.BaseSimulationID]
+	_, ok = listedByID[services.BaseSimulationID]
 	require.True(t, ok)
 	_, ok = listedByID[unaffectedBranch]
 	require.True(t, ok)
@@ -2321,4 +2478,301 @@ func extraThreats(baseThreats, branchThreats map[string]services.Threat) []servi
 	}
 
 	return extra
+}
+
+const branchSummaryResolution = time.Second
+
+type servicingSummaryExpectation struct {
+	completedVisitCount int64
+	totalDurationMs     int64
+	averageDurationMs   *int64
+}
+
+func newBranchSummaryService() *services.SimulationService {
+	return services.NewSimulationService(services.SimulationServiceConfig{Resolution: branchSummaryResolution})
+}
+
+func branchSummaryBaseConfig() services.BaseSimulationConfig {
+	options := inboundOverrideSimulationOptions()
+	options.ConstellationOpts.MinPerRegion = 1
+	options.ConstellationOpts.MaxPerRegion = 1
+	options.ConstellationOpts.MaxTotal = 1
+	options.FleetOpts.AircraftMin = 2
+	options.FleetOpts.AircraftMax = 2
+	options.LifecycleOpts.Durations.InboundDecision = 12 * time.Second
+	options.LifecycleOpts.Durations.Servicing = 5 * time.Second
+
+	stateIndex := 0
+	options.FleetOpts.StateFactory = func(_ *rand.Rand) simulation.AircraftState {
+		stateIndex++
+		if stateIndex == 1 {
+			return &simulation.CommittedState{}
+		}
+		return &simulation.InboundState{}
+	}
+
+	return services.BaseSimulationConfig{Options: options}
+}
+
+func advanceBranchSummaryScenarioToFork(
+	t *testing.T,
+	svc *services.SimulationService,
+	events *serviceEventWatcher,
+) []services.AircraftStateChangeEvent {
+	t.Helper()
+
+	baseEvents := make([]services.AircraftStateChangeEvent, 0, 4)
+	for step := 0; step < 20; step++ {
+		require.NoError(t, svc.StepSimulation(services.BaseSimulationID))
+		baseEvents = append(baseEvents, collectAircraftStateChangeEvents(t, events, 10*time.Millisecond, services.BaseSimulationID)...)
+
+		if branchSummaryForkReached(t, svc, baseEvents) {
+			return baseEvents
+		}
+	}
+
+	t.Fatalf("timed out reaching branch summary fork state; events=%#v", baseEvents)
+	return nil
+}
+
+func advanceBranchSummaryScenarioToBranchOnlyCompletion(
+	t *testing.T,
+	svc *services.SimulationService,
+	events *serviceEventWatcher,
+	branchID string,
+) []services.AircraftStateChangeEvent {
+	t.Helper()
+
+	branchEvents := make([]services.AircraftStateChangeEvent, 0, 4)
+	for step := 0; step < 20; step++ {
+		require.NoError(t, svc.StepSimulation(branchID))
+
+		stepEvents := collectAircraftStateChangeEvents(t, events, 10*time.Millisecond, branchID)
+		branchEvents = append(branchEvents, stepEvents...)
+		for _, event := range stepEvents {
+			if event.OldState == "Servicing" && event.NewState == "Ready" {
+				return branchEvents
+			}
+		}
+	}
+
+	t.Fatalf("timed out reaching branch-only servicing completion for %q", branchID)
+	return nil
+}
+
+func branchSummaryForkReached(
+	t *testing.T,
+	svc *services.SimulationService,
+	baseEvents []services.AircraftStateChangeEvent,
+) bool {
+	t.Helper()
+
+	summary := summarizeCompletedServicingVisitsFromEvents(baseEvents, branchSummaryResolution)
+	if summary.completedVisitCount != 1 {
+		return false
+	}
+
+	servicingExits := 0
+	for _, event := range baseEvents {
+		if event.OldState == "Servicing" {
+			servicingExits++
+		}
+	}
+	if servicingExits != 1 {
+		return false
+	}
+
+	aircrafts, err := svc.Aircrafts(services.BaseSimulationID)
+	require.NoError(t, err)
+
+	readyCount := 0
+	inboundCount := 0
+	for _, aircraft := range aircrafts {
+		switch aircraft.State {
+		case "Ready":
+			readyCount++
+		case "Inbound":
+			inboundCount++
+		}
+	}
+
+	return readyCount == 1 && inboundCount == 1
+}
+
+func collectAircraftStateChangeEvents(
+	t *testing.T,
+	watcher *serviceEventWatcher,
+	timeout time.Duration,
+	simulationID string,
+) []services.AircraftStateChangeEvent {
+	t.Helper()
+
+	collected := make([]services.AircraftStateChangeEvent, 0)
+	for {
+		event, ok := takePendingMatching(watcher, services.EventTypeAircraftStateChange, simulationID, asAircraftStateChangeEvent)
+		if !ok {
+			break
+		}
+		collected = append(collected, event)
+	}
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	for {
+		select {
+		case raw, ok := <-watcher.events:
+			if !ok {
+				t.Fatalf("event stream closed while collecting aircraft_state_change events for simulation %q", simulationID)
+			}
+
+			event, typed := asAircraftStateChangeEvent(raw)
+			if typed && event.EventType() == services.EventTypeAircraftStateChange && event.EventSimulationID() == simulationID {
+				collected = append(collected, event)
+				continue
+			}
+
+			watcher.pending = append(watcher.pending, raw)
+		case <-timer.C:
+			return collected
+		}
+	}
+}
+
+func summarizeBranchCompletedServicingVisitsAtSplit(
+	baseEvents []services.AircraftStateChangeEvent,
+	splitTimestamp time.Time,
+	branchEvents []services.AircraftStateChangeEvent,
+	resolution time.Duration,
+) servicingSummaryExpectation {
+	combined := make([]services.AircraftStateChangeEvent, 0, len(baseEvents)+len(branchEvents))
+	for _, event := range baseEvents {
+		if event.Timestamp.After(splitTimestamp) {
+			continue
+		}
+		combined = append(combined, event)
+	}
+	combined = append(combined, branchEvents...)
+	return summarizeCompletedServicingVisitsFromEvents(combined, resolution)
+}
+
+func summarizeCompletedServicingVisitsFromEvents(
+	events []services.AircraftStateChangeEvent,
+	resolution time.Duration,
+) servicingSummaryExpectation {
+	sortedEvents := append([]services.AircraftStateChangeEvent(nil), events...)
+	sort.SliceStable(sortedEvents, func(i, j int) bool {
+		if sortedEvents[i].Timestamp.Equal(sortedEvents[j].Timestamp) {
+			if sortedEvents[i].TailNumber == sortedEvents[j].TailNumber {
+				if sortedEvents[i].OldState == sortedEvents[j].OldState {
+					return sortedEvents[i].NewState < sortedEvents[j].NewState
+				}
+				return sortedEvents[i].OldState < sortedEvents[j].OldState
+			}
+			return sortedEvents[i].TailNumber < sortedEvents[j].TailNumber
+		}
+		return sortedEvents[i].Timestamp.Before(sortedEvents[j].Timestamp)
+	})
+
+	activeServicingVisits := make(map[string]time.Time)
+	var totalDurationMs int64
+	var completedVisitCount int64
+
+	for _, event := range sortedEvents {
+		switch {
+		case event.NewState == "Servicing":
+			activeServicingVisits[event.TailNumber] = event.Timestamp.Add(resolution)
+		case event.OldState == "Servicing":
+			enteredAt, ok := activeServicingVisits[event.TailNumber]
+			if !ok || !event.Timestamp.After(enteredAt) {
+				delete(activeServicingVisits, event.TailNumber)
+				continue
+			}
+			completedVisitCount++
+			totalDurationMs += event.Timestamp.Sub(enteredAt).Milliseconds()
+			delete(activeServicingVisits, event.TailNumber)
+		}
+	}
+
+	summary := servicingSummaryExpectation{
+		completedVisitCount: completedVisitCount,
+		totalDurationMs:     totalDurationMs,
+	}
+	if completedVisitCount == 0 {
+		return summary
+	}
+
+	averageDurationMs := totalDurationMs / completedVisitCount
+	summary.averageDurationMs = &averageDurationMs
+	return summary
+}
+
+func requireServicingSummaryExpectation(t *testing.T, actual servicingSummaryExpectation, expected servicingSummaryExpectation) {
+	t.Helper()
+
+	require.Equal(t, expected.completedVisitCount, actual.completedVisitCount)
+	require.Equal(t, expected.totalDurationMs, actual.totalDurationMs)
+	if expected.averageDurationMs == nil {
+		require.Nil(t, actual.averageDurationMs)
+		return
+	}
+	require.NotNil(t, actual.averageDurationMs)
+	require.Equal(t, *expected.averageDurationMs, *actual.averageDurationMs)
+}
+
+func requireSimulationEndedSummaryContract(t *testing.T, ended services.SimulationEndedEvent, expected servicingSummaryExpectation) {
+	t.Helper()
+
+	summaryValue := reflect.ValueOf(ended).FieldByName("Summary")
+	require.True(t, summaryValue.IsValid(), "SimulationEndedEvent should expose Summary")
+	summaryValue = dereferenceValue(t, summaryValue, "Summary")
+	require.Equal(t, expected.completedVisitCount, reflectedInt64Field(t, summaryValue, "CompletedVisitCount"))
+	require.Equal(t, expected.totalDurationMs, reflectedInt64Field(t, summaryValue, "TotalDurationMs"))
+
+	averageDurationMs := reflectedOptionalInt64Field(t, summaryValue, "AverageDurationMs")
+	if expected.averageDurationMs == nil {
+		require.Nil(t, averageDurationMs)
+		return
+	}
+	require.NotNil(t, averageDurationMs)
+	require.Equal(t, *expected.averageDurationMs, *averageDurationMs)
+}
+
+func dereferenceValue(t *testing.T, value reflect.Value, fieldName string) reflect.Value {
+	t.Helper()
+
+	for value.Kind() == reflect.Pointer {
+		require.Falsef(t, value.IsNil(), "%s should not be nil", fieldName)
+		value = value.Elem()
+	}
+	return value
+}
+
+func reflectedInt64Field(t *testing.T, value reflect.Value, fieldName string) int64 {
+	t.Helper()
+
+	field := value.FieldByName(fieldName)
+	require.Truef(t, field.IsValid(), "summary should expose %s", fieldName)
+	require.Truef(t, field.CanInt(), "summary field %s should be integer", fieldName)
+	return field.Int()
+}
+
+func reflectedOptionalInt64Field(t *testing.T, value reflect.Value, fieldName string) *int64 {
+	t.Helper()
+
+	field := value.FieldByName(fieldName)
+	require.Truef(t, field.IsValid(), "summary should expose %s", fieldName)
+	if field.Kind() == reflect.Pointer {
+		if field.IsNil() {
+			return nil
+		}
+		field = field.Elem()
+	}
+	require.Truef(t, field.CanInt(), "summary field %s should be optional integer", fieldName)
+	fieldValue := field.Int()
+	return &fieldValue
+}
+
+func ptr[T any](value T) *T {
+	return &value
 }

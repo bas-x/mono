@@ -344,9 +344,30 @@ func (s *SimulationService) ResetSimulation(simulationID string) error {
 	if err != nil {
 		return err
 	}
+
+	finalTick := uint64(0)
+	finalTime := time.Time{}
+	summary := ServicingSummaryObject{}
+	if managed.sim != nil {
+		finalTick = managed.sim.Tick()
+		finalTime = managed.sim.Now()
+		summary = mapServicingSummary(managed.sim.ServicingSummary())
+	}
+	reason := SimulationClosedReasonCancel
+	if s.base == managed {
+		reason = SimulationClosedReasonReset
+	}
 	if managed.cancel != nil {
 		managed.cancel()
 	}
+	s.broadcaster.Emit(SimulationClosedEvent{
+		Type:         EventTypeSimulationClosed,
+		SimulationID: simulationID,
+		Tick:         finalTick,
+		Timestamp:    finalTime,
+		Reason:       reason,
+		Summary:      summary,
+	})
 	if s.base == managed {
 		s.base = nil
 		clear(s.branches)
@@ -604,7 +625,16 @@ func (s *SimulationService) runManagedSimulation(simulationID string, managed *m
 			SimulationID: simulationID,
 			Tick:         finalTick,
 			Timestamp:    finalTime,
+			Summary:      mapServicingSummary(sim.ServicingSummary()),
 		})
+	}
+}
+
+func mapServicingSummary(summary simulation.ServicingSummary) ServicingSummaryObject {
+	return ServicingSummaryObject{
+		CompletedVisitCount: summary.CompletedVisitCount,
+		TotalDurationMs:     summary.TotalDurationMs,
+		AverageDurationMs:   summary.AverageDurationMs,
 	}
 }
 

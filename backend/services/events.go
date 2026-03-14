@@ -8,10 +8,16 @@ const (
 	EventTypeLandingAssignment    = "landing_assignment"
 	EventTypeSimulationStep       = "simulation_step"
 	EventTypeSimulationEnded      = "simulation_ended"
+	EventTypeSimulationClosed     = "simulation_closed"
 	EventTypeThreatSpawned        = "threat_spawned"
 	EventTypeThreatTargeted       = "threat_targeted"
 	EventTypeThreatDespawned      = "threat_despawned"
 	EventTypeAllAircraftPositions = "all_aircraft_positions"
+)
+
+const (
+	SimulationClosedReasonReset  = "reset"
+	SimulationClosedReasonCancel = "cancel"
 )
 
 type Event interface {
@@ -92,10 +98,17 @@ func (e SimulationStepEvent) EventSimulationID() string {
 }
 
 type SimulationEndedEvent struct {
-	Type         string    `json:"type"`
-	SimulationID string    `json:"simulationId"`
-	Tick         uint64    `json:"tick"`
-	Timestamp    time.Time `json:"timestamp"`
+	Type         string                 `json:"type"`
+	SimulationID string                 `json:"simulationId"`
+	Tick         uint64                 `json:"tick"`
+	Timestamp    time.Time              `json:"timestamp"`
+	Summary      ServicingSummaryObject `json:"summary"`
+}
+
+type ServicingSummaryObject struct {
+	CompletedVisitCount int64  `json:"completedVisitCount"`
+	TotalDurationMs     int64  `json:"totalDurationMs"`
+	AverageDurationMs   *int64 `json:"averageDurationMs"`
 }
 
 func (e SimulationEndedEvent) EventType() string {
@@ -103,6 +116,23 @@ func (e SimulationEndedEvent) EventType() string {
 }
 
 func (e SimulationEndedEvent) EventSimulationID() string {
+	return e.SimulationID
+}
+
+type SimulationClosedEvent struct {
+	Type         string                 `json:"type"`
+	SimulationID string                 `json:"simulationId"`
+	Tick         uint64                 `json:"tick"`
+	Timestamp    time.Time              `json:"timestamp"`
+	Reason       string                 `json:"reason"`
+	Summary      ServicingSummaryObject `json:"summary"`
+}
+
+func (e SimulationClosedEvent) EventType() string {
+	return e.Type
+}
+
+func (e SimulationClosedEvent) EventSimulationID() string {
 	return e.SimulationID
 }
 

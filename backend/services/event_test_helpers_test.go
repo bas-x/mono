@@ -1,6 +1,7 @@
 package services_test
 
 import (
+	"encoding/json"
 	"fmt"
 	"testing"
 	"time"
@@ -174,6 +175,125 @@ func requireNextSimulationEndedEvent(t *testing.T, watcher *serviceEventWatcher,
 func requireNoSimulationEndedEvent(t *testing.T, watcher *serviceEventWatcher, timeout time.Duration, simulationID string) {
 	t.Helper()
 	requireNoScopedEvent(t, watcher, timeout, services.EventTypeSimulationEnded, simulationID, asSimulationEndedEvent)
+}
+
+func requireNextSimulationClosedEventPayload(t *testing.T, watcher *serviceEventWatcher, timeout time.Duration, simulationID string) map[string]any {
+	t.Helper()
+	return requireNextEventPayloadByType(t, watcher, timeout, "simulation_closed", simulationID)
+}
+
+func requireNoSimulationClosedEventPayload(t *testing.T, watcher *serviceEventWatcher, timeout time.Duration, simulationID string) {
+	t.Helper()
+	requireNoEventPayloadByType(t, watcher, timeout, "simulation_closed", simulationID)
+}
+
+func requireNextEventPayloadByType(t *testing.T, watcher *serviceEventWatcher, timeout time.Duration, eventType string, simulationID string) map[string]any {
+	t.Helper()
+
+	if payload, ok := takePendingEventPayloadMatching(t, watcher, eventType, simulationID); ok {
+		return payload
+	}
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	mismatchCount := 0
+	latestMismatch := ""
+
+	for {
+		select {
+		case raw, ok := <-watcher.events:
+			if !ok {
+				t.Fatalf("event stream closed while waiting for %s event for simulation %q", eventType, simulationID)
+			}
+
+			if raw.EventType() == eventType && raw.EventSimulationID() == simulationID {
+				payload, err := eventPayload(raw)
+				if err != nil {
+					t.Fatalf("marshal event payload for %s simulation %q: %v", eventType, simulationID, err)
+				}
+				return payload
+			}
+
+			if raw.EventType() == eventType {
+				mismatchCount++
+				latestMismatch = fmt.Sprintf("%#v", raw)
+			}
+
+			watcher.pending = append(watcher.pending, raw)
+		case <-timer.C:
+			if mismatchCount > 0 {
+				t.Fatalf("timed out waiting for %s event for simulation %q after seeing %d same-type event(s) for other simulations; latest=%s", eventType, simulationID, mismatchCount, latestMismatch)
+			}
+
+			t.Fatalf("timed out waiting for %s event for simulation %q", eventType, simulationID)
+		}
+	}
+}
+
+func requireNoEventPayloadByType(t *testing.T, watcher *serviceEventWatcher, timeout time.Duration, eventType string, simulationID string) {
+	t.Helper()
+
+	if payload, ok := takePendingEventPayloadMatching(t, watcher, eventType, simulationID); ok {
+		t.Fatalf("unexpected buffered %s event for simulation %q: %#v", eventType, simulationID, payload)
+	}
+
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
+
+	for {
+		select {
+		case raw, ok := <-watcher.events:
+			if !ok {
+				t.Fatalf("event stream closed while asserting no %s event for simulation %q", eventType, simulationID)
+			}
+
+			if raw.EventType() == eventType && raw.EventSimulationID() == simulationID {
+				payload, err := eventPayload(raw)
+				if err != nil {
+					t.Fatalf("marshal unexpected %s event payload for simulation %q: %v", eventType, simulationID, err)
+				}
+				t.Fatalf("unexpected %s event for simulation %q: %#v", eventType, simulationID, payload)
+			}
+
+			watcher.pending = append(watcher.pending, raw)
+		case <-timer.C:
+			return
+		}
+	}
+}
+
+func takePendingEventPayloadMatching(t *testing.T, watcher *serviceEventWatcher, eventType string, simulationID string) (map[string]any, bool) {
+	t.Helper()
+
+	for i, raw := range watcher.pending {
+		if raw.EventType() != eventType || raw.EventSimulationID() != simulationID {
+			continue
+		}
+
+		watcher.pending = append(watcher.pending[:i], watcher.pending[i+1:]...)
+		payload, err := eventPayload(raw)
+		if err != nil {
+			t.Fatalf("marshal buffered %s event payload for simulation %q: %v", eventType, simulationID, err)
+		}
+		return payload, true
+	}
+
+	return nil, false
+}
+
+func eventPayload(event services.Event) (map[string]any, error) {
+	raw, err := json.Marshal(event)
+	if err != nil {
+		return nil, err
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(raw, &payload); err != nil {
+		return nil, err
+	}
+
+	return payload, nil
 }
 
 func requireNextAllAircraftPositionsEvent(t *testing.T, watcher *serviceEventWatcher, timeout time.Duration, simulationID string) services.AllAircraftPositionsEvent {

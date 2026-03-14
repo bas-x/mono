@@ -939,6 +939,86 @@ func TestSimulationEndedEventOverWebSocket(t *testing.T) {
 		}
 		require.Equal(t, services.BaseSimulationID, payload["simulationId"])
 		require.Equal(t, float64(3), payload["tick"])
+
+		summaryRaw, ok := payload["summary"]
+		require.True(t, ok)
+		summary, ok := summaryRaw.(map[string]any)
+		require.True(t, ok)
+		require.Equal(t, float64(0), summary["completedVisitCount"])
+		require.Equal(t, float64(0), summary["totalDurationMs"])
+		require.Nil(t, summary["averageDurationMs"])
+		_, hasNestedServicing := summary["servicing"]
+		require.False(t, hasNestedServicing)
+		break
+	}
+}
+
+func TestSimulationClosedEventOverWebSocket(t *testing.T) {
+	t.Parallel()
+
+	logger := log.New(io.Discard)
+	config := viper.New()
+	deps := initDeps(config)
+	deps.SimulationService = services.NewSimulationService(services.SimulationServiceConfig{
+		RunnerConfig: simulation.ControlledRunnerConfig{TicksPerSecond: 128},
+	})
+	server := newServer(logger, config, deps)
+	httpServer := httptest.NewServer(server.Handler)
+	defer httpServer.Close()
+
+	_, err := deps.SimulationService.CreateBaseSimulation(services.BaseSimulationConfig{Options: websocketSafeOptions()})
+	require.NoError(t, err)
+
+	wsURL := "ws" + strings.TrimPrefix(httpServer.URL, "http") + "/ws/simulations/base/events"
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	require.NoError(t, err)
+	defer conn.Close()
+
+	req, err := http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/start", nil)
+	require.NoError(t, err)
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	resp.Body.Close()
+	require.Equal(t, http.StatusAccepted, resp.StatusCode)
+
+	require.NoError(t, conn.SetReadDeadline(time.Now().Add(2*time.Second)))
+	for {
+		var payload map[string]any
+		err := conn.ReadJSON(&payload)
+		require.NoError(t, err)
+		if payload["type"] == services.EventTypeSimulationStep {
+			break
+		}
+	}
+
+	req, err = http.NewRequest(http.MethodPost, httpServer.URL+"/simulations/base/reset", nil)
+	require.NoError(t, err)
+	resp, err = http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	resp.Body.Close()
+	require.Equal(t, http.StatusAccepted, resp.StatusCode)
+
+	require.NoError(t, conn.SetReadDeadline(time.Now().Add(2*time.Second)))
+	for {
+		var payload map[string]any
+		err := conn.ReadJSON(&payload)
+		require.NoError(t, err)
+		if payload["type"] != services.EventTypeSimulationClosed {
+			continue
+		}
+
+		require.Equal(t, services.BaseSimulationID, payload["simulationId"])
+		require.Equal(t, services.SimulationClosedReasonReset, payload["reason"])
+
+		summaryRaw, ok := payload["summary"]
+		require.True(t, ok)
+		summary, ok := summaryRaw.(map[string]any)
+		require.True(t, ok)
+		require.Equal(t, float64(0), summary["completedVisitCount"])
+		require.Equal(t, float64(0), summary["totalDurationMs"])
+		require.Nil(t, summary["averageDurationMs"])
+		_, hasNestedServicing := summary["servicing"]
+		require.False(t, hasNestedServicing)
 		break
 	}
 }
