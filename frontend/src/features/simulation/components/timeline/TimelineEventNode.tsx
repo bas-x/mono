@@ -3,10 +3,11 @@ import type { SimulationEvent } from '@/lib/api/types';
 type TimelineEventNodeProps = {
   event: SimulationEvent;
   isSelected: boolean;
+  isDimmed?: boolean;
   onClick: (e: React.MouseEvent<HTMLButtonElement>) => void;
 };
 
-export function TimelineEventNode({ event, isSelected, onClick }: TimelineEventNodeProps) {
+export function TimelineEventNode({ event, isSelected, isDimmed = false, onClick }: TimelineEventNodeProps) {
   const isTick = event.type === 'simulation_step';
   const isAssignment = event.type === 'landing_assignment';
   
@@ -38,7 +39,7 @@ export function TimelineEventNode({ event, isSelected, onClick }: TimelineEventN
       type="button"
       onClick={onClick}
       onPointerDown={(e) => e.stopPropagation()}
-      className="group relative flex flex-col items-center justify-center p-2 focus:outline-none"
+      className={`group relative flex flex-col items-center justify-center p-2 focus:outline-none transition-opacity ${isDimmed ? 'opacity-55 hover:opacity-100' : 'opacity-100'}`}
     >
       <div
         className={`rounded-full transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] ${sizeClass} ${colorClass} ${

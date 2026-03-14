@@ -3,15 +3,19 @@ import type { SimulationEvent } from '@/lib/api/types';
 type TimelineEventDetailsProps = {
   event: SimulationEvent;
   onClose: () => void;
+  laneLabel?: string;
   canBranchFromEvent?: boolean;
   onBranchFromEvent?: (event: SimulationEvent) => unknown;
+  onActivateLane?: () => unknown;
 };
 
 export function TimelineEventDetails({
   event,
   onClose,
+  laneLabel,
   canBranchFromEvent = false,
   onBranchFromEvent,
+  onActivateLane,
 }: TimelineEventDetailsProps) {
   // Omit large or redundant fields for quick display
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -24,6 +28,11 @@ export function TimelineEventDetails({
     <div className="absolute bottom-full left-1/2 z-20 mb-4 w-80 -translate-x-1/2 overflow-hidden rounded-xl border border-[color:var(--color-shell-panel-border)] bg-black/90 shadow-2xl backdrop-blur-xl transition-all">
       <div className="flex items-center justify-between border-b border-white/5 bg-[#111] px-4 py-3">
         <div className="flex flex-col">
+          {laneLabel ? (
+            <span className="mb-1 text-[10px] font-semibold uppercase tracking-[0.26em] text-cyan-200/75">
+              {laneLabel}
+            </span>
+          ) : null}
           <span className="text-xs font-bold text-white/90 tracking-wide">{type}</span>
           {timestamp && (
             <span className="mt-0.5 font-mono text-[10px] text-white/50">
@@ -85,6 +94,17 @@ export function TimelineEventDetails({
             className="w-full rounded-md border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-amber-300 transition-colors hover:bg-amber-500/20"
           >
             Branch from here
+          </button>
+        </div>
+      ) : null}
+      {onActivateLane ? (
+        <div className="border-t border-white/5 px-4 py-3">
+          <button
+            type="button"
+            onClick={() => void onActivateLane()}
+            className="w-full rounded-md border border-cyan-400/25 bg-cyan-400/10 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-cyan-200 transition-colors hover:bg-cyan-400/20"
+          >
+            Focus this branch
           </button>
         </div>
       ) : null}
