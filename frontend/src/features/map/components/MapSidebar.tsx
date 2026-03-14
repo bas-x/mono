@@ -8,6 +8,7 @@ import {
   type SelectedAirbaseDetailsState,
 } from '@/features/map/components/SelectionDrawer';
 import type { Airbase } from '@/features/map/types';
+import type { SimulationInfo } from '@/lib/api/types';
 
 export type ViewMode = 'live' | 'simulate';
 
@@ -29,7 +30,8 @@ type MapSidebarProps = {
   onOpenSimulationSheet: () => void;
   onResetSimulation?: () => void;
   isSimulationRunning?: boolean;
-  simulations?: Array<{ id: string }>;
+  simulations?: SimulationInfo[];
+  selectedSimulationId?: string;
   onLoadSimulation?: (id: string) => void;
 };
 
@@ -193,6 +195,7 @@ type SimulateActionsSectionProps = Pick<
   | 'isOverlayVisible'
   | 'onToggleOverlay'
   | 'simulations'
+  | 'selectedSimulationId'
   | 'onLoadSimulation'
 >;
 
@@ -203,6 +206,7 @@ function SimulateActionsSection({
   isOverlayVisible,
   onToggleOverlay,
   simulations = [],
+  selectedSimulationId,
   onLoadSimulation,
 }: SimulateActionsSectionProps) {
   const [isConfirmingReset, setIsConfirmingReset] = useState(false);
@@ -260,7 +264,7 @@ function SimulateActionsSection({
           <select
             id="simulation-select"
             className="shell-input w-full rounded-sm border px-2 py-1.5 text-sm"
-            defaultValue=""
+            value={selectedSimulationId ?? ''}
             onChange={(e) => {
               if (e.target.value && onLoadSimulation) {
                 onLoadSimulation(e.target.value);
@@ -272,7 +276,9 @@ function SimulateActionsSection({
             </option>
             {simulations.map((sim) => (
               <option key={sim.id} value={sim.id}>
-                {sim.id}
+                {sim.id === 'base'
+                  ? 'Base'
+                  : `${sim.id.slice(0, 8)}${typeof sim.splitTick === 'number' ? ` - fork ${sim.splitTick}` : ''}`}
               </option>
             ))}
           </select>
@@ -326,6 +332,7 @@ export function MapSidebar(props: MapSidebarProps) {
             isOverlayVisible={props.isOverlayVisible}
             onToggleOverlay={props.onToggleOverlay}
             simulations={props.simulations}
+            selectedSimulationId={props.selectedSimulationId}
             onLoadSimulation={props.onLoadSimulation}
           />
         )}

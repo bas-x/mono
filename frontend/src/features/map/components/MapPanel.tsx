@@ -82,10 +82,12 @@ export function MapPanel() {
     useState<SelectedAirbaseDetailsState>({ status: 'idle' });
   const {
     state: simulationState,
+    events: simulationEvents,
     setPlaybackTick,
     simulations,
     loadSimulation,
     createSimulation,
+    createBranchFromEvent,
     refreshData,
     reset: resetSimulation,
     triggerReset,
@@ -326,6 +328,7 @@ export function MapPanel() {
               <SimulationInfoCard
                 simulationState={simulationState}
                 simulations={simulations}
+                onSelectSimulation={loadSimulation}
                 portalRoot={mapOverlayPortalRoot}
               />
             )}
@@ -368,6 +371,7 @@ export function MapPanel() {
             onResetSimulation={triggerReset}
             isSimulationRunning={simulationState.status === 'running'}
             simulations={simulations}
+            selectedSimulationId={simulationState.status === 'running' ? simulationState.simulationId : undefined}
             onLoadSimulation={loadSimulation}
           />
         </div>
@@ -377,8 +381,10 @@ export function MapPanel() {
             <SimulationTimeline
               simulationId={simulationState.simulationId}
               simulationState={simulationState}
+              events={simulationEvents}
               setPlaybackTick={setPlaybackTick}
               onRefresh={refreshData}
+              onBranchFromEvent={createBranchFromEvent}
             />
           </div>
         ) : null}
