@@ -60,6 +60,7 @@ export function getMockAirbaseCapabilities(baseId: string): AirbaseCapabilityMap
 const LIGHT_AIRBASES: SimulationAirbase[] = [
   {
     id: 'd397eeeddbfae33e',
+    name: 'Blekinge Forward Strip',
     location: { x: 109.44765839799018, y: 753.1689567645848 },
     regionId: 'SE-K',
     region: 'Blekinge',
@@ -67,6 +68,7 @@ const LIGHT_AIRBASES: SimulationAirbase[] = [
   },
   {
     id: 'e32c7ce8a4b77c11',
+    name: 'Gotaland West Airbase',
     location: { x: 84.1112039123401, y: 646.5238701142055 },
     regionId: 'SE-O',
     region: 'Vastra Gotaland',
@@ -74,6 +76,7 @@ const LIGHT_AIRBASES: SimulationAirbase[] = [
   },
   {
     id: '4b8b4f6e0f91b7bd',
+    name: 'Gotland Reserve Strip',
     location: { x: 202.4459181132085, y: 683.2145039186111 },
     regionId: 'SE-I',
     region: 'Gotland',
@@ -81,6 +84,7 @@ const LIGHT_AIRBASES: SimulationAirbase[] = [
   },
   {
     id: '1ae4f4da1946d172',
+    name: 'Stockholm North Wing',
     location: { x: 175.9321742199307, y: 592.2041175321494 },
     regionId: 'SE-AB',
     region: 'Stockholm',
@@ -92,6 +96,7 @@ const FULL_AIRBASES: SimulationAirbase[] = [
   ...LIGHT_AIRBASES,
   {
     id: '5c55ed247f82afee',
+    name: 'Norrbotten Arctic Base',
     location: { x: 269.4434002801482, y: 211.0381271336186 },
     regionId: 'SE-BD',
     region: 'Norrbotten',
@@ -99,6 +104,7 @@ const FULL_AIRBASES: SimulationAirbase[] = [
   },
   {
     id: '77d0b19d42cb68a1',
+    name: 'Jamtland Mountain Strip',
     location: { x: 236.2844107311172, y: 317.4833391172533 },
     regionId: 'SE-Z',
     region: 'Jamtland',
@@ -106,6 +112,7 @@ const FULL_AIRBASES: SimulationAirbase[] = [
   },
   {
     id: 'c4d6652975d0f4c8',
+    name: 'Vastmanland Support Base',
     location: { x: 151.9286048183827, y: 535.8519046032481 },
     regionId: 'SE-U',
     region: 'Vastmanland',
@@ -116,17 +123,20 @@ const FULL_AIRBASES: SimulationAirbase[] = [
 const LIGHT_AIRCRAFTS: SimulationAircraft[] = [
   {
     tailNumber: 'BX-101',
+    model: 'Falcon HX-12',
     needs: [createNeed('fuel', 28, true)],
     state: 'Inbound',
   },
   {
     tailNumber: 'BX-214',
+    model: 'Viper ST-9',
     needs: [createNeed('crew_support', 18)],
     state: 'Turnaround',
     assignedTo: '1ae4f4da1946d172',
   },
   {
     tailNumber: 'BX-330',
+    model: 'Aegis LR-4',
     needs: [],
     state: 'Ready',
     assignedTo: 'e32c7ce8a4b77c11',
@@ -136,33 +146,39 @@ const LIGHT_AIRCRAFTS: SimulationAircraft[] = [
 const FULL_AIRCRAFTS: SimulationAircraft[] = [
   {
     tailNumber: 'BX-101',
+    model: 'Falcon HX-12',
     needs: [createNeed('fuel', 32, true), createNeed('munitions', 54)],
     state: 'Inbound',
   },
   {
     tailNumber: 'BX-214',
+    model: 'Viper ST-9',
     needs: [createNeed('crew_support', 22), createNeed('ground_support', 14)],
     state: 'Landing',
   },
   {
     tailNumber: 'BX-330',
+    model: 'Aegis LR-4',
     needs: [createNeed('maintenance', 61, true)],
     state: 'Assessment',
   },
   {
     tailNumber: 'BX-441',
+    model: 'Condor XR-7',
     needs: [createNeed('fuel', 26), createNeed('mission_configuration', 45)],
     state: 'Turnaround',
     assignedTo: '77d0b19d42cb68a1',
   },
   {
     tailNumber: 'BX-578',
+    model: 'Atlas VT-2',
     needs: [createNeed('protection', 19)],
     state: 'Ready',
     assignedTo: '5c55ed247f82afee',
   },
   {
     tailNumber: 'BX-662',
+    model: 'Specter MQ-5',
     needs: [createNeed('repairs', 73, true)],
     state: 'Holding',
   },
