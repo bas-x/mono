@@ -85,11 +85,34 @@
       "running": true,
       "paused": false,
       "tick": 42,
-      "timestamp": "2026-03-12T03:15:05Z"
+      "timestamp": "2026-03-12T03:15:05Z",
+      "parentId": null,
+      "splitTick": null,
+      "splitTimestamp": null
+    },
+    {
+      "id": "7f3c2d1a9b8e6f10",
+      "running": false,
+      "paused": false,
+      "tick": 42,
+      "timestamp": "2026-03-12T03:15:05Z",
+      "parentId": "base",
+      "splitTick": 42,
+      "splitTimestamp": "2026-03-12T03:15:05Z",
+      "sourceEvent": {
+        "id": "timeline-evt-17",
+        "type": "landing_assignment",
+        "tick": 41
+      }
     }
   ]
 }
 ```
+
+- **Behavior**:
+  - Branch entries return lineage metadata on the same `SimulationInfo` shape used by branch-create and detail reads.
+  - `sourceEvent` is optional and is omitted when the branch has no clicked-anchor metadata, including legacy branches.
+  - `splitTick` and `splitTimestamp` are the real fork coordinates. `sourceEvent.id`, `sourceEvent.type`, and `sourceEvent.tick` are metadata only.
 
 ### Get a simulation
 
@@ -99,22 +122,44 @@
 
 ```json
 {
-  "id": "base",
-  "running": true,
+  "id": "7f3c2d1a9b8e6f10",
+  "running": false,
   "paused": false,
   "tick": 42,
   "timestamp": "2026-03-12T03:15:05Z",
-  "parentId": null,
-  "splitTick": null,
-  "splitTimestamp": null
+  "parentId": "base",
+  "splitTick": 42,
+  "splitTimestamp": "2026-03-12T03:15:05Z",
+  "sourceEvent": {
+    "id": "timeline-evt-17",
+    "type": "landing_assignment",
+    "tick": 41
+  }
 }
 ```
+
+- **Behavior**:
+  - Base simulation reads return `parentId`, `splitTick`, and `splitTimestamp` as `null`, and omit `sourceEvent`.
+  - Branch detail reads return the same lineage metadata surfaced by branch creation and list reads.
+  - `sourceEvent` is optional and omitted when absent. It does not change the branch snapshot.
 - **Response** `404`: simulation not found
 
 ### Branch a simulation
 
 - **Method**: `POST`
 - **Path**: `/simulations/:simulationId/branch`
+- **Body**: optional
+
+```json
+{
+  "sourceEvent": {
+    "id": "timeline-evt-17",
+    "type": "landing_assignment",
+    "tick": 41
+  }
+}
+```
+
 - **Response** `201`:
 
 ```json
@@ -126,13 +171,25 @@
   "timestamp": "2026-03-12T03:15:05Z",
   "parentId": "base",
   "splitTick": 42,
-  "splitTimestamp": "2026-03-12T03:15:05Z"
+  "splitTimestamp": "2026-03-12T03:15:05Z",
+  "sourceEvent": {
+    "id": "timeline-evt-17",
+    "type": "landing_assignment",
+    "tick": 41
+  }
 }
 ```
 
 - **Behavior**:
   - V1 only supports branching from `simulationId=base`.
+  - The request body is optional. Clients can still send no body.
+  - If `sourceEvent` is provided, `id`, `type`, and `tick` are all required. Empty or partial `sourceEvent` payloads fail with `400`.
   - The response is the new branch `SimulationInfo`, including lineage metadata.
+  - `splitTick` and `splitTimestamp` are the true branch fork coordinates copied from the base snapshot.
+  - `sourceEvent.id`, `sourceEvent.type`, and `sourceEvent.tick` are clicked-anchor metadata only. They do not change branch snapshot semantics.
+  - When accepted, `sourceEvent` is persisted in runtime branch state and is returned by branch-create, `GET /simulations`, `GET /simulations/:simulationId`, and `branch_created` for the current backend process lifetime.
+  - `sourceEvent` is omitted from JSON when absent.
+- **Response** `400`: malformed or partial `sourceEvent`
 - **Response** `404`: simulation not found
 
 ### Start a simulation
@@ -287,7 +344,7 @@
 - **Behavior**:
   - Streams all event types for the requested simulation.
   - Current event types: `simulation_step`, `simulation_ended`, `aircraft_state_change`, `landing_assignment`, `threat_spawned`, `threat_claimed`, `branch_created`.
-  - `branch_created` is emitted on `/ws/simulations/base/events` when a new V1 branch is created from the base simulation. It carries branch lineage summary fields for the new branch and stays on the base stream because the event `simulationId` is `base`.
+  - `branch_created` is emitted on `/ws/simulations/base/events` when a new V1 branch is created from the base simulation. It carries branch lineage summary fields for the new branch, may include optional `sourceEvent`, and stays on the base stream because the event `simulationId` is `base`.
   - Slow clients are disconnected instead of blocking simulation progress.
 
 - **Example payloads**:
@@ -393,7 +450,12 @@
   "branchId": "7f3c2d1a9b8e6f10",
   "parentId": "base",
   "splitTick": 42,
-  "splitTimestamp": "2026-03-12T03:15:05Z"
+  "splitTimestamp": "2026-03-12T03:15:05Z",
+  "sourceEvent": {
+    "id": "timeline-evt-17",
+    "type": "landing_assignment",
+    "tick": 41
+  }
 }
 ```
 
@@ -402,7 +464,9 @@
 - `simulationId` is part of the path for base and branch simulations.
 - Current implementation supports `simulationId=base` plus service-generated branch IDs created from the base simulation.
 - Branch creation is available over HTTP via `POST /simulations/:simulationId/branch`; successful base branch creation also emits `branch_created` on `/ws/simulations/base/events`.
-- Branch lineage metadata is available from the branch creation response, `GET /simulations/:simulationId`, and the base-stream `branch_created` event.
+- Branch lineage metadata is available from the branch creation response, `GET /simulations`, `GET /simulations/:simulationId`, and the base-stream `branch_created` event.
+- `splitTick` and `splitTimestamp` remain the canonical fork coordinates. Optional `sourceEvent` fields are clicked-anchor metadata only and are omitted when absent.
+- `sourceEvent` persistence is runtime-only. Restarting the backend loses that metadata along with in-memory branch state.
 - First branch support is base simulation only; checkpoint-based branch creation and branch-from-branch workflows are not implemented.
 - Determinism guarantee: branching copies the current simulation state and RNG state, so if base and branch advance equivalently after branching they produce the same future behavior.
 - The local tester now auto-creates the base simulation at startup, shows `Base` as the initial tab, and adds separate tabs for created branches.

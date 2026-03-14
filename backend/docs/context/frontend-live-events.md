@@ -34,11 +34,84 @@ Response:
   "simulations": [
     {
       "id": "base",
-      "running": false
+      "running": false,
+      "paused": false,
+      "tick": 42,
+      "timestamp": "2026-03-12T03:15:05Z",
+      "parentId": null,
+      "splitTick": null,
+      "splitTimestamp": null
+    },
+    {
+      "id": "7f3c2d1a9b8e6f10",
+      "running": false,
+      "paused": false,
+      "tick": 42,
+      "timestamp": "2026-03-12T03:15:05Z",
+      "parentId": "base",
+      "splitTick": 42,
+      "splitTimestamp": "2026-03-12T03:15:05Z",
+      "sourceEvent": {
+        "id": "timeline-evt-17",
+        "type": "landing_assignment",
+        "tick": 41
+      }
     }
   ]
 }
 ```
+
+Branch entries may include optional `sourceEvent`. `splitTick` and `splitTimestamp` are the actual fork coordinates. `sourceEvent.id`, `sourceEvent.type`, and `sourceEvent.tick` are metadata-only clicked-anchor fields.
+
+### Get branch metadata
+
+- `GET /simulations/:simulationId`
+
+Branch detail response example:
+
+```json
+{
+  "id": "7f3c2d1a9b8e6f10",
+  "running": false,
+  "paused": false,
+  "tick": 42,
+  "timestamp": "2026-03-12T03:15:05Z",
+  "parentId": "base",
+  "splitTick": 42,
+  "splitTimestamp": "2026-03-12T03:15:05Z",
+  "sourceEvent": {
+    "id": "timeline-evt-17",
+    "type": "landing_assignment",
+    "tick": 41
+  }
+}
+```
+
+If a branch has no stored source-event anchor, `sourceEvent` is omitted rather than sent as `null`.
+
+### Branch simulation
+
+- `POST /simulations/:simulationId/branch`
+
+Optional request body:
+
+```json
+{
+  "sourceEvent": {
+    "id": "timeline-evt-17",
+    "type": "landing_assignment",
+    "tick": 41
+  }
+}
+```
+
+Notes:
+
+- V1 supports branching from `base` only.
+- The request body is optional.
+- If `sourceEvent` is provided, `id`, `type`, and `tick` are all required. Partial or malformed values return `400`.
+- `splitTick` and `splitTimestamp` still define the actual branch split. `sourceEvent` is metadata only.
+- Source-event persistence is runtime-only. A backend restart loses in-memory branch metadata.
 
 ### Create base simulation
 
@@ -224,7 +297,12 @@ Notes:
   "branchId": "7f3c2d1a9b8e6f10",
   "parentId": "base",
   "splitTick": 42,
-  "splitTimestamp": "2026-03-12T03:15:05Z"
+  "splitTimestamp": "2026-03-12T03:15:05Z",
+  "sourceEvent": {
+    "id": "timeline-evt-17",
+    "type": "landing_assignment",
+    "tick": 41
+  }
 }
 ```
 
@@ -232,6 +310,8 @@ Notes:
 
 - This is a base-stream event carrying branch lineage summary metadata for the newly created branch.
 - V1 still supports branching from `base` only.
+- `splitTick` and `splitTimestamp` are the canonical split coordinates.
+- `sourceEvent` is metadata only, and is omitted from legacy branches or requests that did not provide it.
 
 ## Frontend State Strategy
 
@@ -264,7 +344,8 @@ Suggested reducer behavior:
 - the simulation package itself does **not** know about `simulationId`; the service injects it into outgoing events
 - slow websocket clients are disconnected by the backend rather than allowed to block simulation progress
 - branch creation is available via `POST /simulations/:simulationId/branch`
-- branch lineage metadata (`parentId`, `splitTick`, `splitTimestamp`) comes from REST simulation reads, the branch creation response, and the base-stream `branch_created` event
+- branch lineage metadata (`parentId`, `splitTick`, `splitTimestamp`, optional `sourceEvent`) comes from REST simulation reads, the branch creation response, and the base-stream `branch_created` event
+- `sourceEvent` is metadata-only clicked-anchor data. It does not change branch snapshot semantics, and it is only kept for the current backend runtime
 - `branch_created` is emitted only on `/ws/simulations/base/events`; branch streams continue to receive only events tagged with their own `simulationId`
 - first branch support is base simulation only; checkpoint-based branch creation and branch-from-branch workflows are not implemented
 - determinism guarantee: branch creation copies current simulation state and RNG state, so equivalent future advancement keeps base and branch aligned until a later divergence decision is introduced
