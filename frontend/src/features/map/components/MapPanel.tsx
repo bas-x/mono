@@ -135,6 +135,7 @@ export function MapPanel() {
       const bounds = getPlacementBounds(source);
       return {
         id: source.id,
+        name: source.name,
         area: [
           { x: bounds.minX, y: bounds.minY },
           { x: bounds.maxX, y: bounds.minY },
@@ -364,6 +365,8 @@ export function MapPanel() {
                 />
                 <LandingAssignmentStack
                   events={simulationEvents}
+                  aircrafts={simulationState.aircrafts}
+                  airbases={simulationState.airbases}
                   portalRoot={mapOverlayPortalRoot}
                 />
               </>
