@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/ebitenui/ebitenui"
 	ebitenuiimage "github.com/ebitenui/ebitenui/image"
@@ -50,6 +51,8 @@ const (
 	detailPanelPaddingX = 8
 	detailPanelPaddingY = 8
 	detailPanelMinH     = 96
+	recentEventsLimit   = 100
+	eventsScrollMaxH    = 220
 )
 
 var (
@@ -102,6 +105,12 @@ type threatEntry struct {
 	engagedCount int
 }
 
+type eventEntry struct {
+	id     string
+	text   string
+	detail string
+}
+
 type shellUIResult struct {
 	ui              *ebitenui.UI
 	seedInput       *widget.TextInput
@@ -112,9 +121,12 @@ type shellUIResult struct {
 	airbaseButtons  map[string]*widget.Button
 	threatContent   *widget.Container
 	threatButtons   map[string]*widget.Button
+	eventContent    *widget.Container
+	eventButtons    []*widget.Button
 	aircraftDetail  *widget.Text
 	airbaseDetail   *widget.Text
 	threatDetail    *widget.Text
+	eventDetail     *widget.Text
 	listFace        *textv2.Face
 }
 
@@ -138,9 +150,15 @@ type textShell struct {
 	threatMap               map[string]threatEntry
 	threatEngagedByThreatID map[string]map[string]bool
 	selectedThreat          string
+	eventContent            *widget.Container
+	recentEvents            []eventEntry
+	eventButtons            []*widget.Button
+	eventsDirty             bool
 	aircraftDetail          *widget.Text
 	airbaseDetail           *widget.Text
 	threatDetail            *widget.Text
+	eventDetail             *widget.Text
+	selectedEventID         string
 	listFace                *textv2.Face
 	subID                   uint64
 	eventCh                 <-chan services.Event
@@ -191,6 +209,8 @@ func newTextShell(options launchOptions, service *services.SimulationService) (*
 		threatMap:               make(map[string]threatEntry),
 		threatButtons:           make(map[string]*widget.Button),
 		threatEngagedByThreatID: make(map[string]map[string]bool),
+		recentEvents:            make([]eventEntry, 0, recentEventsLimit),
+		eventButtons:            make([]*widget.Button, 0, recentEventsLimit),
 		subID:                   subID,
 		eventCh:                 eventCh,
 	}
@@ -219,6 +239,7 @@ func (s *textShell) Update() error {
 	s.refreshAircraftList()
 	s.refreshAirbaseList()
 	s.refreshThreatList()
+	s.refreshRecentEvents()
 	s.refreshDetailLabels()
 	if s.ui != nil {
 		s.ui.Update()
@@ -232,6 +253,9 @@ func (s *textShell) Update() error {
 		s.workspace = workspace
 		s.lastAircraftPollTabID = ""
 		s.lastAircraftPollTail = ""
+		s.recentEvents = s.recentEvents[:0]
+		s.selectedEventID = ""
+		s.eventsDirty = true
 		s.seedAircraftMap()
 		s.seedAirbaseMap()
 		s.seedThreatMap()
@@ -252,6 +276,9 @@ func (s *textShell) Update() error {
 		s.subID, s.eventCh = s.service.Broadcaster().Subscribe()
 		s.lastAircraftPollTabID = ""
 		s.lastAircraftPollTail = ""
+		s.recentEvents = s.recentEvents[:0]
+		s.selectedEventID = ""
+		s.eventsDirty = true
 		s.seedAircraftMap()
 		s.seedAirbaseMap()
 		s.seedThreatMap()
@@ -274,6 +301,9 @@ func (s *textShell) Update() error {
 		s.workspace = workspace
 		s.lastAircraftPollTabID = ""
 		s.lastAircraftPollTail = ""
+		s.recentEvents = s.recentEvents[:0]
+		s.selectedEventID = ""
+		s.eventsDirty = true
 		s.seedAircraftMap()
 		s.seedAirbaseMap()
 		s.seedThreatMap()
@@ -340,6 +370,8 @@ func (s *textShell) rebuildUI() error {
 		s.aircraftMap, s.selectedAircraft,
 		s.airbaseMap, s.selectedAirbase,
 		s.threatMap, s.selectedThreat,
+		s.recentEvents,
+		s.selectedEventID,
 		func(tabID string) {
 			s.pendingSelectID = tabID
 		},
@@ -359,6 +391,10 @@ func (s *textShell) rebuildUI() error {
 			s.selectedThreat = threatID
 			s.updateThreatSelection()
 		},
+		func(eventID string) {
+			s.selectedEventID = eventID
+			s.updateEventSelection()
+		},
 	)
 	if err != nil {
 		return err
@@ -372,9 +408,12 @@ func (s *textShell) rebuildUI() error {
 	s.airbaseButtons = result.airbaseButtons
 	s.threatContent = result.threatContent
 	s.threatButtons = result.threatButtons
+	s.eventContent = result.eventContent
+	s.eventButtons = result.eventButtons
 	s.aircraftDetail = result.aircraftDetail
 	s.airbaseDetail = result.airbaseDetail
 	s.threatDetail = result.threatDetail
+	s.eventDetail = result.eventDetail
 	s.listFace = result.listFace
 	return nil
 }
@@ -387,6 +426,8 @@ func buildTextShellUI(
 	selectedAirbase string,
 	threatMap map[string]threatEntry,
 	selectedThreat string,
+	recentEvents []eventEntry,
+	selectedEventID string,
 	onSelect func(string),
 	onBranch func(),
 	onReset func(),
@@ -394,6 +435,7 @@ func buildTextShellUI(
 	onAircraftSelect func(string),
 	onAirbaseSelect func(string),
 	onThreatSelect func(string),
+	onEventSelect func(string),
 ) (shellUIResult, error) {
 	face, err := loadToolbarFace(toolbarFontSize)
 	if err != nil {
@@ -682,6 +724,38 @@ func buildTextShellUI(
 	)
 	col2.AddChild(threatScroll)
 
+	eventHeader := widget.NewText(
+		widget.TextOpts.Text("Events", listFace, toolbarTextColor),
+	)
+	col2.AddChild(eventHeader)
+
+	eventContent := widget.NewContainer(
+		widget.ContainerOpts.Layout(widget.NewRowLayout(
+			widget.RowLayoutOpts.Direction(widget.DirectionVertical),
+			widget.RowLayoutOpts.Spacing(0),
+		)),
+	)
+	eventButtons := make([]*widget.Button, 0, len(recentEvents))
+	for _, entry := range recentEvents {
+		btn := newEventButton(entry, entry.id == selectedEventID, listFace, onEventSelect)
+		eventButtons = append(eventButtons, btn)
+		eventContent.AddChild(btn)
+	}
+	eventScroll := widget.NewScrollContainer(
+		widget.ScrollContainerOpts.Content(eventContent),
+		widget.ScrollContainerOpts.StretchContentWidth(),
+		widget.ScrollContainerOpts.Image(&widget.ScrollContainerImage{
+			Idle:     ebitenuiimage.NewNineSliceColor(listBgColor),
+			Disabled: ebitenuiimage.NewNineSliceColor(listBgColor),
+			Mask:     ebitenuiimage.NewNineSliceColor(listBgColor),
+		}),
+		widget.ScrollContainerOpts.WidgetOpts(
+			widget.WidgetOpts.MinSize(150, 0),
+			widget.WidgetOpts.LayoutData(widget.RowLayoutData{Stretch: true, MaxHeight: eventsScrollMaxH}),
+		),
+	)
+	col2.AddChild(eventScroll)
+
 	columnsContainer.AddChild(col2)
 
 	col3 := widget.NewContainer(
@@ -718,6 +792,13 @@ func buildTextShellUI(
 	)
 	col3.AddChild(threatDetailPanel)
 
+	eventDetailPanel, eventDetailLabel := newDetailPanel(
+		"Selected Event",
+		formatEventDetail(recentEvents, selectedEventID),
+		listFace,
+	)
+	col3.AddChild(eventDetailPanel)
+
 	columnsContainer.AddChild(col3)
 
 	tabBody.AddChild(columnsContainer)
@@ -737,9 +818,12 @@ func buildTextShellUI(
 		airbaseButtons:  airbaseButtons,
 		threatContent:   threatContent,
 		threatButtons:   threatButtons,
+		eventContent:    eventContent,
+		eventButtons:    eventButtons,
 		aircraftDetail:  aircraftDetailLabel,
 		airbaseDetail:   airbaseDetailLabel,
 		threatDetail:    threatDetailLabel,
+		eventDetail:     eventDetailLabel,
 		listFace:        listFace,
 	}, nil
 }
@@ -934,6 +1018,18 @@ func formatThreatDetail(m map[string]threatEntry, selected string) string {
 	return b.String()
 }
 
+func formatEventDetail(events []eventEntry, selected string) string {
+	if selected == "" {
+		return "No event selected"
+	}
+	for _, entry := range events {
+		if entry.id == selected {
+			return entry.detail
+		}
+	}
+	return "No event selected"
+}
+
 func aircraftButtonLabel(entry aircraftEntry) string {
 	return fmt.Sprintf("%-16s  Needs: %d  State: %s", entry.tailNumber, entry.needCount, entry.state)
 }
@@ -1028,6 +1124,68 @@ func threatButtonLabel(entry threatEntry) string {
 	return fmt.Sprintf("%-8s  Engaged: %d", short, entry.engagedCount)
 }
 
+func formatRecentEvent(evt services.Event) (eventEntry, bool) {
+	switch e := evt.(type) {
+	case services.AircraftStateChangeEvent:
+		return eventEntry{
+			id:     fmt.Sprintf("%s:%s:%d:%s:%s", e.Type, e.TailNumber, e.Tick, e.OldState, e.NewState),
+			text:   fmt.Sprintf("%s %s %s -> %s", e.Timestamp.Format("15:04:05"), shortID(e.TailNumber), e.OldState, e.NewState),
+			detail: fmt.Sprintf("Type: %s\nTail: %s\nTick: %d\nState: %s -> %s\nTime: %s", e.Type, e.TailNumber, e.Tick, e.OldState, e.NewState, e.Timestamp.Format(time.RFC3339)),
+		}, true
+	case services.LandingAssignmentEvent:
+		return eventEntry{
+			id:     fmt.Sprintf("%s:%s:%d:%s:%s", e.Type, e.TailNumber, e.Tick, e.BaseID, e.Source),
+			text:   fmt.Sprintf("%s assign %s -> %s (%s)", e.Timestamp.Format("15:04:05"), shortID(e.TailNumber), shortID(e.BaseID), string(e.Source)),
+			detail: fmt.Sprintf("Type: %s\nTail: %s\nBase: %s\nSource: %s\nTick: %d\nTime: %s", e.Type, e.TailNumber, e.BaseID, e.Source, e.Tick, e.Timestamp.Format(time.RFC3339)),
+		}, true
+	case services.ThreatSpawnedEvent:
+		return eventEntry{
+			id:     fmt.Sprintf("%s:%s:%d", e.Type, e.Threat.ID, e.Tick),
+			text:   fmt.Sprintf("%s threat spawned %s", e.Timestamp.Format("15:04:05"), shortID(e.Threat.ID)),
+			detail: fmt.Sprintf("Type: %s\nThreat: %s\nTick: %d\nTime: %s", e.Type, e.Threat.ID, e.Tick, e.Timestamp.Format(time.RFC3339)),
+		}, true
+	case services.ThreatTargetedEvent:
+		return eventEntry{
+			id:     fmt.Sprintf("%s:%s:%d:%s", e.Type, e.Threat.ID, e.Tick, e.TailNumber),
+			text:   fmt.Sprintf("%s threat %s targeted by %s", e.Timestamp.Format("15:04:05"), shortID(e.Threat.ID), shortID(e.TailNumber)),
+			detail: fmt.Sprintf("Type: %s\nThreat: %s\nTail: %s\nTick: %d\nTime: %s", e.Type, e.Threat.ID, e.TailNumber, e.Tick, e.Timestamp.Format(time.RFC3339)),
+		}, true
+	case services.ThreatDespawnedEvent:
+		return eventEntry{
+			id:     fmt.Sprintf("%s:%s:%d", e.Type, e.Threat.ID, e.Tick),
+			text:   fmt.Sprintf("%s threat despawned %s", e.Timestamp.Format("15:04:05"), shortID(e.Threat.ID)),
+			detail: fmt.Sprintf("Type: %s\nThreat: %s\nTick: %d\nTime: %s", e.Type, e.Threat.ID, e.Tick, e.Timestamp.Format(time.RFC3339)),
+		}, true
+	case services.SimulationEndedEvent:
+		return eventEntry{
+			id:     fmt.Sprintf("%s:%d", e.Type, e.Tick),
+			text:   fmt.Sprintf("%s simulation ended", e.Timestamp.Format("15:04:05")),
+			detail: fmt.Sprintf("Type: %s\nTick: %d\nTime: %s", e.Type, e.Tick, e.Timestamp.Format(time.RFC3339)),
+		}, true
+	case services.SimulationClosedEvent:
+		return eventEntry{
+			id:     fmt.Sprintf("%s:%d:%s", e.Type, e.Tick, e.Reason),
+			text:   fmt.Sprintf("%s simulation closed (%s)", e.Timestamp.Format("15:04:05"), e.Reason),
+			detail: fmt.Sprintf("Type: %s\nReason: %s\nTick: %d\nTime: %s", e.Type, e.Reason, e.Tick, e.Timestamp.Format(time.RFC3339)),
+		}, true
+	case services.BranchCreatedEvent:
+		return eventEntry{
+			id:     fmt.Sprintf("%s:%s:%d", e.Type, e.BranchID, e.Tick),
+			text:   fmt.Sprintf("%s branch created %s", e.SplitTimestamp.Format("15:04:05"), shortID(e.BranchID)),
+			detail: fmt.Sprintf("Type: %s\nBranch: %s\nParent: %s\nTick: %d\nTime: %s", e.Type, e.BranchID, e.ParentID, e.Tick, e.SplitTimestamp.Format(time.RFC3339)),
+		}, true
+	default:
+		return eventEntry{}, false
+	}
+}
+
+func shortID(value string) string {
+	if len(value) <= 8 {
+		return value
+	}
+	return value[:8]
+}
+
 func newThreatButton(entry threatEntry, selected bool, face *textv2.Face, onSelect func(string)) *widget.Button {
 	label := threatButtonLabel(entry)
 	id := entry.id
@@ -1046,6 +1204,26 @@ func newThreatButton(entry threatEntry, selected bool, face *textv2.Face, onSele
 		widget.ButtonOpts.TextPosition(widget.TextPositionStart, widget.TextPositionCenter),
 		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
 			onSelect(id)
+		}),
+	)
+}
+
+func newEventButton(entry eventEntry, selected bool, face *textv2.Face, onSelect func(string)) *widget.Button {
+	return widget.NewButton(
+		widget.ButtonOpts.WidgetOpts(widget.WidgetOpts.LayoutData(widget.RowLayoutData{
+			Stretch: true,
+		})),
+		widget.ButtonOpts.Image(aircraftButtonImage(selected)),
+		widget.ButtonOpts.Text(entry.text, face, aircraftButtonTextColor(selected)),
+		widget.ButtonOpts.TextPadding(&widget.Insets{
+			Left:   listEntryPaddingX,
+			Right:  listEntryPaddingX,
+			Top:    listEntryPaddingY,
+			Bottom: listEntryPaddingY,
+		}),
+		widget.ButtonOpts.TextPosition(widget.TextPositionStart, widget.TextPositionCenter),
+		widget.ButtonOpts.ClickedHandler(func(*widget.ButtonClickedEventArgs) {
+			onSelect(entry.id)
 		}),
 	)
 }
@@ -1183,6 +1361,7 @@ func (s *textShell) drainEvents() {
 			if evt.EventSimulationID() != s.workspace.activeTabID {
 				continue
 			}
+			s.appendRecentEvent(evt)
 			switch e := evt.(type) {
 			case services.AircraftStateChangeEvent:
 				s.aircraftMap[e.Aircraft.TailNumber] = aircraftEntry{
@@ -1381,6 +1560,67 @@ func (s *textShell) refreshThreatList() {
 	}
 }
 
+func (s *textShell) appendRecentEvent(evt services.Event) {
+	entry, ok := formatRecentEvent(evt)
+	if !ok {
+		return
+	}
+	s.recentEvents = append([]eventEntry{entry}, s.recentEvents...)
+	if len(s.recentEvents) > recentEventsLimit {
+		s.recentEvents = s.recentEvents[:recentEventsLimit]
+	}
+	if s.selectedEventID == "" {
+		s.selectedEventID = entry.id
+	}
+	selectedStillExists := false
+	for _, existing := range s.recentEvents {
+		if existing.id == s.selectedEventID {
+			selectedStillExists = true
+			break
+		}
+	}
+	if !selectedStillExists {
+		s.selectedEventID = ""
+	}
+	s.eventsDirty = true
+}
+
+func (s *textShell) refreshRecentEvents() {
+	if s.eventContent == nil || !s.eventsDirty {
+		return
+	}
+	s.eventsDirty = false
+
+	for len(s.eventButtons) < len(s.recentEvents) {
+		idx := len(s.eventButtons)
+		entry := s.recentEvents[idx]
+		btn := newEventButton(entry, entry.id == s.selectedEventID, s.listFace, func(eventID string) {
+			s.selectedEventID = eventID
+			s.updateEventSelection()
+		})
+		s.eventButtons = append(s.eventButtons, btn)
+		s.eventContent.AddChild(btn)
+	}
+	for i, entry := range s.recentEvents {
+		s.eventButtons[i].SetText(entry.text)
+		s.eventButtons[i].SetImage(aircraftButtonImage(entry.id == s.selectedEventID))
+	}
+	for i := len(s.recentEvents); i < len(s.eventButtons); i++ {
+		s.eventButtons[i].SetText("")
+		s.eventButtons[i].SetImage(aircraftButtonImage(false))
+	}
+	if s.ui != nil && s.ui.Container != nil {
+		s.ui.Container.RequestRelayout()
+	}
+}
+
+func (s *textShell) updateEventSelection() {
+	for i, btn := range s.eventButtons {
+		selected := i < len(s.recentEvents) && s.recentEvents[i].id == s.selectedEventID
+		btn.SetImage(aircraftButtonImage(selected))
+	}
+}
+
 func (s *textShell) refreshDetailLabels() {
 	if s.aircraftDetail != nil {
 		label := formatAircraftDetail(s.aircraftMap, s.selectedAircraft)
@@ -1404,6 +1644,15 @@ func (s *textShell) refreshDetailLabels() {
 		label := formatThreatDetail(s.threatMap, s.selectedThreat)
 		if s.threatDetail.Label != label {
 			s.threatDetail.Label = label
+			if s.ui != nil && s.ui.Container != nil {
+				s.ui.Container.RequestRelayout()
+			}
+		}
+	}
+	if s.eventDetail != nil {
+		label := formatEventDetail(s.recentEvents, s.selectedEventID)
+		if s.eventDetail.Label != label {
+			s.eventDetail.Label = label
 			if s.ui != nil && s.ui.Container != nil {
 				s.ui.Container.RequestRelayout()
 			}
