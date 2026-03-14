@@ -39,6 +39,10 @@ func TestSimulationService_AirbasesAndAircrafts(t *testing.T) {
 	require.Len(t, bases[0].ID, 16)
 	_, err = hex.DecodeString(bases[0].ID)
 	require.NoError(t, err)
+	require.NotEmpty(t, bases[0].Capabilities)
+	fuelCapability, ok := bases[0].Capabilities[string(simulation.NeedFuel)]
+	require.True(t, ok)
+	require.Equal(t, int64(1300), fuelCapability.RecoveryMultiplierPermille)
 
 	aircrafts, err := svc.Aircrafts(BaseSimulationID)
 	require.NoError(t, err)

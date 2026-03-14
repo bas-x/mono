@@ -249,6 +249,10 @@
       "location": {"x": 0.0, "y": 0.0},
       "regionId": "SE-BLE",
       "region": "Blekinge",
+      "capabilities": {
+        "fuel": {"recoveryMultiplierPermille": 1300},
+        "mission_configuration": {"recoveryMultiplierPermille": 1050}
+      },
       "metadata": {}
     }
   ]

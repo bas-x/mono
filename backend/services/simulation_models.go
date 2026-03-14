@@ -14,11 +14,16 @@ type Point struct {
 }
 
 type Airbase struct {
-	ID       string         `json:"id"`
-	Location Point          `json:"location"`
-	RegionID string         `json:"regionId"`
-	Region   string         `json:"region"`
-	Metadata map[string]any `json:"metadata,omitempty"`
+	ID           string                       `json:"id"`
+	Location     Point                        `json:"location"`
+	RegionID     string                       `json:"regionId"`
+	Region       string                       `json:"region"`
+	Capabilities map[string]AirbaseCapability `json:"capabilities,omitempty"`
+	Metadata     map[string]any               `json:"metadata,omitempty"`
+}
+
+type AirbaseCapability struct {
+	RecoveryMultiplierPermille int64 `json:"recoveryMultiplierPermille"`
 }
 
 type Need struct {
@@ -67,13 +72,23 @@ func mapAirbase(input simulation.Airbase) Airbase {
 		metadata = make(map[string]any, len(input.Metadata))
 		maps.Copy(metadata, input.Metadata)
 	}
+	var capabilities map[string]AirbaseCapability
+	if input.Capabilities != nil {
+		capabilities = make(map[string]AirbaseCapability, len(input.Capabilities))
+		for needType, capability := range input.Capabilities {
+			capabilities[string(needType)] = AirbaseCapability{
+				RecoveryMultiplierPermille: capability.RecoveryMultiplierPermille,
+			}
+		}
+	}
 
 	return Airbase{
-		ID:       hex.EncodeToString(input.ID[:]),
-		Location: Point{X: input.Location.X, Y: input.Location.Y},
-		RegionID: input.RegionID,
-		Region:   input.Region,
-		Metadata: metadata,
+		ID:           hex.EncodeToString(input.ID[:]),
+		Location:     Point{X: input.Location.X, Y: input.Location.Y},
+		RegionID:     input.RegionID,
+		Region:       input.Region,
+		Capabilities: capabilities,
+		Metadata:     metadata,
 	}
 }
 
