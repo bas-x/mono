@@ -182,6 +182,6 @@ export function createFocusedViewBox(bounds: PolygonBounds, sourceViewBox: MapVi
   };
 }
 
-export function toAriaLabel(airbase: Pick<Airbase, 'id'>): string {
-  return `Airbase ${airbase.id}`;
+export function toAriaLabel(airbase: Pick<Airbase, 'id' | 'name'>): string {
+  return `Airbase ${airbase.name}`;
 }

@@ -14,9 +14,11 @@ export type AirbaseCapacity = 'small' | 'medium' | 'large';
 
 export type RenderableAirbase = {
   id: string;
+  name: string;
   infoUrl?: string;
   centroid: AirbasePoint;
   regionId?: string;
+  region?: string;
   ariaLabel: string;
   markerSizePx: number;
 };
