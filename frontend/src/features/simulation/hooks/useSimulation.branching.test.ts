@@ -208,15 +208,21 @@ describe('useSimulation branching helpers', () => {
       [{ tailNumber: 'BX-101', needs: [], state: 'Inbound' }],
       'BX-101',
       { base: 'base-a', source: 'algorithm' },
+      [
+        { type: 'fuel', severity: 42, requiredCapability: 'fuel', blocking: false },
+      ],
     );
     const afterHuman = applyAircraftAssignment(afterAlgorithm, 'BX-101', {
       base: 'base-b',
       source: 'human',
-    });
+    }, [
+      { type: 'fuel', severity: 18, requiredCapability: 'fuel', blocking: false },
+    ]);
 
     expect(afterHuman[0]).toMatchObject({
       assignedTo: 'base-b',
       assignmentSource: 'human',
+      needs: [{ type: 'fuel', severity: 18, requiredCapability: 'fuel', blocking: false }],
     });
   });
 
