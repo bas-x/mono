@@ -35,6 +35,7 @@ func TestFleetInitGeneratesAircrafts(t *testing.T) {
 
 	for _, aircraft := range aircrafts {
 		aircraft.AssertInvariants()
+		require.NotEmpty(t, aircraft.Model)
 		_, duplicate := seenTails[aircraft.TailNumber]
 		require.False(t, duplicate, "duplicate tail number")
 		seenTails[aircraft.TailNumber] = struct{}{}

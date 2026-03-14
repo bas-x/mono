@@ -27,6 +27,7 @@ func TestSimulationServiceEndToEnd_BaseReadModels(t *testing.T) {
 	for _, airbase := range airbases {
 		require.NotEmpty(t, airbase.RegionID)
 		require.NotEmpty(t, airbase.Region)
+		require.NotEmpty(t, airbase.Name)
 		require.Len(t, airbase.ID, 16)
 		_, decodeErr := hex.DecodeString(airbase.ID)
 		require.NoError(t, decodeErr)
@@ -39,6 +40,7 @@ func TestSimulationServiceEndToEnd_BaseReadModels(t *testing.T) {
 		require.Len(t, aircraft.TailNumber, 16)
 		_, decodeErr := hex.DecodeString(aircraft.TailNumber)
 		require.NoError(t, decodeErr)
+		require.NotEmpty(t, aircraft.Model)
 		require.NotEmpty(t, aircraft.State)
 		require.NotNil(t, aircraft.Needs)
 		require.NotEmpty(t, aircraft.Needs)

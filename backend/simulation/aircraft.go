@@ -12,6 +12,7 @@ type TailNumber [8]byte
 
 type Aircraft struct {
 	TailNumber     TailNumber
+	Model          string
 	Needs          []Need
 	NeedRemainders map[NeedType]int64
 	State          AircraftState
@@ -39,6 +40,7 @@ func NewAircraft(
 	}
 	aircraft := Aircraft{
 		TailNumber:     tn,
+		Model:          "",
 		State:          state.Clone(),
 		Needs:          clonedNeeds,
 		NeedRemainders: make(map[NeedType]int64, len(clonedNeeds)),
@@ -96,6 +98,7 @@ func (a *Aircraft) Clone() *Aircraft {
 	}
 	return &Aircraft{
 		TailNumber:     a.TailNumber,
+		Model:          a.Model,
 		State:          a.State.Clone(),
 		Needs:          clonedNeeds,
 		NeedRemainders: cloneNeedRemainders(a.NeedRemainders),

@@ -5,6 +5,7 @@ import (
 	"math/rand/v2"
 
 	"github.com/bas-x/basex/assert"
+	"github.com/bas-x/basex/assets"
 	"github.com/bas-x/basex/prng"
 )
 
@@ -70,6 +71,7 @@ func (f *Fleet) Init(env *Environment, opts *FleetOptions) error {
 		state := normalized.StateFactory(rng)
 		assert.NotNil(state, "fleet state factory result")
 		aircraft := NewAircraft(tail, state, needs)
+		aircraft.Model = assets.AircraftModels[len(aircrafts)%len(assets.AircraftModels)]
 		aircraft.Speed = aircraftSpeed(tail)
 		aircrafts = append(aircrafts, aircraft)
 	}

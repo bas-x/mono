@@ -37,6 +37,7 @@ func TestSimulationService_AirbasesAndAircrafts(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, bases, 1)
 	require.Len(t, bases[0].ID, 16)
+	require.NotEmpty(t, bases[0].Name)
 	_, err = hex.DecodeString(bases[0].ID)
 	require.NoError(t, err)
 	require.NotEmpty(t, bases[0].Capabilities)
@@ -50,6 +51,7 @@ func TestSimulationService_AirbasesAndAircrafts(t *testing.T) {
 	require.Len(t, aircrafts[0].TailNumber, 16)
 	_, err = hex.DecodeString(aircrafts[0].TailNumber)
 	require.NoError(t, err)
+	require.NotEmpty(t, aircrafts[0].Model)
 	require.NotEmpty(t, aircrafts[0].State)
 }
 

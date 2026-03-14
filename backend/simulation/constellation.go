@@ -3,6 +3,7 @@ package simulation
 import (
 	"encoding/binary"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/bas-x/basex/assert"
@@ -161,8 +162,14 @@ func (c *Constellation) generateAirbases(env *Environment, opts ConstellationOpt
 			if !ok {
 				continue
 			}
+			nameIndex := len(airbases)
+			name := assets.AirbaseNames[nameIndex%len(assets.AirbaseNames)]
+			if nameIndex >= len(assets.AirbaseNames) {
+				name = name + " " + strconv.Itoa(nameIndex/len(assets.AirbaseNames)+1)
+			}
 			airbase := Airbase{
 				ID:           makeBaseID(rng.Uint64()),
+				Name:         name,
 				Location:     pt,
 				RegionID:     region.ID,
 				Region:       region.Name,

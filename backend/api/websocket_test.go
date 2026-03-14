@@ -1050,6 +1050,7 @@ func TestCreateBaseSimulationProvidesGeneratedAircrafts(t *testing.T) {
 	require.NotEmpty(t, payload.Aircrafts)
 	for _, aircraft := range payload.Aircrafts {
 		require.NotEmpty(t, aircraft.TailNumber)
+		require.NotEmpty(t, aircraft.Model)
 		require.NotEmpty(t, aircraft.State)
 		require.NotEmpty(t, aircraft.Needs)
 	}

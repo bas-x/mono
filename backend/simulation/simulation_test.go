@@ -143,6 +143,7 @@ func TestSimulationInitAirbases(t *testing.T) {
 
 	region := findRegionByName(t, "Blekinge")
 	for _, base := range bases {
+		require.NotEmpty(t, base.Name)
 		require.Equal(t, "Blekinge", base.Region)
 		require.Truef(t, pointInsideRegion(base.Location, region), "base %+v not inside region", base)
 	}

@@ -246,6 +246,7 @@
   "airbases": [
     {
       "id": "3a5f...",
+      "name": "Raven Base",
       "location": {"x": 0.0, "y": 0.0},
       "regionId": "SE-BLE",
       "region": "Blekinge",
@@ -270,6 +271,7 @@
   "aircrafts": [
     {
       "tailNumber": "9b2e...",
+      "model": "SR-71 Blackbird",
       "state": "Outbound",
       "needs": [
         {

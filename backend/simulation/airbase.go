@@ -10,6 +10,7 @@ type BaseID [8]byte
 
 type Airbase struct {
 	ID           BaseID
+	Name         string
 	Location     geometry.Point
 	RegionID     string
 	Region       string
@@ -30,6 +31,7 @@ func (a Airbase) Clone() Airbase {
 	}
 	return Airbase{
 		ID:           a.ID,
+		Name:         a.Name,
 		Location:     a.Location,
 		RegionID:     a.RegionID,
 		Region:       a.Region,

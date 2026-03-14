@@ -55,6 +55,52 @@ var BoundsData BoundsFile
 // RegionNames provides all region names from bounds.json.
 var RegionNames []string
 
+var AirbaseNames = []string{
+	"Raven Base",
+	"Granite Field",
+	"Northwatch",
+	"Falcon Point",
+	"Storm Harbor",
+	"Iron Ridge",
+	"Pine Run",
+	"Silver Meadow",
+	"Cinder Bay",
+	"Blue Fjord",
+	"Ember Field",
+	"Crown Station",
+	"Echo Ramp",
+	"Aurora Post",
+	"Mistral Base",
+	"Fox Hollow",
+	"Lynx Crossing",
+	"Glacier Point",
+	"Timber Yard",
+	"Harbor North",
+	"Harbor South",
+	"Delta Field",
+	"Atlas Base",
+	"Bravo Station",
+	"Copper Shore",
+	"Winter Hold",
+	"Skylark Field",
+	"Red Pine Base",
+	"Sable Point",
+	"Vector Yard",
+	"Orion Post",
+	"Juniper Field",
+}
+
+var AircraftModels = []string{
+	"Harrier",
+	"Pave Low",
+	"AC-130",
+	"SR-71 Blackbird",
+	"Mi-24 Hind",
+	"UH-1 Huey",
+	"B-52",
+	"Stealth Bomber",
+}
+
 // RegionBoundsByName maps a region name to its bounding box entry.
 var RegionBoundsByName map[string]RegionBounds
 

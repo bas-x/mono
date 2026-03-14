@@ -15,6 +15,7 @@ type Point struct {
 
 type Airbase struct {
 	ID           string                       `json:"id"`
+	Name         string                       `json:"name"`
 	Location     Point                        `json:"location"`
 	RegionID     string                       `json:"regionId"`
 	Region       string                       `json:"region"`
@@ -35,6 +36,7 @@ type Need struct {
 
 type Aircraft struct {
 	TailNumber string  `json:"tailNumber"`
+	Model      string  `json:"model"`
 	Needs      []Need  `json:"needs"`
 	State      string  `json:"state"`
 	AssignedTo *string `json:"assignedTo,omitempty"`
@@ -92,6 +94,7 @@ func mapAirbase(input simulation.Airbase) Airbase {
 
 	return Airbase{
 		ID:           hex.EncodeToString(input.ID[:]),
+		Name:         input.Name,
 		Location:     Point{X: input.Location.X, Y: input.Location.Y},
 		RegionID:     input.RegionID,
 		Region:       input.Region,
@@ -119,6 +122,7 @@ func mapAircraft(input simulation.Aircraft) Aircraft {
 
 	return Aircraft{
 		TailNumber: hex.EncodeToString(input.TailNumber[:]),
+		Model:      input.Model,
 		Needs:      needs,
 		State:      input.State.Name(),
 		AssignedTo: assignedTo,

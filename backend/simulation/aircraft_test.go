@@ -17,6 +17,7 @@ func TestAircraftCloneNewFields(t *testing.T) {
 	// Create an aircraft with non-zero values for all 5 new fields
 	original := &Aircraft{
 		TailNumber:     [8]byte{10, 20, 30, 40, 50, 60, 70, 80},
+		Model:          "SR-71 Blackbird",
 		State:          &OutboundState{},
 		Position:       geometry.Point{X: 100.5, Y: 200.5},
 		Speed:          95.5,
@@ -34,6 +35,9 @@ func TestAircraftCloneNewFields(t *testing.T) {
 	}
 	if cloned.Speed != original.Speed {
 		t.Errorf("Speed not cloned: got %v, want %v", cloned.Speed, original.Speed)
+	}
+	if cloned.Model != original.Model {
+		t.Errorf("Model not cloned: got %v, want %v", cloned.Model, original.Model)
 	}
 	if cloned.OrbitAngle != original.OrbitAngle {
 		t.Errorf("OrbitAngle not cloned: got %v, want %v", cloned.OrbitAngle, original.OrbitAngle)
