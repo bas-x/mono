@@ -1843,6 +1843,8 @@ func TestSimulationServiceEndToEnd_AircraftStateChangeEvent_BaseCommitMatchesAir
 	require.Equal(t, tailNumber, landingEvent.TailNumber)
 	require.Equal(t, expectedAssignedBaseID, landingEvent.BaseID)
 	require.Equal(t, services.AssignmentSourceAlgorithm, landingEvent.Source)
+	require.Equal(t, afterAssignment.aircrafts[tailNumber].Needs, landingEvent.Needs)
+	require.Equal(t, afterAssignment.airbases[expectedAssignedBaseID].Capabilities, landingEvent.Capabilities)
 	require.Equal(t, afterAssignment.info.Timestamp, landingEvent.Timestamp)
 
 	aircraftAfterAssignment := afterAssignment.aircrafts[tailNumber]
@@ -1943,6 +1945,10 @@ func TestSimulationServiceEndToEnd_AircraftStateChangeEvent_BranchCommitMatchesA
 	afterOverride := captureReadModelSnapshots(t, svc, services.BaseSimulationID, branchID)
 	baseAfterOverride := afterOverride[services.BaseSimulationID]
 	branchAfterOverride := afterOverride[branchID]
+	require.Equal(t, branchAfterOverride.aircrafts[tailNumber].Needs, algorithmEvent.Needs)
+	require.Equal(t, branchAfterOverride.aircrafts[tailNumber].Needs, humanEvent.Needs)
+	require.Equal(t, branchAfterOverride.airbases[expectedAlgorithmBaseID].Capabilities, algorithmEvent.Capabilities)
+	require.Equal(t, branchAfterOverride.airbases[targetBaseID].Capabilities, humanEvent.Capabilities)
 	require.Equal(t, baseBefore.info, baseAfterOverride.info)
 	require.Equal(t, baseBefore.airbases, baseAfterOverride.airbases)
 	require.Equal(t, baseBefore.aircrafts, baseAfterOverride.aircrafts)

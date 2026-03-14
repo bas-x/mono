@@ -712,6 +712,19 @@ func (s *SimulationService) registerHooks(simulationID string, sim *simulation.S
 	})
 
 	sim.AddLandingAssignmentHook(func(event simulation.LandingAssignmentEvent) {
+		mappedAircraft := Aircraft{TailNumber: hex.EncodeToString(event.TailNumber[:])}
+		if aircraft, ok := findAircraftByTail(sim.Aircrafts(), event.TailNumber); ok {
+			mappedAircraft = mapAircraft(aircraft)
+		}
+
+		mappedAirbase := Airbase{ID: hex.EncodeToString(event.Base[:])}
+		for _, airbase := range sim.Airbases() {
+			if airbase.ID == event.Base {
+				mappedAirbase = mapAirbase(airbase)
+				break
+			}
+		}
+
 		s.broadcaster.Emit(LandingAssignmentEvent{
 			Type:         EventTypeLandingAssignment,
 			SimulationID: simulationID,
@@ -719,6 +732,8 @@ func (s *SimulationService) registerHooks(simulationID string, sim *simulation.S
 			TailNumber:   hex.EncodeToString(event.TailNumber[:]),
 			BaseID:       hex.EncodeToString(event.Base[:]),
 			Source:       mapAssignmentSource(event.Source),
+			Needs:        mappedAircraft.Needs,
+			Capabilities: mappedAirbase.Capabilities,
 			Timestamp:    event.Timestamp,
 		})
 	})

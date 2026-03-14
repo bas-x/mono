@@ -1433,6 +1433,12 @@ func TestAssignmentOverrideEventOverWebSocket(t *testing.T) {
 		}
 		require.Equal(t, targetBase, payload["baseId"])
 		require.Equal(t, "human", source)
+		needs, ok := payload["needs"].([]any)
+		require.True(t, ok)
+		require.NotNil(t, needs)
+		capabilities, ok := payload["capabilities"].(map[string]any)
+		require.True(t, ok)
+		require.NotEmpty(t, capabilities)
 		break
 	}
 }
