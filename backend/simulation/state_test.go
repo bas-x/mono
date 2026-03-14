@@ -202,7 +202,7 @@ func TestOutboundProximityTransition(t *testing.T) {
 	require.IsType(t, &EngagedState{}, next)
 }
 
-func TestEngagedOrbit(t *testing.T) {
+func TestEngagedStopsAtThreat(t *testing.T) {
 	t.Parallel()
 
 	ts := New(time.Second, WithEpoch(time.Unix(0, 1)))
@@ -211,11 +211,12 @@ func TestEngagedOrbit(t *testing.T) {
 	state := &EngagedState{entered: true, enteredAt: now, lastNeedUpdateAt: now}
 	aircraft := NewAircraft(TailNumber{10}, state, nil)
 	aircraft.ThreatCentroid = geometry.Point{X: 100, Y: 100}
+	aircraft.Position = geometry.Point{X: 80, Y: 120}
 
 	for range 10 {
 		next := aircraft.State.Step(&aircraft, ctx)
 		require.IsType(t, &EngagedState{}, next)
-		require.InDelta(t, OrbitRadius, geometry.Distance(aircraft.Position, aircraft.ThreatCentroid), 1.0)
+		require.Equal(t, aircraft.ThreatCentroid, aircraft.Position)
 		aircraft.State = next
 	}
 }

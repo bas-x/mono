@@ -1,11 +1,6 @@
 package simulation
 
-import (
-	"math"
-	"time"
-
-	"github.com/bas-x/basex/geometry"
-)
+import "time"
 
 type EngagedState struct {
 	entered             bool
@@ -28,11 +23,7 @@ func (e *EngagedState) Step(a *Aircraft, ctx FlightContext) AircraftState {
 		a.ClaimedThreat = nil
 		return &InboundState{}
 	}
-	a.OrbitAngle += OrbitAngleDeltaPerTick
-	a.Position = geometry.Point{
-		X: a.ThreatCentroid.X + OrbitRadius*math.Cos(a.OrbitAngle),
-		Y: a.ThreatCentroid.Y + OrbitRadius*math.Sin(a.OrbitAngle),
-	}
+	a.Position = a.ThreatCentroid
 	a.ApplyNeedPhase(e.consumeElapsed(now), NeedPhaseEngaged, ctx.Lifecycle, nil)
 	if NeedsThresholdReached(a.Needs, ctx.Lifecycle.ReturnThreshold) {
 		return &InboundState{}
