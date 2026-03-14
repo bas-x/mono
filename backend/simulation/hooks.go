@@ -11,6 +11,7 @@ type AircraftStateChangeEvent struct {
 	OldState   string
 	NewState   string
 	Aircraft   Aircraft
+	Tick       uint64
 	Timestamp  time.Time
 }
 
@@ -18,6 +19,7 @@ type LandingAssignmentEvent struct {
 	TailNumber TailNumber
 	Base       BaseID
 	Source     LandingAssignmentSource
+	Tick       uint64
 	Timestamp  time.Time
 }
 
@@ -28,17 +30,20 @@ type SimulationStepEvent struct {
 
 type ThreatSpawnedEvent struct {
 	Threat    Threat
+	Tick      uint64
 	Timestamp time.Time
 }
 
 type ThreatTargetedEvent struct {
 	Threat     Threat
 	TailNumber TailNumber
+	Tick       uint64
 	Timestamp  time.Time
 }
 
 type ThreatDespawnedEvent struct {
 	Threat    Threat
+	Tick      uint64
 	Timestamp time.Time
 }
 

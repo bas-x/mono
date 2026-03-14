@@ -7,7 +7,7 @@ import type {
   SimulationInfo,
 } from '@/lib/api/types';
 
-type MockSimulationScenario = {
+export type MockSimulationScenario = {
   info: SimulationInfo;
   airbases: SimulationAirbase[];
   aircrafts: SimulationAircraft[];
@@ -309,7 +309,10 @@ const BASE_SCENARIOS: Record<string, MockSimulationScenario> = {
   },
 };
 
-function cloneScenario(scenario: MockSimulationScenario, simulationId = scenario.info.id): MockSimulationScenario {
+export function cloneMockSimulationScenario(
+  scenario: MockSimulationScenario,
+  simulationId = scenario.info.id,
+): MockSimulationScenario {
   return {
     info: { ...scenario.info, id: simulationId },
     airbases: scenario.airbases.map((airbase) => ({
@@ -368,13 +371,16 @@ export function resolveMockScenarioTemplateId(request?: CreateBaseSimulationRequ
 }
 
 export function listMockSimulationScenarios(): MockSimulationScenario[] {
-  return [cloneScenario(BASE_SCENARIOS[LIGHT_SCENARIO_ID]!), cloneScenario(BASE_SCENARIOS[FULL_SCENARIO_ID]!)];
+  return [
+    cloneMockSimulationScenario(BASE_SCENARIOS[LIGHT_SCENARIO_ID]!),
+    cloneMockSimulationScenario(BASE_SCENARIOS[FULL_SCENARIO_ID]!),
+  ];
 }
 
 export function getMockSimulationScenario(simulationId: string): MockSimulationScenario {
   const normalizedId = normalizeScenarioId(simulationId);
   const baseScenario = BASE_SCENARIOS[normalizedId] ?? BASE_SCENARIOS[FULL_SCENARIO_ID]!;
-  return cloneScenario(baseScenario, simulationId);
+  return cloneMockSimulationScenario(baseScenario, simulationId);
 }
 
 export function createMockSimulationInfoUpdate(

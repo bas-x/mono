@@ -12,9 +12,26 @@ type TimelineTrackProps = {
   zoom: number;
   onBeforeScrub?: () => void;
   isLive?: boolean;
+  splitTick?: number;
+  splitTimestamp?: string;
+  canBranchFromEvent?: boolean;
+  onBranchFromEvent?: (event: SimulationEvent) => unknown;
 };
 
-export function TimelineTrack({ events, currentTick, maxTick, playbackTick, onScrub, zoom, onBeforeScrub, isLive = false }: TimelineTrackProps) {
+export function TimelineTrack({
+  events,
+  currentTick,
+  maxTick,
+  playbackTick,
+  onScrub,
+  zoom,
+  onBeforeScrub,
+  isLive = false,
+  splitTick,
+  splitTimestamp,
+  canBranchFromEvent = false,
+  onBranchFromEvent,
+}: TimelineTrackProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const [selectedEvent, setSelectedEvent] = useState<SimulationEvent | null>(null);
@@ -167,6 +184,19 @@ export function TimelineTrack({ events, currentTick, maxTick, playbackTick, onSc
               {activeTick} / {maxTick}
             </div>
 
+            {typeof splitTick === 'number' && splitTick >= 0 && splitTick <= maxTick ? (
+              <div
+                className="absolute bottom-0 top-0 z-10 -translate-x-1/2"
+                style={{ left: `${getPositionPercent(splitTick)}%` }}
+              >
+                <div className="absolute -top-7 left-1/2 -translate-x-1/2 whitespace-nowrap rounded border border-cyan-400/20 bg-cyan-400/10 px-2 py-1 text-[9px] font-semibold uppercase tracking-widest text-cyan-200">
+                  Split {splitTick}
+                  {splitTimestamp ? ` - ${new Date(splitTimestamp).toLocaleTimeString()}` : ''}
+                </div>
+                <div className="h-full w-px bg-cyan-300/70 shadow-[0_0_8px_rgba(103,232,249,0.45)]" />
+              </div>
+            ) : null}
+
             {events.length === 0 && (
               <div className="absolute left-1/2 top-4 -translate-x-1/2 text-[10px] uppercase tracking-widest text-white/30">
                 Waiting for events...
@@ -212,7 +242,9 @@ export function TimelineTrack({ events, currentTick, maxTick, playbackTick, onSc
       {selectedEvent && (
         <TimelineEventDetails 
           event={selectedEvent} 
-          onClose={() => setSelectedEvent(null)} 
+          onClose={() => setSelectedEvent(null)}
+          canBranchFromEvent={canBranchFromEvent}
+          onBranchFromEvent={onBranchFromEvent}
         />
       )}
     </>

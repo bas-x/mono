@@ -28,6 +28,7 @@ type Event interface {
 type AircraftStateChangeEvent struct {
 	Type         string    `json:"type"`
 	SimulationID string    `json:"simulationId"`
+	Tick         uint64    `json:"tick"`
 	TailNumber   string    `json:"tailNumber"`
 	OldState     string    `json:"oldState"`
 	NewState     string    `json:"newState"`
@@ -46,6 +47,7 @@ func (e AircraftStateChangeEvent) EventSimulationID() string {
 type LandingAssignmentEvent struct {
 	Type         string    `json:"type"`
 	SimulationID string    `json:"simulationId"`
+	Tick         uint64    `json:"tick"`
 	TailNumber   string    `json:"tailNumber"`
 	BaseID       string    `json:"baseId"`
 	Source       string    `json:"source"`
@@ -63,6 +65,7 @@ func (e LandingAssignmentEvent) EventSimulationID() string {
 type BranchCreatedEvent struct {
 	Type           string       `json:"type"`
 	SimulationID   string       `json:"simulationId"`
+	Tick           uint64       `json:"tick"`
 	BranchID       string       `json:"branchId"`
 	ParentID       string       `json:"parentId"`
 	SplitTick      uint64       `json:"splitTick"`
@@ -139,6 +142,7 @@ func (e SimulationClosedEvent) EventSimulationID() string {
 type ThreatSpawnedEvent struct {
 	Type         string    `json:"type"`
 	SimulationID string    `json:"simulationId"`
+	Tick         uint64    `json:"tick"`
 	Threat       Threat    `json:"threat"`
 	Timestamp    time.Time `json:"timestamp"`
 }
@@ -154,6 +158,7 @@ func (e ThreatSpawnedEvent) EventSimulationID() string {
 type ThreatTargetedEvent struct {
 	Type         string    `json:"type"`
 	SimulationID string    `json:"simulationId"`
+	Tick         uint64    `json:"tick"`
 	Threat       Threat    `json:"threat"`
 	TailNumber   string    `json:"tailNumber"`
 	Timestamp    time.Time `json:"timestamp"`
@@ -162,6 +167,7 @@ type ThreatTargetedEvent struct {
 type ThreatDespawnedEvent struct {
 	Type         string    `json:"type"`
 	SimulationID string    `json:"simulationId"`
+	Tick         uint64    `json:"tick"`
 	Threat       Threat    `json:"threat"`
 	Timestamp    time.Time `json:"timestamp"`
 }

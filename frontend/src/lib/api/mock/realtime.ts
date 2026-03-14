@@ -4,7 +4,12 @@ import type {
   SimulationStreamClient,
   Unsubscribe,
 } from '@/lib/api/types';
-import { createMockEventTimestamp, getMockSimulationScenario } from '@/lib/api/mock/scenarios';
+import { createMockEventTimestamp } from '@/lib/api/mock/scenarios';
+import {
+  createMockSequenceEvent,
+  getStoredMockSimulationScenario,
+  subscribeToMockBaseBranchEvents,
+} from '@/lib/api/mock/store';
 
 const STEP_INTERVAL_MS = 1_500;
 
@@ -13,8 +18,9 @@ export function createMockSimulationStreamClient(): SimulationStreamClient {
   let connectTimer: ReturnType<typeof setTimeout> | null = null;
   let intervalTimer: ReturnType<typeof setInterval> | null = null;
   let currentSimulationId = 'base';
-  let scriptedEvents = getMockSimulationScenario(currentSimulationId).events;
+  let scriptedEvents = getStoredMockSimulationScenario(currentSimulationId).events;
   let scriptIndex = 0;
+  let unsubscribeBranchEvents: Unsubscribe | null = null;
 
   const eventSubscribers = new Set<(event: SimulationEvent) => void>();
   const stateSubscribers = new Set<(state: ConnectionState) => void>();
@@ -35,6 +41,11 @@ export function createMockSimulationStreamClient(): SimulationStreamClient {
     if (intervalTimer) {
       clearInterval(intervalTimer);
       intervalTimer = null;
+    }
+
+    if (unsubscribeBranchEvents) {
+      unsubscribeBranchEvents();
+      unsubscribeBranchEvents = null;
     }
   }
 
@@ -70,8 +81,16 @@ export function createMockSimulationStreamClient(): SimulationStreamClient {
     }
 
     currentSimulationId = simulationId;
-    scriptedEvents = getMockSimulationScenario(simulationId).events;
+    scriptedEvents = getStoredMockSimulationScenario(simulationId).events;
     scriptIndex = 0;
+
+    if (simulationId === 'base') {
+      unsubscribeBranchEvents = subscribeToMockBaseBranchEvents((event) => {
+        eventSubscribers.forEach((handler) => {
+          handler(createMockSequenceEvent(event, scriptIndex + 1000));
+        });
+      });
+    }
 
     console.log('Mock: Connecting to simulation stream', simulationId);
     emitState('connecting');

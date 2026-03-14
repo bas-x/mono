@@ -59,6 +59,7 @@ func (a *Aircraft) Step(ctx FlightContext) {
 			OldState:   oldState,
 			NewState:   a.State.Name(),
 			Aircraft:   *a.Clone(),
+			Tick:       ctx.Clock.Ticks(),
 			Timestamp:  ctx.Clock.Now(),
 		})
 	}

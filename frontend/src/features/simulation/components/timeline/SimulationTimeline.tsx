@@ -2,21 +2,39 @@ import { useState, useEffect } from 'react';
 import { TimelineControls } from './TimelineControls';
 import { TimelineTrack } from './TimelineTrack';
 import { useSimulationControls } from '../../hooks/useSimulationControls';
-import { useSimulationEvents } from '../../hooks/useSimulationEvents';
 import { formatSimulationDurationFromTicks, type SimulationState } from '../../hooks/useSimulation';
+import type { SimulationEvent } from '@/lib/api/types';
 
 type SimulationTimelineProps = {
   simulationId: string;
   simulationState: SimulationState;
+  events: SimulationEvent[];
   setPlaybackTick: (tick: number | null) => void;
   onRefresh: () => Promise<void>;
+  onBranchFromEvent?: (event: SimulationEvent) => unknown;
 };
+
+export function getTimelineSplitMarker(simulationState: SimulationState): {
+  tick: number;
+  timestamp?: string;
+} | null {
+  if (simulationState.status !== 'running' || typeof simulationState.splitTick !== 'number') {
+    return null;
+  }
+
+  return {
+    tick: simulationState.splitTick,
+    timestamp: simulationState.splitTimestamp,
+  };
+}
 
 export function SimulationTimeline({
   simulationId,
   simulationState,
+  events,
   setPlaybackTick,
   onRefresh,
+  onBranchFromEvent,
 }: SimulationTimelineProps) {
   const {
     status,
@@ -36,8 +54,6 @@ export function SimulationTimeline({
       : undefined,
     onRefresh,
   );
-  const { events } = useSimulationEvents(simulationId, status === 'paused', status === 'idle');
-
   const [zoom, setZoom] = useState(1);
 
   const isRunning = simulationState.status === 'running';
@@ -55,6 +71,7 @@ export function SimulationTimeline({
   const durationLabel = isRunning
     ? formatSimulationDurationFromTicks(simulationState.untilTick ?? timelineEndTick)
     : null;
+  const splitMarker = getTimelineSplitMarker(simulationState);
 
   const handlePause = async () => {
     if (status !== 'running') {
@@ -196,6 +213,10 @@ export function SimulationTimeline({
           zoom={zoom}
           onBeforeScrub={handleBeforeScrub}
           isLive={isLivePlayback}
+          splitTick={splitMarker?.tick}
+          splitTimestamp={splitMarker?.timestamp}
+          canBranchFromEvent={simulationId === 'base'}
+          onBranchFromEvent={onBranchFromEvent}
         />
       </div>
     </div>

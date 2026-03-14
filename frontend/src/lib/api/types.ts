@@ -129,6 +129,16 @@ export type CreateBaseSimulationRequest = {
   simulationOptions?: CreateSimulationOptions;
 };
 
+export type SourceEvent = {
+  id: string;
+  type: string;
+  tick: number;
+};
+
+export type CreateBranchSimulationRequest = {
+  sourceEvent?: SourceEvent;
+};
+
 export type SimulationInfo = {
   id: string;
   running: boolean;
@@ -136,6 +146,10 @@ export type SimulationInfo = {
   tick: number;
   timestamp: string;
   untilTick?: number;
+  parentId?: string;
+  splitTick?: number;
+  splitTimestamp?: string;
+  sourceEvent?: SourceEvent;
 };
 
 export interface SimulationServiceClient {
@@ -145,6 +159,11 @@ export interface SimulationServiceClient {
     request: CreateBaseSimulationRequest,
     signal?: AbortSignal,
   ): Promise<{ id: string }>;
+  createBranchSimulation(
+    simulationId: string,
+    request?: CreateBranchSimulationRequest,
+    signal?: AbortSignal,
+  ): Promise<SimulationInfo>;
   startSimulation(simulationId: string, signal?: AbortSignal): Promise<void>;
   pauseSimulation(simulationId: string, signal?: AbortSignal): Promise<void>;
   resumeSimulation(simulationId: string, signal?: AbortSignal): Promise<void>;
@@ -180,6 +199,15 @@ export type SimulationEvent = {
   timestamp: string;
   sequence?: number;
   [key: string]: any;
+};
+
+export type BranchCreatedEvent = SimulationEvent & {
+  type: 'branch_created';
+  branchId: string;
+  parentId: string;
+  splitTick: number;
+  splitTimestamp: string;
+  sourceEvent?: SourceEvent;
 };
 
 export type SimulationEventEnvelope = SimulationEvent;

@@ -3,9 +3,16 @@ import type { SimulationEvent } from '@/lib/api/types';
 type TimelineEventDetailsProps = {
   event: SimulationEvent;
   onClose: () => void;
+  canBranchFromEvent?: boolean;
+  onBranchFromEvent?: (event: SimulationEvent) => unknown;
 };
 
-export function TimelineEventDetails({ event, onClose }: TimelineEventDetailsProps) {
+export function TimelineEventDetails({
+  event,
+  onClose,
+  canBranchFromEvent = false,
+  onBranchFromEvent,
+}: TimelineEventDetailsProps) {
   // Omit large or redundant fields for quick display
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const { type, simulationId, timestamp, ...rest } = event;
@@ -36,6 +43,17 @@ export function TimelineEventDetails({ event, onClose }: TimelineEventDetailsPro
           {JSON.stringify(rest, null, 2)}
         </pre>
       </div>
+      {canBranchFromEvent && onBranchFromEvent ? (
+        <div className="border-t border-white/5 px-4 py-3">
+          <button
+            type="button"
+            onClick={() => void onBranchFromEvent(event)}
+            className="w-full rounded-md border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-xs font-semibold uppercase tracking-wider text-amber-300 transition-colors hover:bg-amber-500/20"
+          >
+            Branch from here
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -15,6 +15,7 @@ type Dispatcher struct {
 	inboundOrder  []TailNumber
 	onAssignment  func(LandingAssignmentEvent)
 	now           func() time.Time
+	currentTick   func() uint64
 }
 
 // LandingAssignmentSource indicates how an assignment was produced.
@@ -183,8 +184,17 @@ func (d *Dispatcher) emitAssignment(record *InboundRecord) {
 		TailNumber: record.Tail,
 		Base:       record.Assignment.Base,
 		Source:     record.Assignment.Source,
+		Tick:       d.tick(),
 		Timestamp:  d.currentTime(),
 	})
+}
+
+func (d *Dispatcher) tick() uint64 {
+	if d.currentTick == nil {
+		return 0
+	}
+
+	return d.currentTick()
 }
 
 func (d *Dispatcher) currentTime() time.Time {

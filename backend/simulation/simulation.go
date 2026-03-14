@@ -134,11 +134,11 @@ func (s *Simulation) Step() {
 	s.ts.Tick()
 
 	if spawned, ok := s.threats.TrySpawnEdge(s.env, s.threatOpts, s.ts.Ticks()); ok {
-		safeInvoke(s.threatSpawnedHooks, ThreatSpawnedEvent{Threat: spawned, Timestamp: s.ts.Now()})
+		safeInvoke(s.threatSpawnedHooks, ThreatSpawnedEvent{Threat: spawned, Tick: s.ts.Ticks(), Timestamp: s.ts.Now()})
 	}
 	despawned := s.threats.DespawnActive(s.ts.Ticks(), s.threatOpts.MaxActiveTicks)
 	for _, t := range despawned {
-		safeInvoke(s.threatDespawnedHooks, ThreatDespawnedEvent{Threat: t, Timestamp: s.ts.Now()})
+		safeInvoke(s.threatDespawnedHooks, ThreatDespawnedEvent{Threat: t, Tick: s.ts.Ticks(), Timestamp: s.ts.Now()})
 	}
 	ctx := FlightContext{
 		Clock:         s.ts,
@@ -328,6 +328,7 @@ func (s *Simulation) bindInternalHooks() {
 		return
 	}
 	s.dispatcher.now = s.ts.Now
+	s.dispatcher.currentTick = s.ts.Ticks
 	s.dispatcher.onAssignment = func(event LandingAssignmentEvent) {
 		safeInvoke(s.landingAssignmentHooks, event)
 	}

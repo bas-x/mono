@@ -2,16 +2,19 @@ import { type SimulationState } from '@/features/simulation/hooks/useSimulation'
 import { createPortal } from 'react-dom';
 import { useState } from 'react';
 import { AccordionCard } from '@/features/ui/components/AccordionCard';
+import type { SimulationInfo } from '@/lib/api/types';
 
 type SimulationInfoCardProps = {
   simulationState: SimulationState;
-  simulations?: Array<{ id: string }>;
+  simulations?: SimulationInfo[];
+  onSelectSimulation?: (simulationId: string) => void;
   portalRoot: Element | null;
 };
 
 export function SimulationInfoCard({
   simulationState,
   simulations = [],
+  onSelectSimulation,
   portalRoot,
 }: SimulationInfoCardProps) {
   const [isSimOpen, setIsSimOpen] = useState(true);
@@ -36,19 +39,19 @@ export function SimulationInfoCard({
   const aircraftCount = simulationState.aircrafts?.length ?? 0;
   const airbaseCount = simulationState.airbases?.length ?? 0;
 
-  const isMockMode = import.meta.env.VITE_USE_MOCK_API === 'true';
-  const branches = isMockMode
-    ? [
-        { id: '1', name: 'Alpha Strike Plan', status: 'active', timeSaved: '+12m' },
-        { id: '2', name: 'Conservative Fueling', status: 'idle', timeSaved: '-4m' },
-        { id: '3', name: 'Max Rearm Speed', status: 'idle', timeSaved: '+18m' },
-      ]
-    : simulations.map((sim) => ({
-        id: sim.id,
-        name: `${sim.id.substring(0, 8)}`,
-        status: simulationState.simulationId === sim.id ? 'active' : 'idle',
-        timeSaved: 'N/A',
-      }));
+  const branches = simulations.map((simulation) => ({
+    id: simulation.id,
+    name: simulation.id === 'base' ? 'Base' : simulation.id.substring(0, 8),
+    status: simulationState.simulationId === simulation.id ? 'active' : 'idle',
+    detail: simulation.id === 'base'
+      ? 'Canonical base run'
+      : typeof simulation.splitTick === 'number'
+        ? `Forked at tick ${simulation.splitTick}`
+        : 'Branch',
+    annotation: simulation.sourceEvent
+      ? `${simulation.sourceEvent.type} @ ${simulation.sourceEvent.tick}`
+      : simulation.parentId ?? 'No metadata',
+  }));
 
   return createPortal(
     <div className="pointer-events-none absolute inset-4 z-20 flex items-start justify-start">
@@ -131,6 +134,8 @@ export function SimulationInfoCard({
             {branches.map((branch, idx) => (
               <div key={branch.id}>
                 <button
+                  type="button"
+                  onClick={() => onSelectSimulation?.(branch.id)}
                   className={`group flex w-full items-center justify-between rounded-md p-3 text-left transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] active:scale-[0.98] ${
                     branch.status === 'active'
                       ? 'border border-[color:var(--color-primary)]/35 bg-[color:var(--color-shell-nav-active-bg)] shadow-[inset_0_0_12px_rgba(217,119,6,0.12)]'
@@ -156,18 +161,12 @@ export function SimulationInfoCard({
                         {branch.name}
                       </div>
                       <div className="mt-0.5 text-[10px] text-[color:var(--color-shell-text-muted)] transition-colors duration-300 group-hover:text-[color:var(--color-shell-text)]">
-                        Created 2m ago
+                        {branch.detail}
                       </div>
                     </div>
                   </div>
-                  <div
-                    className={`font-mono text-xs font-medium transition-transform duration-300 ease-out group-hover:-translate-x-1 ${
-                      branch.timeSaved.startsWith('+')
-                        ? 'text-[color:var(--color-primary)]'
-                        : 'text-[color:var(--color-primary-strong)]'
-                    }`}
-                  >
-                    {branch.timeSaved}
+                  <div className="font-mono text-[10px] font-medium text-[color:var(--color-primary)] transition-transform duration-300 ease-out group-hover:-translate-x-1">
+                    {branch.annotation}
                   </div>
                 </button>
                 {idx < branches.length - 1 && (
