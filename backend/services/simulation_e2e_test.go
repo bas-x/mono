@@ -1842,7 +1842,7 @@ func TestSimulationServiceEndToEnd_AircraftStateChangeEvent_BaseCommitMatchesAir
 	require.Equal(t, services.BaseSimulationID, landingEvent.SimulationID)
 	require.Equal(t, tailNumber, landingEvent.TailNumber)
 	require.Equal(t, expectedAssignedBaseID, landingEvent.BaseID)
-	require.Equal(t, "algorithm", landingEvent.Source)
+	require.Equal(t, services.AssignmentSourceAlgorithm, landingEvent.Source)
 	require.Equal(t, afterAssignment.info.Timestamp, landingEvent.Timestamp)
 
 	aircraftAfterAssignment := afterAssignment.aircrafts[tailNumber]
@@ -1914,13 +1914,13 @@ func TestSimulationServiceEndToEnd_AircraftStateChangeEvent_BranchCommitMatchesA
 	require.NotNil(t, updatedAircraft.AssignedTo)
 	require.Equal(t, targetBaseID, *updatedAircraft.AssignedTo)
 	require.Equal(t, targetBaseID, updatedAssignment.Base)
-	require.Equal(t, "human", updatedAssignment.Source)
+	require.Equal(t, services.AssignmentSourceHuman, updatedAssignment.Source)
 
 	landingEvents := []services.LandingAssignmentEvent{
 		requireNextLandingAssignmentEvent(t, events, time.Second, branchID),
 		requireNextLandingAssignmentEvent(t, events, time.Second, branchID),
 	}
-	landingEventsBySource := make(map[string]services.LandingAssignmentEvent, len(landingEvents))
+	landingEventsBySource := make(map[services.LandingAssignmentSource]services.LandingAssignmentEvent, len(landingEvents))
 	for _, event := range landingEvents {
 		_, exists := landingEventsBySource[event.Source]
 		require.Falsef(t, exists, "duplicate %q landing assignment event for simulation %q", event.Source, branchID)
@@ -1932,11 +1932,11 @@ func TestSimulationServiceEndToEnd_AircraftStateChangeEvent_BranchCommitMatchesA
 		require.Equal(t, branchBefore.info.Timestamp, event.Timestamp)
 	}
 
-	algorithmEvent, ok := landingEventsBySource["algorithm"]
+	algorithmEvent, ok := landingEventsBySource[services.AssignmentSourceAlgorithm]
 	require.True(t, ok)
 	require.Equal(t, expectedAlgorithmBaseID, algorithmEvent.BaseID)
 
-	humanEvent, ok := landingEventsBySource["human"]
+	humanEvent, ok := landingEventsBySource[services.AssignmentSourceHuman]
 	require.True(t, ok)
 	require.Equal(t, targetBaseID, humanEvent.BaseID)
 

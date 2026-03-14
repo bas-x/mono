@@ -45,13 +45,13 @@ func (e AircraftStateChangeEvent) EventSimulationID() string {
 }
 
 type LandingAssignmentEvent struct {
-	Type         string    `json:"type"`
-	SimulationID string    `json:"simulationId"`
-	Tick         uint64    `json:"tick"`
-	TailNumber   string    `json:"tailNumber"`
-	BaseID       string    `json:"baseId"`
-	Source       string    `json:"source"`
-	Timestamp    time.Time `json:"timestamp"`
+	Type         string                  `json:"type"`
+	SimulationID string                  `json:"simulationId"`
+	Tick         uint64                  `json:"tick"`
+	TailNumber   string                  `json:"tailNumber"`
+	BaseID       string                  `json:"baseId"`
+	Source       LandingAssignmentSource `json:"source"`
+	Timestamp    time.Time               `json:"timestamp"`
 }
 
 func (e LandingAssignmentEvent) EventType() string {

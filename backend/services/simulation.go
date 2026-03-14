@@ -792,13 +792,13 @@ func (s *SimulationService) registerHooks(simulationID string, sim *simulation.S
 	})
 }
 
-func mapAssignmentSource(source simulation.LandingAssignmentSource) string {
+func mapAssignmentSource(source simulation.LandingAssignmentSource) LandingAssignmentSource {
 	switch source {
 	case simulation.AssignmentSourceAlgorithm:
-		return "algorithm"
+		return AssignmentSourceAlgorithm
 	case simulation.AssignmentSourceHuman:
-		return "human"
+		return AssignmentSourceHuman
 	default:
-		return "unknown"
+		return AssignmentSourceUnknown
 	}
 }

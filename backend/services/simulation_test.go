@@ -358,7 +358,7 @@ func TestSimulationServiceOverrideAssignmentBeforeCommit(t *testing.T) {
 	require.NotNil(t, aircraft.AssignedTo)
 	require.Equal(t, targetBase, *aircraft.AssignedTo)
 	require.Equal(t, targetBase, assignment.Base)
-	require.Equal(t, "human", assignment.Source)
+	require.Equal(t, AssignmentSourceHuman, assignment.Source)
 }
 
 func TestSimulationServiceOverrideAssignmentAfterCommitRejected(t *testing.T) {
@@ -467,14 +467,14 @@ func TestSimulationServiceOverrideAssignmentAllowsRepeatedOverrideBeforeCommit(t
 	require.NotNil(t, firstAircraft.AssignedTo)
 	require.Equal(t, bases[1].ID, *firstAircraft.AssignedTo)
 	require.Equal(t, bases[1].ID, firstAssignment.Base)
-	require.Equal(t, "human", firstAssignment.Source)
+	require.Equal(t, AssignmentSourceHuman, firstAssignment.Source)
 
 	secondAircraft, secondAssignment, err := svc.OverrideAssignment(BaseSimulationID, aircrafts[0].TailNumber, bases[0].ID)
 	require.NoError(t, err)
 	require.NotNil(t, secondAircraft.AssignedTo)
 	require.Equal(t, bases[0].ID, *secondAircraft.AssignedTo)
 	require.Equal(t, bases[0].ID, secondAssignment.Base)
-	require.Equal(t, "human", secondAssignment.Source)
+	require.Equal(t, AssignmentSourceHuman, secondAssignment.Source)
 }
 
 func testSimulationOptions(numBases, numAircraft uint) *simulation.SimulationOptions {

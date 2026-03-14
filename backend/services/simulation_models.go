@@ -55,9 +55,17 @@ type AircraftPositionSnapshot struct {
 	Needs      []Need `json:"needs"`
 }
 
+type LandingAssignmentSource string
+
+const (
+	AssignmentSourceUnknown   LandingAssignmentSource = "unknown"
+	AssignmentSourceAlgorithm LandingAssignmentSource = "algorithm"
+	AssignmentSourceHuman     LandingAssignmentSource = "human"
+)
+
 type Assignment struct {
-	Base   string `json:"base"`
-	Source string `json:"source"`
+	Base   string                  `json:"base"`
+	Source LandingAssignmentSource `json:"source"`
 }
 
 type SourceEvent struct {
