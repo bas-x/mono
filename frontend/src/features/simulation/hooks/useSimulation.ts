@@ -8,9 +8,12 @@ import { createSimulationStreamClient } from '@/lib/api/realtime/simulationStrea
 import { useSimulationStream } from '@/lib/api/useSimulationStream';
 import { SIMULATION_TICKS_PER_SECOND } from '@/lib/api/types';
 import type {
+  Assignment,
   ApiConfig,
   BranchCreatedEvent,
   CreateBaseSimulationRequest,
+  LandingAssignmentEvent,
+  OverrideAssignmentResponse,
   SimulationAirbase,
   SimulationAircraft,
   SimulationAircraftNeed,
@@ -216,6 +219,60 @@ export function getSimulationCloseFallback(
   return base?.id ?? remaining[0]?.id ?? null;
 }
 
+export function applyAircraftAssignment(
+  aircrafts: SimulationAircraft[],
+  tailNumber: string,
+  assignment: Assignment,
+): SimulationAircraft[] {
+  return aircrafts.map((aircraft) => (
+    aircraft.tailNumber === tailNumber
+      ? {
+          ...aircraft,
+          assignedTo: assignment.base,
+          assignmentSource: assignment.source,
+        }
+      : aircraft
+  ));
+}
+
+export function applyOverrideResponse(
+  aircrafts: SimulationAircraft[],
+  response: OverrideAssignmentResponse,
+): SimulationAircraft[] {
+  return aircrafts.map((aircraft) => (
+    aircraft.tailNumber === response.aircraft.tailNumber
+      ? {
+          ...aircraft,
+          ...response.aircraft,
+          assignmentSource: response.assignment.source,
+          assignedTo: response.assignment.base,
+        }
+      : aircraft
+  ));
+}
+
+function isLandingAssignmentEvent(event: SimulationEvent): event is LandingAssignmentEvent {
+  return event.type === 'landing_assignment'
+    && typeof event.tailNumber === 'string'
+    && typeof event.baseId === 'string'
+    && (event.source === 'algorithm' || event.source === 'human');
+}
+
+export function mapOverrideErrorMessage(error: unknown): string {
+  const status = getErrorStatus(error);
+
+  switch (status) {
+    case 409:
+      return 'Override too late';
+    case 404:
+      return 'Simulation or aircraft no longer exists';
+    case 400:
+      return 'Invalid assignment target';
+    default:
+      return extractErrorMessage(error);
+  }
+}
+
 export type AircraftPosition = {
   tailNumber: string;
   position: { x: number; y: number };
@@ -248,6 +305,28 @@ export type SimulationState =
   | { status: 'error'; message: string };
 
 type RunningSimulationState = Extract<SimulationState, { status: 'running' }>;
+
+export function buildHistorySnapshot(
+  current: RunningSimulationState,
+  tick: number,
+  overrides: Partial<RunningSimulationState['history'][number]> = {},
+): RunningSimulationState['history'][number] {
+  const existingSnapshot = current.history[tick];
+
+  return {
+    aircrafts: overrides.aircrafts ?? existingSnapshot?.aircrafts ?? current.aircrafts,
+    aircraftPositions:
+      overrides.aircraftPositions ?? existingSnapshot?.aircraftPositions ?? current.aircraftPositions,
+  };
+}
+
+export function getVisibleAircraftsForPlayback(state: RunningSimulationState): SimulationAircraft[] {
+  if (state.playbackTick == null) {
+    return state.aircrafts;
+  }
+
+  return state.history[state.playbackTick]?.aircrafts ?? state.aircrafts;
+}
 
 export function rehydrateRunningSimulationState(
   simulationInfo: SimulationInfo,
@@ -467,10 +546,7 @@ export function useSimulation() {
             time: event.timestamp,
             history: {
               ...current.history,
-              [currentTick]: current.history[currentTick] || {
-                aircrafts: current.aircrafts,
-                aircraftPositions: current.aircraftPositions,
-              },
+              [currentTick]: buildHistorySnapshot(current, currentTick),
             },
           };
         });
@@ -486,15 +562,20 @@ export function useSimulation() {
             aircrafts: updatedAircrafts,
             history: {
               ...current.history,
-              [currentTick]: { ...current.history[currentTick], aircrafts: updatedAircrafts },
+              [currentTick]: buildHistorySnapshot(current, currentTick, { aircrafts: updatedAircrafts }),
             },
           };
         });
-      } else if (event.type === 'landing_assignment') {
+      } else if (isLandingAssignmentEvent(event)) {
         setState((current) => {
           if (current.status !== 'running') return current;
-          const updatedAircrafts = current.aircrafts.map((aircraft) =>
-            aircraft.tailNumber === event.tailNumber ? { ...aircraft, assignedTo: event.baseId } : aircraft,
+          const updatedAircrafts = applyAircraftAssignment(
+            current.aircrafts,
+            event.tailNumber,
+            {
+              base: event.baseId,
+              source: event.source,
+            },
           );
           const currentTick = current.tick ?? 0;
           return {
@@ -502,7 +583,7 @@ export function useSimulation() {
             aircrafts: updatedAircrafts,
             history: {
               ...current.history,
-              [currentTick]: { ...current.history[currentTick], aircrafts: updatedAircrafts },
+              [currentTick]: buildHistorySnapshot(current, currentTick, { aircrafts: updatedAircrafts }),
             },
           };
         });
@@ -515,7 +596,9 @@ export function useSimulation() {
             aircraftPositions: event.positions,
             history: {
               ...current.history,
-              [currentTick]: { ...current.history[currentTick], aircraftPositions: event.positions },
+              [currentTick]: buildHistorySnapshot(current, currentTick, {
+                aircraftPositions: event.positions,
+              }),
             },
           };
         });
@@ -586,6 +669,46 @@ export function useSimulation() {
       return false;
     }
   }, [clients.simulation, loadSimulation, state]);
+
+  const overrideAssignment = useCallback(async (tailNumber: string, baseId: string): Promise<boolean> => {
+    if (state.status !== 'running') {
+      return false;
+    }
+
+    try {
+      const response = await clients.simulation.overrideAssignment(state.simulationId, tailNumber, { baseId });
+      setState((current) => {
+        if (current.status !== 'running' || current.simulationId !== state.simulationId) {
+          return current;
+        }
+
+        const updatedAircrafts = applyOverrideResponse(current.aircrafts, response);
+        const currentTick = current.tick ?? 0;
+        return {
+          ...current,
+          aircrafts: updatedAircrafts,
+          history: {
+            ...current.history,
+            [currentTick]: buildHistorySnapshot(current, currentTick, { aircrafts: updatedAircrafts }),
+          },
+        };
+      });
+      toast.success('Assignment override applied');
+      return true;
+    } catch (error) {
+      toast.error(mapOverrideErrorMessage(error));
+      if (getErrorStatus(error) === 404) {
+        const list = await fetchSimulations();
+        if (!list.some((simulation) => simulation.id === state.simulationId)) {
+          const fallbackSimulationId = getSimulationCloseFallback(state.simulationId, list);
+          if (fallbackSimulationId) {
+            await loadSimulation(fallbackSimulationId);
+          }
+        }
+      }
+      return false;
+    }
+  }, [clients.simulation, fetchSimulations, loadSimulation, state]);
 
   const refreshData = useCallback(async () => {
     if (state.status !== 'running') return;
@@ -665,11 +788,9 @@ export function useSimulation() {
   const visibleState = state.status === 'running'
     ? {
         ...state,
-        aircrafts: state.playbackTick != null && state.history[state.playbackTick]
-          ? state.history[state.playbackTick].aircrafts
-          : state.aircrafts,
+        aircrafts: getVisibleAircraftsForPlayback(state),
         aircraftPositions: state.playbackTick != null && state.history[state.playbackTick]
-          ? state.history[state.playbackTick].aircraftPositions
+          ? state.history[state.playbackTick].aircraftPositions ?? state.aircraftPositions
           : state.aircraftPositions,
       }
     : state;
@@ -683,6 +804,7 @@ export function useSimulation() {
     loadSimulation,
     createSimulation,
     createBranchFromEvent,
+    overrideAssignment,
     refreshData,
     triggerReset,
     reset,

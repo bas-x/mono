@@ -79,4 +79,30 @@ describe('createMockSimulationStreamClient', () => {
     client.disconnect();
     vi.useRealTimers();
   });
+
+  it('emits human landing_assignment on the targeted simulation stream after override', async () => {
+    vi.useFakeTimers();
+
+    const service = createMockSimulationServiceClient();
+    const client = createMockSimulationStreamClient();
+    const seenEvents: Array<{ baseId: string; source: string }> = [];
+
+    client.subscribe((event) => {
+      if (event.type === 'landing_assignment' && event.source === 'human') {
+        seenEvents.push({ baseId: String(event.baseId), source: String(event.source) });
+      }
+    });
+
+    client.connect('base');
+    vi.advanceTimersByTime(250);
+
+    const aircrafts = await service.getAircrafts('base');
+    const airbases = await service.getAirbases('base');
+    await service.overrideAssignment('base', aircrafts[0]!.tailNumber, { baseId: airbases[1]!.id });
+
+    expect(seenEvents.at(-1)).toEqual({ baseId: airbases[1]!.id, source: 'human' });
+
+    client.disconnect();
+    vi.useRealTimers();
+  });
 });

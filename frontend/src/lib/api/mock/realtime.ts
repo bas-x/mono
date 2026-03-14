@@ -8,7 +8,7 @@ import { createMockEventTimestamp } from '@/lib/api/mock/scenarios';
 import {
   createMockSequenceEvent,
   getStoredMockSimulationScenario,
-  subscribeToMockBaseBranchEvents,
+  subscribeToMockSimulationEvents,
 } from '@/lib/api/mock/store';
 
 const STEP_INTERVAL_MS = 1_500;
@@ -85,7 +85,13 @@ export function createMockSimulationStreamClient(): SimulationStreamClient {
     scriptIndex = 0;
 
     if (simulationId === 'base') {
-      unsubscribeBranchEvents = subscribeToMockBaseBranchEvents((event) => {
+      unsubscribeBranchEvents = subscribeToMockSimulationEvents(simulationId, (event) => {
+        eventSubscribers.forEach((handler) => {
+          handler(createMockSequenceEvent(event, scriptIndex + 1000));
+        });
+      });
+    } else {
+      unsubscribeBranchEvents = subscribeToMockSimulationEvents(simulationId, (event) => {
         eventSubscribers.forEach((handler) => {
           handler(createMockSequenceEvent(event, scriptIndex + 1000));
         });

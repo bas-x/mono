@@ -220,5 +220,5 @@ func aircraftSpeed(tail TailNumber) float64 {
 	if h < 0 {
 		h = -h
 	}
-	return 1.0 + float64(h%20)*0.5
+	return 0.8 + float64(h%20)*0.005
 }

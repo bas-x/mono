@@ -63,4 +63,27 @@ describe('createMockSimulationServiceClient', () => {
       tick: 41,
     });
   });
+
+  it('applies override assignments only to the targeted simulation', async () => {
+    const client = createMockSimulationServiceClient();
+    const branch = await client.createBranchSimulation('base');
+
+    const baseAircraft = await client.getAircrafts('base');
+    const branchAircraft = await client.getAircrafts(branch.id);
+    const branchAirbases = await client.getAirbases(branch.id);
+
+    const targetTail = branchAircraft[0]!.tailNumber;
+    const overrideBaseId = branchAirbases[1]!.id;
+    const originalBaseAssignment = baseAircraft.find((aircraft) => aircraft.tailNumber === targetTail)?.assignedTo;
+
+    const result = await client.overrideAssignment(branch.id, targetTail, { baseId: overrideBaseId });
+
+    expect(result.assignment).toEqual({ base: overrideBaseId, source: 'human' });
+    expect(result.aircraft.assignedTo).toBe(overrideBaseId);
+    expect(result.aircraft.assignmentSource).toBe('human');
+
+    const refreshedBaseAircraft = await client.getAircrafts('base');
+    expect(refreshedBaseAircraft.find((aircraft) => aircraft.tailNumber === targetTail)?.assignedTo).toBe(originalBaseAssignment);
+    expect(branchAirbases.length).toBeGreaterThan(0);
+  });
 });

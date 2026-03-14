@@ -300,7 +300,8 @@
 - **Behavior**:
   - Applies a human landing assignment override for the specified aircraft tail number.
   - V1 supports **set override only**; clearing an override is not exposed over HTTP.
-  - The override is allowed only before the aircraft is committed to landing/service flow.
+  - The override is allowed only while the aircraft is still in the inbound pre-commit window.
+  - If the aircraft has no assignment yet, the service may first register the algorithmic landing assignment and then apply the human override.
   - The response returns both the aircraft read model and the assignment metadata.
 
 - **Response** `200`:
