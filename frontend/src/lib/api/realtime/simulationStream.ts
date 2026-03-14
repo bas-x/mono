@@ -1,12 +1,42 @@
 import { parseApiConfigFromEnv, SIMULATION_WS_PATH } from '@/lib/api/config';
 import { createWebSocketClient } from '@/lib/api/realtime/socket';
-import type { ApiConfig, SimulationEvent, SimulationStreamClient } from '@/lib/api/types';
+import type {
+  ApiConfig,
+  ServicingSummary,
+  SimulationClosedReason,
+  SimulationEvent,
+  SimulationStreamClient,
+} from '@/lib/api/types';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
 
-function parseSimulationEvent(rawData: string): SimulationEvent | null {
+function parseServicingSummary(value: unknown): ServicingSummary | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  if (
+    typeof value.completedVisitCount !== 'number' ||
+    typeof value.totalDurationMs !== 'number' ||
+    !(typeof value.averageDurationMs === 'number' || value.averageDurationMs === null)
+  ) {
+    return null;
+  }
+
+  return {
+    completedVisitCount: value.completedVisitCount,
+    totalDurationMs: value.totalDurationMs,
+    averageDurationMs: value.averageDurationMs,
+  };
+}
+
+function parseSimulationClosedReason(value: unknown): SimulationClosedReason | null {
+  return value === 'reset' || value === 'cancel' ? value : null;
+}
+
+export function parseSimulationEvent(rawData: string): SimulationEvent | null {
   const parsed = JSON.parse(rawData) as unknown;
 
   if (!isRecord(parsed)) {
@@ -19,6 +49,48 @@ function parseSimulationEvent(rawData: string): SimulationEvent | null {
     typeof parsed.timestamp !== 'string'
   ) {
     return null;
+  }
+
+  if (parsed.type === 'simulation_ended') {
+    if (typeof parsed.tick !== 'number') {
+      return null;
+    }
+
+    const summary = parseServicingSummary(parsed.summary);
+    if (!summary) {
+      return null;
+    }
+
+    return {
+      ...(parsed as Record<string, unknown>),
+      type: parsed.type,
+      simulationId: parsed.simulationId,
+      timestamp: parsed.timestamp,
+      tick: parsed.tick,
+      summary,
+    } as SimulationEvent;
+  }
+
+  if (parsed.type === 'simulation_closed') {
+    if (typeof parsed.tick !== 'number') {
+      return null;
+    }
+
+    const reason = parseSimulationClosedReason(parsed.reason);
+    const summary = parseServicingSummary(parsed.summary);
+    if (!reason || !summary) {
+      return null;
+    }
+
+    return {
+      ...(parsed as Record<string, unknown>),
+      type: parsed.type,
+      simulationId: parsed.simulationId,
+      timestamp: parsed.timestamp,
+      tick: parsed.tick,
+      reason,
+      summary,
+    } as SimulationEvent;
   }
 
   return parsed as SimulationEvent;

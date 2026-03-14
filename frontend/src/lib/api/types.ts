@@ -53,6 +53,12 @@ export type SimulationAircraftNeed = {
   blocking: boolean;
 };
 
+export type AirbaseCapability = {
+  recoveryMultiplierPermille: number;
+};
+
+export type AirbaseCapabilityMap = Record<string, AirbaseCapability>;
+
 export type SimulationAircraft = {
   tailNumber: string;
   needs: SimulationAircraftNeed[];
@@ -67,6 +73,14 @@ export type Assignment = {
   base: string;
   source: AssignmentSource;
 };
+
+export type ServicingSummary = {
+  completedVisitCount: number;
+  totalDurationMs: number;
+  averageDurationMs: number | null;
+};
+
+export type SimulationClosedReason = 'reset' | 'cancel';
 
 export const SIMULATION_TICKS_PER_SECOND = 64;
 
@@ -239,6 +253,21 @@ export type LandingAssignmentEvent = SimulationEvent & {
   baseId: string;
   source: AssignmentSource;
   tick: number;
+  needs: SimulationAircraftNeed[];
+  capabilities: AirbaseCapabilityMap;
+};
+
+export type SimulationEndedEvent = SimulationEvent & {
+  type: 'simulation_ended';
+  tick: number;
+  summary: ServicingSummary;
+};
+
+export type SimulationClosedEvent = SimulationEvent & {
+  type: 'simulation_closed';
+  tick: number;
+  reason: SimulationClosedReason;
+  summary: ServicingSummary;
 };
 
 export type SimulationEventEnvelope = SimulationEvent;

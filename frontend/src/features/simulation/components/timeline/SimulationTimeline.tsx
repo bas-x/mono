@@ -2,13 +2,20 @@ import { useState, useEffect } from 'react';
 import { TimelineControls } from './TimelineControls';
 import { TimelineTrack } from './TimelineTrack';
 import { useSimulationControls } from '../../hooks/useSimulationControls';
-import { formatSimulationDurationFromTicks, type SimulationState } from '../../hooks/useSimulation';
+import {
+  formatSimulationDurationFromTicks,
+  formatTerminalSummaryDuration,
+  type SimulationState,
+  type TerminalSimulationRecord,
+} from '../../hooks/useSimulation';
 import type { SimulationEvent } from '@/lib/api/types';
 
 type SimulationTimelineProps = {
   simulationId: string;
   simulationState: SimulationState;
   events: SimulationEvent[];
+  terminalRecord?: TerminalSimulationRecord | null;
+  latestTerminalRecord?: TerminalSimulationRecord | null;
   setPlaybackTick: (tick: number | null) => void;
   onRefresh: () => Promise<void>;
   onBranchFromEvent?: (event: SimulationEvent) => unknown;
@@ -32,6 +39,8 @@ export function SimulationTimeline({
   simulationId,
   simulationState,
   events,
+  terminalRecord,
+  latestTerminalRecord,
   setPlaybackTick,
   onRefresh,
   onBranchFromEvent,
@@ -72,6 +81,8 @@ export function SimulationTimeline({
     ? formatSimulationDurationFromTicks(simulationState.untilTick ?? timelineEndTick)
     : null;
   const splitMarker = getTimelineSplitMarker(simulationState);
+  const displayedTerminalRecord = terminalRecord
+    ?? (latestTerminalRecord && latestTerminalRecord.kind === 'closed' ? latestTerminalRecord : null);
 
   const handlePause = async () => {
     if (status !== 'running') {
@@ -204,6 +215,26 @@ export function SimulationTimeline({
           onZoomChange={setZoom}
           durationLabel={durationLabel}
         />
+        {displayedTerminalRecord ? (
+          <div className="rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-xs text-white/80">
+            <div className="flex items-center justify-between gap-3">
+              <div className="font-semibold uppercase tracking-widest text-white/90">
+                {displayedTerminalRecord.kind === 'ended'
+                  ? 'Run completed'
+                  : displayedTerminalRecord.reason === 'reset'
+                    ? 'Run reset'
+                    : 'Branch stopped'}
+              </div>
+              <div className="font-mono text-[10px] text-white/50">
+                {displayedTerminalRecord.summary.completedVisitCount} completed services
+              </div>
+            </div>
+            <div className="mt-2 flex flex-wrap gap-4 font-mono text-[11px] text-white/70">
+              <span>Total service time {formatTerminalSummaryDuration(displayedTerminalRecord.summary.totalDurationMs)}</span>
+              <span>Average service time {formatTerminalSummaryDuration(displayedTerminalRecord.summary.averageDurationMs)}</span>
+            </div>
+          </div>
+        ) : null}
         <TimelineTrack
           events={filteredEvents}
           currentTick={currentTick}

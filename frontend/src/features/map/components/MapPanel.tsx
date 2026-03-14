@@ -8,8 +8,10 @@ import { useAirbases } from '@/features/map/hooks/useAirbases';
 import { createFocusedViewBox } from '@/features/map/lib/geometry';
 import { getPlacementBounds, resolveActivePlacementSources } from '@/features/map/lib/placement';
 import { SimulationSetupSheet } from '@/features/simulation/components/SimulationSetupSheet';
+import { TerminalSummarySheet } from '@/features/simulation/components/TerminalSummarySheet';
+import { LandingAssignmentStack } from '@/features/simulation/components/LandingAssignmentStack';
 import { SimulationTimeline } from '@/features/simulation/components/timeline/SimulationTimeline';
-import { useSimulation } from '@/features/simulation/hooks/useSimulation';
+import { type TerminalSimulationRecord, useSimulation } from '@/features/simulation/hooks/useSimulation';
 import {
   DEFAULT_SIMULATION_SETUP_FORM_VALUES,
   type SimulationSetupFormValues,
@@ -77,12 +79,16 @@ export function MapPanel() {
   const [simulationSetupValues, setSimulationSetupValues] = useState<SimulationSetupFormValues>(
     DEFAULT_SIMULATION_SETUP_FORM_VALUES,
   );
+  const [activeTerminalModalRecord, setActiveTerminalModalRecord] = useState<TerminalSimulationRecord | null>(null);
   const [mapOverlayPortalRoot, setMapOverlayPortalRoot] = useState<HTMLDivElement | null>(null);
   const [selectedAirbaseDetailsState, setSelectedAirbaseDetailsState] =
     useState<SelectedAirbaseDetailsState>({ status: 'idle' });
   const {
     state: simulationState,
     events: simulationEvents,
+    terminalRecord,
+    latestTerminalRecord,
+    terminalRecords,
     setPlaybackTick,
     simulations,
     loadSimulation,
@@ -151,6 +157,26 @@ export function MapPanel() {
       cancelActiveRequest();
     };
   }, [cancelActiveRequest]);
+
+  useEffect(() => {
+    if (!latestTerminalRecord) {
+      return;
+    }
+
+    setActiveTerminalModalRecord((current) => {
+      if (
+        current?.simulationId === latestTerminalRecord.simulationId
+        && current?.timestamp === latestTerminalRecord.timestamp
+        && current?.tick === latestTerminalRecord.tick
+        && current?.kind === latestTerminalRecord.kind
+        && current?.reason === latestTerminalRecord.reason
+      ) {
+        return current;
+      }
+
+      return latestTerminalRecord;
+    });
+  }, [latestTerminalRecord]);
 
   const focusAirbase = useCallback(
     (airbaseId: string) => {
@@ -326,13 +352,21 @@ export function MapPanel() {
             />
 
             {isOverlayVisible && viewMode === 'simulate' && simulationState.status === 'running' && (
-              <SimulationInfoCard
-                simulationState={simulationState}
-                simulations={simulations}
-                onSelectSimulation={loadSimulation}
-                onOverrideAssignment={overrideAssignment}
-                portalRoot={mapOverlayPortalRoot}
-              />
+              <>
+                <SimulationInfoCard
+                  simulationState={simulationState}
+                  simulations={simulations}
+                  terminalRecord={terminalRecord}
+                  latestTerminalRecord={latestTerminalRecord}
+                  onSelectSimulation={loadSimulation}
+                  onOverrideAssignment={overrideAssignment}
+                  portalRoot={mapOverlayPortalRoot}
+                />
+                <LandingAssignmentStack
+                  events={simulationEvents}
+                  portalRoot={mapOverlayPortalRoot}
+                />
+              </>
             )}
           </div>
 
@@ -384,6 +418,8 @@ export function MapPanel() {
               simulationId={simulationState.simulationId}
               simulationState={simulationState}
               events={simulationEvents}
+              terminalRecord={terminalRecord}
+              latestTerminalRecord={latestTerminalRecord}
               setPlaybackTick={setPlaybackTick}
               onRefresh={refreshData}
               onBranchFromEvent={createBranchFromEvent}
@@ -397,6 +433,12 @@ export function MapPanel() {
         onClose={handleCloseSimulationSheet}
         defaultValues={simulationSetupValues}
         onSubmit={handleSubmitSimulationSetup}
+      />
+
+      <TerminalSummarySheet
+        record={activeTerminalModalRecord}
+        records={terminalRecords}
+        onClose={() => setActiveTerminalModalRecord(null)}
       />
     </>
   );

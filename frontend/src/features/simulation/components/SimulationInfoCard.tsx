@@ -1,4 +1,9 @@
-import { type SimulationState } from '@/features/simulation/hooks/useSimulation';
+import {
+  formatTerminalSummaryDuration,
+  formatTerminalSummaryHeadline,
+  type SimulationState,
+  type TerminalSimulationRecord,
+} from '@/features/simulation/hooks/useSimulation';
 import { createPortal } from 'react-dom';
 import { useState } from 'react';
 import { AccordionCard } from '@/features/ui/components/AccordionCard';
@@ -7,6 +12,8 @@ import type { SimulationInfo } from '@/lib/api/types';
 type SimulationInfoCardProps = {
   simulationState: SimulationState;
   simulations?: SimulationInfo[];
+  terminalRecord?: TerminalSimulationRecord | null;
+  latestTerminalRecord?: TerminalSimulationRecord | null;
   onSelectSimulation?: (simulationId: string) => void;
   onOverrideAssignment?: (tailNumber: string, baseId: string) => Promise<boolean>;
   portalRoot: Element | null;
@@ -15,6 +22,8 @@ type SimulationInfoCardProps = {
 export function SimulationInfoCard({
   simulationState,
   simulations = [],
+  terminalRecord,
+  latestTerminalRecord,
   onSelectSimulation,
   onOverrideAssignment,
   portalRoot,
@@ -41,6 +50,8 @@ export function SimulationInfoCard({
 
   const aircraftCount = simulationState.aircrafts?.length ?? 0;
   const airbaseCount = simulationState.airbases?.length ?? 0;
+  const displayedTerminalRecord = terminalRecord
+    ?? (latestTerminalRecord && latestTerminalRecord.kind === 'closed' ? latestTerminalRecord : null);
 
   const branches = simulations.map((simulation) => ({
     id: simulation.id,
@@ -106,6 +117,48 @@ export function SimulationInfoCard({
           </span>
           <span className="mt-1 text-xs text-[color:var(--color-shell-text-muted)]">{dateString}</span>
         </div>
+
+        {displayedTerminalRecord ? (
+          <div className="rounded-lg border border-[color:var(--color-shell-border)] bg-[color:var(--color-shell-panel-soft)] p-3">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-[10px] font-semibold uppercase tracking-widest text-[color:var(--color-shell-text-muted)]">
+                  Run outcome
+                </div>
+                <div className="mt-1 text-sm font-medium text-[color:var(--color-shell-text)]">
+                  {formatTerminalSummaryHeadline(displayedTerminalRecord)}
+                </div>
+              </div>
+              <div className="rounded-full border border-[color:var(--color-shell-button-border)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[color:var(--color-primary)]">
+                {displayedTerminalRecord.kind === 'ended'
+                  ? 'Completed'
+                  : displayedTerminalRecord.reason === 'reset'
+                    ? 'Reset'
+                    : 'Stopped'}
+              </div>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2 text-[10px] uppercase tracking-wider text-[color:var(--color-shell-text-muted)]">
+              <div>
+                <div>Completed services</div>
+                <div className="mt-1 font-mono text-sm text-[color:var(--color-shell-text)]">
+                  {displayedTerminalRecord.summary.completedVisitCount}
+                </div>
+              </div>
+              <div>
+                <div>Total service time</div>
+                <div className="mt-1 font-mono text-sm text-[color:var(--color-shell-text)]">
+                  {formatTerminalSummaryDuration(displayedTerminalRecord.summary.totalDurationMs)}
+                </div>
+              </div>
+              <div>
+                <div>Average service time</div>
+                <div className="mt-1 font-mono text-sm text-[color:var(--color-shell-text)]">
+                  {formatTerminalSummaryDuration(displayedTerminalRecord.summary.averageDurationMs)}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-[color:var(--color-shell-border)] bg-[color:var(--color-shell-panel-soft)]">
           <div className="flex items-center justify-between border-b border-[color:var(--color-shell-border)] bg-[color:var(--color-shell-panel)] px-2 py-3">

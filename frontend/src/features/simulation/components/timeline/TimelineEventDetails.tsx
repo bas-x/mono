@@ -15,7 +15,10 @@ export function TimelineEventDetails({
 }: TimelineEventDetailsProps) {
   // Omit large or redundant fields for quick display
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { type, simulationId, timestamp, ...rest } = event;
+  const { type, simulationId, timestamp, needs, capabilities, ...rest } = event;
+
+  const hasStructuredAssignmentDetails = type === 'landing_assignment'
+    && (Array.isArray(needs) || (typeof capabilities === 'object' && capabilities !== null));
 
   return (
     <div className="absolute bottom-full left-1/2 z-20 mb-4 w-80 -translate-x-1/2 overflow-hidden rounded-xl border border-[color:var(--color-shell-panel-border)] bg-black/90 shadow-2xl backdrop-blur-xl transition-all">
@@ -38,10 +41,41 @@ export function TimelineEventDetails({
           </svg>
         </button>
       </div>
-      <div className="max-h-48 overflow-y-auto p-4">
-        <pre className="whitespace-pre-wrap font-mono text-[10px] text-white/70">
-          {JSON.stringify(rest, null, 2)}
-        </pre>
+      <div className="max-h-64 overflow-y-auto p-4">
+        {hasStructuredAssignmentDetails ? (
+          <div className="space-y-4 text-[11px] text-white/75">
+            <div>
+              <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/45">
+                Assignment context
+              </div>
+              <pre className="whitespace-pre-wrap font-mono text-[10px] text-white/70">
+                {JSON.stringify(rest, null, 2)}
+              </pre>
+            </div>
+
+            <div>
+              <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/45">
+                Aircraft needs snapshot
+              </div>
+              <pre className="whitespace-pre-wrap font-mono text-[10px] text-white/70">
+                {JSON.stringify(needs ?? [], null, 2)}
+              </pre>
+            </div>
+
+            <div>
+              <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.2em] text-white/45">
+                Airbase capabilities
+              </div>
+              <pre className="whitespace-pre-wrap font-mono text-[10px] text-white/70">
+                {JSON.stringify(capabilities ?? {}, null, 2)}
+              </pre>
+            </div>
+          </div>
+        ) : (
+          <pre className="whitespace-pre-wrap font-mono text-[10px] text-white/70">
+            {JSON.stringify(rest, null, 2)}
+          </pre>
+        )}
       </div>
       {canBranchFromEvent && onBranchFromEvent ? (
         <div className="border-t border-white/5 px-4 py-3">

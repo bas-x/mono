@@ -12,10 +12,14 @@ import type {
   ApiConfig,
   BranchCreatedEvent,
   CreateBaseSimulationRequest,
+  ServicingSummary,
   LandingAssignmentEvent,
   OverrideAssignmentResponse,
   SimulationAirbase,
   SimulationAircraft,
+  SimulationClosedEvent,
+  SimulationClosedReason,
+  SimulationEndedEvent,
   SimulationAircraftNeed,
   SimulationEvent,
   SimulationInfo,
@@ -223,6 +227,7 @@ export function applyAircraftAssignment(
   aircrafts: SimulationAircraft[],
   tailNumber: string,
   assignment: Assignment,
+  needs?: SimulationAircraftNeed[],
 ): SimulationAircraft[] {
   return aircrafts.map((aircraft) => (
     aircraft.tailNumber === tailNumber
@@ -230,6 +235,7 @@ export function applyAircraftAssignment(
           ...aircraft,
           assignedTo: assignment.base,
           assignmentSource: assignment.source,
+          needs: needs ?? aircraft.needs,
         }
       : aircraft
   ));
@@ -255,7 +261,10 @@ function isLandingAssignmentEvent(event: SimulationEvent): event is LandingAssig
   return event.type === 'landing_assignment'
     && typeof event.tailNumber === 'string'
     && typeof event.baseId === 'string'
-    && (event.source === 'algorithm' || event.source === 'human');
+    && (event.source === 'algorithm' || event.source === 'human')
+    && Array.isArray(event.needs)
+    && typeof event.capabilities === 'object'
+    && event.capabilities !== null;
 }
 
 export function mapOverrideErrorMessage(error: unknown): string {
@@ -280,6 +289,15 @@ export type AircraftPosition = {
   needs: SimulationAircraftNeed[];
 };
 
+export type TerminalSimulationRecord = {
+  simulationId: string;
+  tick: number;
+  timestamp: string;
+  kind: 'ended' | 'closed';
+  reason?: SimulationClosedReason;
+  summary: ServicingSummary;
+};
+
 export type SimulationState =
   | { status: 'idle' }
   | { status: 'creating' }
@@ -301,6 +319,7 @@ export type SimulationState =
       splitTick?: number;
       splitTimestamp?: string;
       sourceEvent?: SourceEvent;
+      terminalRecord?: TerminalSimulationRecord;
     }
   | { status: 'error'; message: string };
 
@@ -352,6 +371,7 @@ export function rehydrateRunningSimulationState(
     splitTick: simulationInfo.splitTick,
     splitTimestamp: simulationInfo.splitTimestamp,
     sourceEvent: simulationInfo.sourceEvent,
+    terminalRecord: cachedState?.terminalRecord,
   };
 }
 
@@ -363,13 +383,102 @@ function isBranchCreatedEvent(event: SimulationEvent): event is BranchCreatedEve
     && typeof event.splitTimestamp === 'string';
 }
 
+function isSimulationEndedEvent(event: SimulationEvent): event is SimulationEndedEvent {
+  return event.type === 'simulation_ended'
+    && typeof event.tick === 'number'
+    && typeof event.summary?.completedVisitCount === 'number'
+    && typeof event.summary?.totalDurationMs === 'number'
+    && (typeof event.summary?.averageDurationMs === 'number' || event.summary?.averageDurationMs === null);
+}
+
+function isSimulationClosedEvent(event: SimulationEvent): event is SimulationClosedEvent {
+  return event.type === 'simulation_closed'
+    && typeof event.tick === 'number'
+    && (event.reason === 'reset' || event.reason === 'cancel')
+    && typeof event.summary?.completedVisitCount === 'number'
+    && typeof event.summary?.totalDurationMs === 'number'
+    && (typeof event.summary?.averageDurationMs === 'number' || event.summary?.averageDurationMs === null);
+}
+
+export function createTerminalSimulationRecord(
+  event: SimulationEndedEvent | SimulationClosedEvent,
+): TerminalSimulationRecord {
+  return {
+    simulationId: event.simulationId,
+    tick: event.tick,
+    timestamp: event.timestamp,
+    kind: event.type === 'simulation_ended' ? 'ended' : 'closed',
+    reason: event.type === 'simulation_closed' ? event.reason : undefined,
+    summary: event.summary,
+  };
+}
+
+export function formatTerminalSummaryDuration(durationMs: number | null): string {
+  if (durationMs == null) {
+    return 'No completed services yet';
+  }
+
+  if (durationMs < 1000) {
+    return `${durationMs} ms`;
+  }
+
+  const seconds = durationMs / 1000;
+  return `${seconds.toFixed(seconds >= 10 ? 0 : 1)} s`;
+}
+
+export function formatTerminalSummaryHeadline(record: TerminalSimulationRecord): string {
+  if (record.kind === 'ended') {
+    return 'Run completed successfully';
+  }
+
+  return record.reason === 'reset' ? 'Run stopped and reset' : 'Branch stopped';
+}
+
+export function sortTerminalSimulationRecords(
+  records: TerminalSimulationRecord[],
+): TerminalSimulationRecord[] {
+  return [...records].sort((left, right) => {
+    if (left.simulationId === 'base') {
+      return -1;
+    }
+
+    if (right.simulationId === 'base') {
+      return 1;
+    }
+
+    if (left.timestamp !== right.timestamp) {
+      return right.timestamp.localeCompare(left.timestamp);
+    }
+
+    if (left.tick !== right.tick) {
+      return right.tick - left.tick;
+    }
+
+    return left.simulationId.localeCompare(right.simulationId);
+  });
+}
+
+function sameTerminalRecord(
+  left: TerminalSimulationRecord | null,
+  right: TerminalSimulationRecord,
+): boolean {
+  return left?.simulationId === right.simulationId
+    && left?.tick === right.tick
+    && left?.timestamp === right.timestamp
+    && left?.kind === right.kind
+    && left?.reason === right.reason;
+}
+
 export function useSimulation() {
   const { clients, config } = useApi();
   const [state, setState] = useState<SimulationState>({ status: 'idle' });
   const [simulations, setSimulations] = useState<SimulationInfo[]>([]);
   const [isLoadingSimulations, setIsLoadingSimulations] = useState(false);
+  const [latestTerminalRecord, setLatestTerminalRecord] = useState<TerminalSimulationRecord | null>(null);
+  const [activeTerminalModalRecord, setActiveTerminalModalRecord] = useState<TerminalSimulationRecord | null>(null);
   const simulationStateCacheRef = useRef<Map<string, RunningSimulationState>>(new Map());
   const eventsBySimulationRef = useRef<Map<string, SimulationEvent[]>>(new Map());
+  const terminalRecordsRef = useRef<Map<string, TerminalSimulationRecord>>(new Map());
   const streamClientsRef = useRef<
     Map<string, { client: SimulationStreamClient; unsubscribe: () => void; unsubscribeState: () => void }>
   >(new Map());
@@ -384,6 +493,22 @@ export function useSimulation() {
   const currentEvents = state.status === 'running'
     ? (eventsBySimulationRef.current.get(state.simulationId) ?? [])
     : [];
+  const currentTerminalRecord = state.status === 'running'
+    ? (terminalRecordsRef.current.get(state.simulationId) ?? state.terminalRecord ?? null)
+    : latestTerminalRecord;
+  const terminalRecords = sortTerminalSimulationRecords(Array.from(terminalRecordsRef.current.values()));
+
+  const registerTerminalRecord = useCallback((record: TerminalSimulationRecord) => {
+    terminalRecordsRef.current.set(record.simulationId, record);
+    setLatestTerminalRecord(record);
+    setActiveTerminalModalRecord((current) => {
+      if (sameTerminalRecord(current, record)) {
+        return current;
+      }
+
+      return record;
+    });
+  }, []);
 
   const recordSimulationEvent = useCallback((event: SimulationEvent) => {
     eventsBySimulationRef.current = appendSimulationEvent(eventsBySimulationRef.current, event);
@@ -429,7 +554,6 @@ export function useSimulation() {
 
   const handleSimulationClosed = useCallback(async (closedSimulationId: string) => {
     simulationStateCacheRef.current.delete(closedSimulationId);
-    eventsBySimulationRef.current.delete(closedSimulationId);
     setSimulations((current) => sortSimulationInfos(current.filter((simulation) => simulation.id !== closedSimulationId)));
     const list = await fetchSimulations();
 
@@ -460,6 +584,9 @@ export function useSimulation() {
 
       const client = createStandaloneSimulationStreamClient(config);
       const unsubscribe = client.subscribe((event) => {
+        if (isSimulationEndedEvent(event) || isSimulationClosedEvent(event)) {
+          registerTerminalRecord(createTerminalSimulationRecord(event));
+        }
         recordSimulationEvent(event);
       });
       const unsubscribeState = client.onConnectionStateChange(() => {});
@@ -482,7 +609,7 @@ export function useSimulation() {
       eventsBySimulationRef.current,
       activeSimulationIds,
     );
-  }, [config, recordSimulationEvent, simulations]);
+  }, [config, recordSimulationEvent, registerTerminalRecord, simulations]);
 
   useEffect(() => {
     return () => {
@@ -530,7 +657,7 @@ export function useSimulation() {
         return;
       }
 
-      if (event.type === 'simulation_closed') {
+      if (isSimulationClosedEvent(event)) {
         void handleSimulationClosed(event.simulationId);
         return;
       }
@@ -576,6 +703,7 @@ export function useSimulation() {
               base: event.baseId,
               source: event.source,
             },
+            event.needs,
           );
           const currentTick = current.tick ?? 0;
           return {
@@ -602,7 +730,9 @@ export function useSimulation() {
             },
           };
         });
-      } else if (event.type === 'simulation_ended') {
+      } else if (isSimulationEndedEvent(event)) {
+        const terminalRecord = terminalRecordsRef.current.get(event.simulationId)
+          ?? createTerminalSimulationRecord(event);
         setState((current) => {
           if (current.status !== 'running') return current;
           const endedTick = event.tick as number;
@@ -614,6 +744,7 @@ export function useSimulation() {
             tick: endedTick,
             maxTick: boundedMaxTick,
             time: event.timestamp,
+            terminalRecord,
             playbackTick:
               current.playbackTick == null ? null : Math.min(current.playbackTick, boundedMaxTick),
           };
@@ -737,6 +868,7 @@ export function useSimulation() {
           splitTick: simulationInfo.splitTick,
           splitTimestamp: simulationInfo.splitTimestamp,
           sourceEvent: simulationInfo.sourceEvent,
+          terminalRecord: terminalRecordsRef.current.get(simulationInfo.id) ?? current.terminalRecord,
         };
       });
     } catch (error) {
@@ -785,6 +917,10 @@ export function useSimulation() {
     });
   }, []);
 
+  const dismissTerminalModal = useCallback(() => {
+    setActiveTerminalModalRecord(null);
+  }, []);
+
   const visibleState = state.status === 'running'
     ? {
         ...state,
@@ -798,6 +934,11 @@ export function useSimulation() {
   return {
     state: visibleState,
     events: currentEvents,
+    terminalRecord: currentTerminalRecord,
+    latestTerminalRecord,
+    terminalRecords,
+    activeTerminalModalRecord,
+    dismissTerminalModal,
     setPlaybackTick,
     simulations,
     isLoadingSimulations,
