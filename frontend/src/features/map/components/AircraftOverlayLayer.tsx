@@ -9,6 +9,28 @@ type AircraftOverlayLayerProps = {
   viewBox: MapViewBox;
 };
 
+const DEFAULT_AIRCRAFT_STROKE = '#94a3b8';
+
+const AIRCRAFT_STATE_STROKE_COLORS: Record<string, string> = {
+  inbound: '#2563eb',
+  landing: '#f59e0b',
+  servicing: '#d946ef',
+  turnaround: '#06b6d4',
+  ready: '#16a34a',
+  holding: '#7c3aed',
+  assessment: '#f97316',
+  repair: '#dc2626',
+  taxi: '#eab308',
+};
+
+function normalizeAircraftState(state: string) {
+  return state.trim().toLowerCase();
+}
+
+export function getAircraftStrokeColor(state: string) {
+  return AIRCRAFT_STATE_STROKE_COLORS[normalizeAircraftState(state)] ?? DEFAULT_AIRCRAFT_STROKE;
+}
+
 export function AircraftOverlayLayer({
   aircraftPositions,
   containerSize,
@@ -26,6 +48,7 @@ export function AircraftOverlayLayer({
         <div
           key={aircraft.tailNumber}
           className="absolute flex items-center justify-center text-primary"
+          data-aircraft-state={normalizeAircraftState(aircraft.state)}
           style={{
             left: `calc(${aircraft.x}% - 20px)`,
             top: `calc(${aircraft.y}% - 20px)`,
@@ -39,7 +62,7 @@ export function AircraftOverlayLayer({
           <IoMdJet 
             className="h-10 w-10 text-white drop-shadow-md" 
             style={{ 
-              stroke: '#f59e0b',
+              stroke: getAircraftStrokeColor(aircraft.state),
               strokeWidth: '24',
               strokeLinejoin: 'round' 
             }} 

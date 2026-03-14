@@ -5,6 +5,7 @@ import type { MapViewBox } from '@/features/map/types';
 
 export type RenderedAircraft = {
   tailNumber: string;
+  state: string;
   x: number;
   y: number;
   rotation: number;
@@ -29,8 +30,8 @@ export function useSmoothAircrafts(
 
   const stateRef = useRef<{
     [tailNumber: string]: {
-      current: { x: number; y: number; rotation: number };
-      target: { x: number; y: number; rotation: number; rawX: number; rawY: number };
+      current: { x: number; y: number; rotation: number; state: string };
+      target: { x: number; y: number; rotation: number; rawX: number; rawY: number; state: string };
     };
   }>({});
 
@@ -55,8 +56,8 @@ export function useSmoothAircrafts(
 
       if (!state[ac.tailNumber]) {
         state[ac.tailNumber] = {
-          current: { x: ptX, y: ptY, rotation: 0 },
-          target: { x: ptX, y: ptY, rotation: 0, rawX: ac.position.x, rawY: ac.position.y },
+          current: { x: ptX, y: ptY, rotation: 0, state: ac.state },
+          target: { x: ptX, y: ptY, rotation: 0, rawX: ac.position.x, rawY: ac.position.y, state: ac.state },
         };
       } else {
         const prevTarget = state[ac.tailNumber].target;
@@ -70,7 +71,14 @@ export function useSmoothAircrafts(
           newRotation = headingDeg + 45;
         }
 
-        state[ac.tailNumber].target = { x: ptX, y: ptY, rotation: newRotation, rawX: ac.position.x, rawY: ac.position.y };
+        state[ac.tailNumber].target = {
+          x: ptX,
+          y: ptY,
+          rotation: newRotation,
+          rawX: ac.position.x,
+          rawY: ac.position.y,
+          state: ac.state,
+        };
       }
     });
 
@@ -119,6 +127,7 @@ export function useSmoothAircrafts(
 
           updatedList.push({
             tailNumber,
+            state: target.state,
             x: current.x,
             y: current.y,
             rotation: current.rotation,
