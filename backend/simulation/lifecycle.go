@@ -29,9 +29,9 @@ type NeedRateModel struct {
 func (m NeedRateModel) RateForPhase(phase NeedPhase) int64 {
 	switch phase {
 	case NeedPhaseOutbound:
-		return m.OutboundMilliPerHour + 200
+		return m.OutboundMilliPerHour + 350
 	case NeedPhaseEngaged:
-		return m.EngagedMilliPerHour + 200
+		return m.EngagedMilliPerHour + 350
 	case NeedPhaseServicing:
 		return m.ServicingMilliPerHour + 250
 	default:
