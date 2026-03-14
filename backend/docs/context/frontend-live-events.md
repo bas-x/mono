@@ -283,6 +283,17 @@ Both terminal event types use the same direct `summary` object. `totalDurationMs
   "tailNumber": "9b2e...",
   "baseId": "3a5f...",
   "source": "algorithm",
+  "needs": [
+    {
+      "type": "fuel",
+      "severity": 42,
+      "requiredCapability": "fuel",
+      "blocking": false
+    }
+  ],
+  "capabilities": {
+    "fuel": {"recoveryMultiplierPermille": 1300}
+  },
   "timestamp": "2026-03-11T18:00:08Z"
 }
 ```
@@ -311,6 +322,8 @@ Both terminal event types use the same direct `summary` object. `totalDurationMs
 Notes:
 
 - A landing override uses the existing `landing_assignment` websocket event.
+- `needs` is the assigned aircraft's current need snapshot at event emission time.
+- `capabilities` is the assigned airbase's current capability map at event emission time.
 - Frontend code should key off `source`:
   - `algorithm` = dispatcher-selected assignment
   - `human` = operator override applied through the API
