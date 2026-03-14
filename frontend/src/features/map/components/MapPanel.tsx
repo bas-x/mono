@@ -88,6 +88,7 @@ export function MapPanel() {
     loadSimulation,
     createSimulation,
     createBranchFromEvent,
+    overrideAssignment,
     refreshData,
     reset: resetSimulation,
     triggerReset,
@@ -329,6 +330,7 @@ export function MapPanel() {
                 simulationState={simulationState}
                 simulations={simulations}
                 onSelectSimulation={loadSimulation}
+                onOverrideAssignment={overrideAssignment}
                 portalRoot={mapOverlayPortalRoot}
               />
             )}

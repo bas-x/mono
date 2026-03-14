@@ -8,6 +8,7 @@ type SimulationInfoCardProps = {
   simulationState: SimulationState;
   simulations?: SimulationInfo[];
   onSelectSimulation?: (simulationId: string) => void;
+  onOverrideAssignment?: (tailNumber: string, baseId: string) => Promise<boolean>;
   portalRoot: Element | null;
 };
 
@@ -15,10 +16,12 @@ export function SimulationInfoCard({
   simulationState,
   simulations = [],
   onSelectSimulation,
+  onOverrideAssignment,
   portalRoot,
 }: SimulationInfoCardProps) {
   const [isSimOpen, setIsSimOpen] = useState(true);
   const [isAirOpen, setIsAirOpen] = useState(false);
+  const [overrideTargets, setOverrideTargets] = useState<Record<string, string>>({});
 
   if (typeof document === 'undefined' || simulationState.status !== 'running' || !portalRoot) {
     return null;
@@ -188,23 +191,61 @@ export function SimulationInfoCard({
           {simulationState.aircrafts?.map((ac, idx) => (
             <div
               key={ac.tailNumber}
-              className={`group flex cursor-pointer items-center justify-between p-3 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-[color:var(--color-shell-button-hover)] ${
+              className={`group flex cursor-pointer flex-col gap-3 p-3 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] hover:bg-[color:var(--color-shell-button-hover)] ${
                 idx !== simulationState.aircrafts.length - 1
                   ? 'border-b border-[color:var(--color-shell-border)]'
                   : ''
               }`}
             >
-              <div className="flex items-center gap-3 transition-transform duration-400 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:translate-x-2">
-                <span className="font-mono text-sm font-semibold text-[color:var(--color-shell-text)] transition-colors duration-300 group-hover:text-[color:var(--color-primary)]">
-                  {ac.tailNumber.substring(0, 8)}
-                </span>
-                <span className="rounded-full border border-[color:var(--color-shell-button-border)] bg-[color:var(--color-shell-button-bg)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[color:var(--color-shell-text-muted)] transition-all duration-300 group-hover:border-[color:var(--color-primary)]/40 group-hover:bg-[color:var(--color-shell-button-hover)] group-hover:text-[color:var(--color-shell-text)]">
-                  {ac.state}
-                </span>
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 transition-transform duration-400 ease-[cubic-bezier(0.32,0.72,0,1)] group-hover:translate-x-2">
+                  <span className="font-mono text-sm font-semibold text-[color:var(--color-shell-text)] transition-colors duration-300 group-hover:text-[color:var(--color-primary)]">
+                    {ac.tailNumber.substring(0, 8)}
+                  </span>
+                  <span className="rounded-full border border-[color:var(--color-shell-button-border)] bg-[color:var(--color-shell-button-bg)] px-2 py-0.5 text-[10px] uppercase tracking-wider text-[color:var(--color-shell-text-muted)] transition-all duration-300 group-hover:border-[color:var(--color-primary)]/40 group-hover:bg-[color:var(--color-shell-button-hover)] group-hover:text-[color:var(--color-shell-text)]">
+                    {ac.state}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-[color:var(--color-shell-text-muted)]">
+                  <span>{ac.assignedTo ? `Base ${ac.assignedTo.slice(0, 6)}` : 'Unassigned'}</span>
+                  <span className="rounded-full border border-[color:var(--color-shell-button-border)] px-2 py-0.5">
+                    {ac.assignmentSource === 'human' ? 'Manual' : 'Auto'}
+                  </span>
+                </div>
               </div>
-              <button className="text-[10px] font-bold uppercase tracking-wider text-[color:var(--color-primary)] opacity-0 -translate-x-3 transition-all duration-400 ease-[cubic-bezier(0.32,0.72,0,1)] hover:text-[color:var(--color-primary-strong)] active:scale-95 group-hover:translate-x-0 group-hover:opacity-100">
-                SEE DETAILS
-              </button>
+
+              <div className="flex items-center gap-2">
+                <select
+                  value={overrideTargets[ac.tailNumber] ?? ac.assignedTo ?? simulationState.airbases[0]?.id ?? ''}
+                  onChange={(event) => {
+                    const nextBaseId = event.target.value;
+                    setOverrideTargets((current) => ({
+                      ...current,
+                      [ac.tailNumber]: nextBaseId,
+                    }));
+                  }}
+                  className="shell-input min-w-0 flex-1 rounded-sm border px-2 py-1.5 text-xs"
+                >
+                  {simulationState.airbases.map((airbase) => (
+                    <option key={airbase.id} value={airbase.id}>
+                      {airbase.region} ({airbase.id.slice(0, 6)})
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const targetBaseId = overrideTargets[ac.tailNumber] ?? ac.assignedTo ?? simulationState.airbases[0]?.id;
+                    if (!targetBaseId || !onOverrideAssignment) {
+                      return;
+                    }
+                    void onOverrideAssignment(ac.tailNumber, targetBaseId);
+                  }}
+                  className="shell-button rounded-sm border px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-[color:var(--color-primary)]"
+                >
+                  Override
+                </button>
+              </div>
             </div>
           ))}
           {(!simulationState.aircrafts || simulationState.aircrafts.length === 0) && (
