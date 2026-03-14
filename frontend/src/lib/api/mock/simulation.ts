@@ -1,64 +1,50 @@
 import type {
   CreateBaseSimulationRequest,
-  SimulationInfo,
+  CreateBranchSimulationRequest,
   SimulationServiceClient,
 } from '@/lib/api/types';
 import {
-  createMockSimulationFromRequest,
-  createMockSimulationInfoUpdate,
-  getMockSimulationScenario,
-  listMockSimulationScenarios,
-} from '@/lib/api/mock/scenarios';
+  createStoredMockBaseSimulation,
+  createStoredMockBranchSimulation,
+  createStoredMockSimulationInfoUpdate,
+  getStoredMockSimulationScenario,
+  listStoredMockSimulationScenarios,
+  resetMockScenarioStore,
+  resetStoredMockSimulation,
+  updateStoredMockSimulationInfo,
+} from '@/lib/api/mock/store';
 
 export function createMockSimulationServiceClient(): SimulationServiceClient {
-  const simulationStore = new Map<string, ReturnType<typeof getMockSimulationScenario>>();
-
-  for (const scenario of listMockSimulationScenarios()) {
-    simulationStore.set(scenario.info.id, scenario);
-  }
-
-  function ensureScenario(simulationId: string) {
-    const existingScenario = simulationStore.get(simulationId);
-    if (existingScenario) {
-      return existingScenario;
-    }
-
-    const fallbackScenario = getMockSimulationScenario(simulationId);
-    simulationStore.set(simulationId, fallbackScenario);
-    return fallbackScenario;
-  }
-
-  function updateSimulationInfo(simulationId: string, nextInfo: SimulationInfo) {
-    const scenario = ensureScenario(simulationId);
-    simulationStore.set(simulationId, {
-      ...scenario,
-      info: nextInfo,
-    });
-  }
+  resetMockScenarioStore();
 
   return {
     async getSimulations() {
       console.log('Mock: Getting simulations');
-      return Array.from(simulationStore.values()).map((scenario) => ({ ...scenario.info }));
+      return listStoredMockSimulationScenarios().map((scenario) => ({ ...scenario.info }));
     },
 
     async getSimulation(simulationId: string) {
       console.log('Mock: Getting simulation', simulationId);
-      return { ...ensureScenario(simulationId).info };
+      return { ...getStoredMockSimulationScenario(simulationId).info };
     },
 
     async createBaseSimulation(request: CreateBaseSimulationRequest) {
       console.log('Mock: Creating base simulation', request);
-      const scenario = createMockSimulationFromRequest(request);
-      simulationStore.set(scenario.info.id, scenario);
+      const scenario = createStoredMockBaseSimulation(request);
       return { id: scenario.info.id };
+    },
+
+    async createBranchSimulation(simulationId: string, request?: CreateBranchSimulationRequest) {
+      console.log('Mock: Branching simulation', simulationId, request);
+      const scenario = createStoredMockBranchSimulation(simulationId, request);
+      return { ...scenario.info };
     },
 
     async startSimulation(simulationId: string) {
       console.log('Mock: Starting simulation', simulationId);
-      updateSimulationInfo(
+      updateStoredMockSimulationInfo(
         simulationId,
-        createMockSimulationInfoUpdate(simulationId, {
+        createStoredMockSimulationInfoUpdate(simulationId, {
           running: true,
           paused: false,
         }),
@@ -67,9 +53,9 @@ export function createMockSimulationServiceClient(): SimulationServiceClient {
 
     async pauseSimulation(simulationId: string) {
       console.log('Mock: Pausing simulation', simulationId);
-      updateSimulationInfo(
+      updateStoredMockSimulationInfo(
         simulationId,
-        createMockSimulationInfoUpdate(simulationId, {
+        createStoredMockSimulationInfoUpdate(simulationId, {
           running: true,
           paused: true,
         }),
@@ -78,9 +64,9 @@ export function createMockSimulationServiceClient(): SimulationServiceClient {
 
     async resumeSimulation(simulationId: string) {
       console.log('Mock: Resuming simulation', simulationId);
-      updateSimulationInfo(
+      updateStoredMockSimulationInfo(
         simulationId,
-        createMockSimulationInfoUpdate(simulationId, {
+        createStoredMockSimulationInfoUpdate(simulationId, {
           running: true,
           paused: false,
         }),
@@ -89,13 +75,12 @@ export function createMockSimulationServiceClient(): SimulationServiceClient {
 
     async resetSimulation(simulationId: string) {
       console.log('Mock: Resetting simulation', simulationId);
-      const scenario = getMockSimulationScenario(simulationId);
-      simulationStore.set(simulationId, scenario);
+      resetStoredMockSimulation(simulationId);
     },
 
     async getAirbases(simulationId: string) {
       console.log('Mock: Getting airbases for simulation', simulationId);
-      return ensureScenario(simulationId).airbases.map((airbase) => ({
+      return getStoredMockSimulationScenario(simulationId).airbases.map((airbase) => ({
         ...airbase,
         location: { ...airbase.location },
         metadata: airbase.metadata ? { ...airbase.metadata } : undefined,
@@ -104,7 +89,7 @@ export function createMockSimulationServiceClient(): SimulationServiceClient {
 
     async getAircrafts(simulationId: string) {
       console.log('Mock: Getting aircrafts for simulation', simulationId);
-      return ensureScenario(simulationId).aircrafts.map((aircraft) => ({
+      return getStoredMockSimulationScenario(simulationId).aircrafts.map((aircraft) => ({
         ...aircraft,
         needs: aircraft.needs.map((need) => ({ ...need })),
       }));

@@ -41,4 +41,26 @@ describe('createMockSimulationServiceClient', () => {
 
     expect(created.id).toBe('mock-light-sortie');
   });
+
+  it('creates branch simulations with lineage metadata', async () => {
+    const client = createMockSimulationServiceClient();
+
+    const branch = await client.createBranchSimulation('base', {
+      sourceEvent: {
+        id: 'timeline-evt-17',
+        type: 'landing_assignment',
+        tick: 41,
+      },
+    });
+
+    expect(branch.id).toMatch(/^branch-/);
+    expect(branch.parentId).toBe('base');
+    expect(branch.splitTick).toBeTypeOf('number');
+    expect(branch.splitTimestamp).toBeTypeOf('string');
+    expect(branch.sourceEvent).toEqual({
+      id: 'timeline-evt-17',
+      type: 'landing_assignment',
+      tick: 41,
+    });
+  });
 });
