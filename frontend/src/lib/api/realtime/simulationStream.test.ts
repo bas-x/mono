@@ -106,4 +106,29 @@ describe('parseSimulationEvent', () => {
       },
     });
   });
+
+  it('passes threat event payloads through with threat position data', () => {
+    const event = parseSimulationEvent(JSON.stringify({
+      type: 'threat_spawned',
+      simulationId: 'base',
+      tick: 4,
+      timestamp: '2026-03-12T03:15:05Z',
+      threat: {
+        id: 'threat-1',
+        position: { x: 201.2, y: 422.4 },
+        createdAt: '2026-03-12T03:15:05Z',
+        createdTick: 4,
+      },
+    }));
+
+    expect(event).toMatchObject({
+      type: 'threat_spawned',
+      threat: {
+        id: 'threat-1',
+        position: { x: 201.2, y: 422.4 },
+        createdAt: '2026-03-12T03:15:05Z',
+        createdTick: 4,
+      },
+    });
+  });
 });

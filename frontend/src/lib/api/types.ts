@@ -70,6 +70,13 @@ export type SimulationAircraft = {
   assignmentSource?: AssignmentSource;
 };
 
+export type SimulationThreat = {
+  id: string;
+  position: { x: number; y: number };
+  createdAt: string;
+  createdTick: number;
+};
+
 export type AssignmentSource = 'algorithm' | 'human';
 
 export type Assignment = {
@@ -271,6 +278,25 @@ export type SimulationClosedEvent = SimulationEvent & {
   tick: number;
   reason: SimulationClosedReason;
   summary: ServicingSummary;
+};
+
+export type ThreatSpawnedEvent = SimulationEvent & {
+  type: 'threat_spawned';
+  tick: number;
+  threat: SimulationThreat;
+};
+
+export type ThreatTargetedEvent = SimulationEvent & {
+  type: 'threat_targeted';
+  tick: number;
+  threat: SimulationThreat;
+  tailNumber: string;
+};
+
+export type ThreatDespawnedEvent = SimulationEvent & {
+  type: 'threat_despawned';
+  tick: number;
+  threat: SimulationThreat;
 };
 
 export type SimulationEventEnvelope = SimulationEvent;
