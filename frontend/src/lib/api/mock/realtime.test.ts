@@ -40,11 +40,39 @@ describe('createMockSimulationStreamClient', () => {
     });
 
     client.connect('mock-full-sortie');
-    vi.advanceTimersByTime(250 + 1_500 * 6);
+    vi.advanceTimersByTime(250 + 1_500 * 20);
 
     expect(eventTypes).toContain('all_aircraft_positions');
     expect(eventTypes).toContain('landing_assignment');
     expect(eventTypes).toContain('aircraft_state_change');
+    expect(eventTypes).toContain('simulation_ended');
+
+    client.disconnect();
+    vi.useRealTimers();
+  });
+
+  it('emits simulation_ended with a flat terminal summary payload', () => {
+    vi.useFakeTimers();
+
+    const client = createMockSimulationStreamClient();
+    const endedEvents: Array<Record<string, unknown>> = [];
+
+    client.subscribe((event) => {
+      if (event.type === 'simulation_ended') {
+        endedEvents.push(event as Record<string, unknown>);
+      }
+    });
+
+    client.connect('mock-full-sortie');
+    vi.advanceTimersByTime(250 + 1_500 * 20);
+
+    expect(endedEvents).toHaveLength(1);
+    expect(endedEvents[0]?.summary).toEqual({
+      completedVisitCount: 2,
+      totalDurationMs: 10000,
+      averageDurationMs: 5000,
+    });
+    expect((endedEvents[0]?.summary as Record<string, unknown>).servicing).toBeUndefined();
 
     client.disconnect();
     vi.useRealTimers();
@@ -85,11 +113,16 @@ describe('createMockSimulationStreamClient', () => {
 
     const service = createMockSimulationServiceClient();
     const client = createMockSimulationStreamClient();
-    const seenEvents: Array<{ baseId: string; source: string }> = [];
+    const seenEvents: Array<{ baseId: string; source: string; needs: unknown; capabilities: unknown }> = [];
 
     client.subscribe((event) => {
       if (event.type === 'landing_assignment' && event.source === 'human') {
-        seenEvents.push({ baseId: String(event.baseId), source: String(event.source) });
+        seenEvents.push({
+          baseId: String(event.baseId),
+          source: String(event.source),
+          needs: event.needs,
+          capabilities: event.capabilities,
+        });
       }
     });
 
@@ -100,7 +133,14 @@ describe('createMockSimulationStreamClient', () => {
     const airbases = await service.getAirbases('base');
     await service.overrideAssignment('base', aircrafts[0]!.tailNumber, { baseId: airbases[1]!.id });
 
-    expect(seenEvents.at(-1)).toEqual({ baseId: airbases[1]!.id, source: 'human' });
+    expect(seenEvents.at(-1)).toEqual({
+      baseId: airbases[1]!.id,
+      source: 'human',
+      needs: aircrafts[0]!.needs,
+      capabilities: expect.objectContaining({
+        fuel: expect.objectContaining({ recoveryMultiplierPermille: expect.any(Number) }),
+      }),
+    });
 
     client.disconnect();
     vi.useRealTimers();

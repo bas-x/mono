@@ -1,5 +1,6 @@
 import { SIMULATION_TICKS_PER_SECOND } from '@/lib/api/types';
 import type {
+  AirbaseCapabilityMap,
   CreateBaseSimulationRequest,
   SimulationAirbase,
   SimulationAircraft,
@@ -30,6 +31,30 @@ function createNeed(type: string, severity: number, blocking = false) {
     requiredCapability: type,
     blocking,
   };
+}
+
+function createCapabilities(...entries: Array<[string, number]>): AirbaseCapabilityMap {
+  return Object.fromEntries(
+    entries.map(([capability, recoveryMultiplierPermille]) => [
+      capability,
+      { recoveryMultiplierPermille },
+    ]),
+  );
+}
+
+export function getMockAirbaseCapabilities(baseId: string): AirbaseCapabilityMap {
+  switch (baseId) {
+    case 'd397eeeddbfae33e':
+      return createCapabilities(['fuel', 1300], ['munitions', 1150]);
+    case 'c4d6652975d0f4c8':
+      return createCapabilities(['crew_support', 1250], ['ground_support', 1100]);
+    case '77d0b19d42cb68a1':
+      return createCapabilities(['repairs', 1400], ['maintenance', 1200]);
+    case 'e32c7ce8a4b77c11':
+      return createCapabilities(['fuel', 1200], ['crew_support', 1050]);
+    default:
+      return createCapabilities(['fuel', 1000]);
+  }
 }
 
 const LIGHT_AIRBASES: SimulationAirbase[] = [
@@ -154,7 +179,15 @@ const LIGHT_EVENTS: MockSimulationScenario['events'] = [
       { tailNumber: 'BX-330', position: { x: 84.111, y: 646.524 }, state: 'Ready', needs: [] },
     ],
   },
-  { type: 'landing_assignment', tick: 1, tailNumber: 'BX-101', baseId: 'd397eeeddbfae33e' },
+  {
+    type: 'landing_assignment',
+    tick: 1,
+    tailNumber: 'BX-101',
+    baseId: 'd397eeeddbfae33e',
+    source: 'algorithm',
+    needs: LIGHT_AIRCRAFTS[0]?.needs ?? [],
+    capabilities: getMockAirbaseCapabilities('d397eeeddbfae33e'),
+  },
   { type: 'simulation_step', tick: 1 },
   {
     type: 'aircraft_state_change',
@@ -188,7 +221,15 @@ const LIGHT_EVENTS: MockSimulationScenario['events'] = [
     },
   },
   { type: 'simulation_step', tick: 6 },
-  { type: 'simulation_ended', tick: 8 },
+  {
+    type: 'simulation_ended',
+    tick: 8,
+    summary: {
+      completedVisitCount: 1,
+      totalDurationMs: 3000,
+      averageDurationMs: 3000,
+    },
+  },
 ];
 
 const FULL_EVENTS: MockSimulationScenario['events'] = [
@@ -205,8 +246,24 @@ const FULL_EVENTS: MockSimulationScenario['events'] = [
       { tailNumber: 'BX-662', position: { x: 162.004, y: 524.113 }, state: 'Holding', needs: FULL_AIRCRAFTS[5]?.needs ?? [] },
     ],
   },
-  { type: 'landing_assignment', tick: 1, tailNumber: 'BX-101', baseId: 'd397eeeddbfae33e' },
-  { type: 'landing_assignment', tick: 1, tailNumber: 'BX-214', baseId: 'c4d6652975d0f4c8' },
+  {
+    type: 'landing_assignment',
+    tick: 1,
+    tailNumber: 'BX-101',
+    baseId: 'd397eeeddbfae33e',
+    source: 'algorithm',
+    needs: FULL_AIRCRAFTS[0]?.needs ?? [],
+    capabilities: getMockAirbaseCapabilities('d397eeeddbfae33e'),
+  },
+  {
+    type: 'landing_assignment',
+    tick: 1,
+    tailNumber: 'BX-214',
+    baseId: 'c4d6652975d0f4c8',
+    source: 'algorithm',
+    needs: FULL_AIRCRAFTS[1]?.needs ?? [],
+    capabilities: getMockAirbaseCapabilities('c4d6652975d0f4c8'),
+  },
   { type: 'simulation_step', tick: 1 },
   {
     type: 'aircraft_state_change',
@@ -277,7 +334,15 @@ const FULL_EVENTS: MockSimulationScenario['events'] = [
   },
   { type: 'simulation_step', tick: 9 },
   { type: 'simulation_step', tick: 12 },
-  { type: 'simulation_ended', tick: 16 },
+  {
+    type: 'simulation_ended',
+    tick: 16,
+    summary: {
+      completedVisitCount: 2,
+      totalDurationMs: 10000,
+      averageDurationMs: 5000,
+    },
+  },
 ];
 
 const BASE_SCENARIOS: Record<string, MockSimulationScenario> = {
@@ -346,6 +411,17 @@ export function cloneMockSimulationScenario(
               : position.needs,
           }))
         : event.positions,
+      capabilities:
+        typeof event.capabilities === 'object' && event.capabilities !== null
+          ? Object.fromEntries(
+              Object.entries(event.capabilities as Record<string, Record<string, unknown>>).map(
+                ([capability, details]) => [capability, { ...details }],
+              ),
+            )
+          : event.capabilities,
+      needs: Array.isArray(event.needs)
+        ? event.needs.map((need: Record<string, unknown>) => ({ ...need }))
+        : event.needs,
     })),
   };
 }

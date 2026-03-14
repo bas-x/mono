@@ -11,6 +11,7 @@ import {
   cloneMockSimulationScenario,
   createMockEventTimestamp,
   createMockSimulationFromRequest,
+  getMockAirbaseCapabilities,
   getMockSimulationScenario,
   listMockSimulationScenarios,
   type MockSimulationScenario,
@@ -203,6 +204,8 @@ export function overrideStoredMockAssignment(
     tailNumber,
     baseId,
     source: 'human',
+    needs: updatedAircraft.needs.map((need) => ({ ...need })),
+    capabilities: getMockAirbaseCapabilities(baseId),
     tick: scenario.info.tick,
     timestamp: createMockEventTimestamp(scenario.info.tick, scenario.info.tick),
   });
