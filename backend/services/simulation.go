@@ -145,6 +145,7 @@ func (s *SimulationService) BranchSimulationWithSourceEvent(simulationID string,
 	s.broadcaster.Emit(BranchCreatedEvent{
 		Type:           EventTypeBranchCreated,
 		SimulationID:   BaseSimulationID,
+		Tick:           splitTick,
 		BranchID:       branchID,
 		ParentID:       parentID,
 		SplitTick:      splitTick,
@@ -701,6 +702,7 @@ func (s *SimulationService) registerHooks(simulationID string, sim *simulation.S
 		s.broadcaster.Emit(AircraftStateChangeEvent{
 			Type:         EventTypeAircraftStateChange,
 			SimulationID: simulationID,
+			Tick:         event.Tick,
 			TailNumber:   hex.EncodeToString(event.TailNumber[:]),
 			OldState:     event.OldState,
 			NewState:     event.NewState,
@@ -713,6 +715,7 @@ func (s *SimulationService) registerHooks(simulationID string, sim *simulation.S
 		s.broadcaster.Emit(LandingAssignmentEvent{
 			Type:         EventTypeLandingAssignment,
 			SimulationID: simulationID,
+			Tick:         event.Tick,
 			TailNumber:   hex.EncodeToString(event.TailNumber[:]),
 			BaseID:       hex.EncodeToString(event.Base[:]),
 			Source:       mapAssignmentSource(event.Source),
@@ -733,6 +736,7 @@ func (s *SimulationService) registerHooks(simulationID string, sim *simulation.S
 		s.broadcaster.Emit(ThreatSpawnedEvent{
 			Type:         EventTypeThreatSpawned,
 			SimulationID: simulationID,
+			Tick:         event.Tick,
 			Threat:       mapThreat(event.Threat),
 			Timestamp:    event.Timestamp,
 		})
@@ -742,6 +746,7 @@ func (s *SimulationService) registerHooks(simulationID string, sim *simulation.S
 		s.broadcaster.Emit(ThreatTargetedEvent{
 			Type:         EventTypeThreatTargeted,
 			SimulationID: simulationID,
+			Tick:         event.Tick,
 			Threat:       mapThreat(event.Threat),
 			TailNumber:   hex.EncodeToString(event.TailNumber[:]),
 			Timestamp:    event.Timestamp,
@@ -752,6 +757,7 @@ func (s *SimulationService) registerHooks(simulationID string, sim *simulation.S
 		s.broadcaster.Emit(ThreatDespawnedEvent{
 			Type:         EventTypeThreatDespawned,
 			SimulationID: simulationID,
+			Tick:         event.Tick,
 			Threat:       mapThreat(event.Threat),
 			Timestamp:    event.Timestamp,
 		})
