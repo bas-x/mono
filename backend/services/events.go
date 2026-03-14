@@ -55,12 +55,13 @@ func (e LandingAssignmentEvent) EventSimulationID() string {
 }
 
 type BranchCreatedEvent struct {
-	Type           string    `json:"type"`
-	SimulationID   string    `json:"simulationId"`
-	BranchID       string    `json:"branchId"`
-	ParentID       string    `json:"parentId"`
-	SplitTick      uint64    `json:"splitTick"`
-	SplitTimestamp time.Time `json:"splitTimestamp"`
+	Type           string       `json:"type"`
+	SimulationID   string       `json:"simulationId"`
+	BranchID       string       `json:"branchId"`
+	ParentID       string       `json:"parentId"`
+	SplitTick      uint64       `json:"splitTick"`
+	SplitTimestamp time.Time    `json:"splitTimestamp"`
+	SourceEvent    *SourceEvent `json:"sourceEvent,omitempty"`
 }
 
 func (e BranchCreatedEvent) EventType() string {

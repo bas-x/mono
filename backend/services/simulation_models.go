@@ -55,6 +55,12 @@ type Assignment struct {
 	Source string `json:"source"`
 }
 
+type SourceEvent struct {
+	ID   string `json:"id"`
+	Type string `json:"type"`
+	Tick uint64 `json:"tick"`
+}
+
 func mapAirbase(input simulation.Airbase) Airbase {
 	var metadata map[string]any
 	if input.Metadata != nil {

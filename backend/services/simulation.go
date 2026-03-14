@@ -51,6 +51,7 @@ type managedSimulation struct {
 	parentID       *string
 	splitTick      *uint64
 	splitTimestamp *time.Time
+	sourceEvent    *SourceEvent
 }
 
 type BaseSimulationConfig struct {
@@ -60,15 +61,16 @@ type BaseSimulationConfig struct {
 }
 
 type SimulationInfo struct {
-	ID             string     `json:"id"`
-	Running        bool       `json:"running"`
-	Paused         bool       `json:"paused"`
-	Tick           uint64     `json:"tick"`
-	Timestamp      time.Time  `json:"timestamp"`
-	ParentID       *string    `json:"parentId"`
-	SplitTick      *uint64    `json:"splitTick"`
-	SplitTimestamp *time.Time `json:"splitTimestamp"`
-	UntilTick      int64      `json:"untilTick,omitempty"`
+	ID             string       `json:"id"`
+	Running        bool         `json:"running"`
+	Paused         bool         `json:"paused"`
+	Tick           uint64       `json:"tick"`
+	Timestamp      time.Time    `json:"timestamp"`
+	ParentID       *string      `json:"parentId"`
+	SplitTick      *uint64      `json:"splitTick"`
+	SplitTimestamp *time.Time   `json:"splitTimestamp"`
+	SourceEvent    *SourceEvent `json:"sourceEvent,omitempty"`
+	UntilTick      int64        `json:"untilTick,omitempty"`
 }
 
 func NewSimulationService(cfg SimulationServiceConfig) *SimulationService {
@@ -90,6 +92,10 @@ func NewSimulationService(cfg SimulationServiceConfig) *SimulationService {
 }
 
 func (s *SimulationService) BranchSimulation(simulationID string) (string, error) {
+	return s.BranchSimulationWithSourceEvent(simulationID, nil)
+}
+
+func (s *SimulationService) BranchSimulationWithSourceEvent(simulationID string, sourceEvent *SourceEvent) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -124,6 +130,7 @@ func (s *SimulationService) BranchSimulation(simulationID string) (string, error
 	branchSim := baseSnapshot.Clone()
 	resetSimulationHooks(branchSim)
 	s.registerHooks(branchID, branchSim)
+	persistedSourceEvent := cloneSourceEvent(sourceEvent)
 	s.branches[branchID] = &managedSimulation{
 		sim:            branchSim,
 		running:        wasRunning,
@@ -132,6 +139,7 @@ func (s *SimulationService) BranchSimulation(simulationID string) (string, error
 		parentID:       ptr(parentID),
 		splitTick:      ptr(splitTick),
 		splitTimestamp: ptr(splitTimestamp),
+		sourceEvent:    persistedSourceEvent,
 	}
 
 	s.broadcaster.Emit(BranchCreatedEvent{
@@ -141,9 +149,19 @@ func (s *SimulationService) BranchSimulation(simulationID string) (string, error
 		ParentID:       parentID,
 		SplitTick:      splitTick,
 		SplitTimestamp: splitTimestamp,
+		SourceEvent:    persistedSourceEvent,
 	})
 
 	return branchID, nil
+}
+
+func cloneSourceEvent(sourceEvent *SourceEvent) *SourceEvent {
+	if sourceEvent == nil {
+		return nil
+	}
+
+	cloned := *sourceEvent
+	return &cloned
 }
 
 func (s *SimulationService) StepSimulation(simulationID string) error {
@@ -486,6 +504,7 @@ func simulationInfoFromManaged(id string, managed *managedSimulation) Simulation
 	info.ParentID = managed.parentID
 	info.SplitTick = managed.splitTick
 	info.SplitTimestamp = managed.splitTimestamp
+	info.SourceEvent = managed.sourceEvent
 	info.UntilTick = managed.untilTick
 	if managed.sim != nil {
 		info.Tick = managed.sim.Tick()
