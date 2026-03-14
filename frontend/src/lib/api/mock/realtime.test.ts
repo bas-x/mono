@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import { createMockSimulationStreamClient } from '@/lib/api/mock/realtime';
+import { createMockSimulationServiceClient } from '@/lib/api/mock/simulation';
 
 describe('createMockSimulationStreamClient', () => {
   it('emits deterministic sequence values', () => {
@@ -44,6 +45,36 @@ describe('createMockSimulationStreamClient', () => {
     expect(eventTypes).toContain('all_aircraft_positions');
     expect(eventTypes).toContain('landing_assignment');
     expect(eventTypes).toContain('aircraft_state_change');
+
+    client.disconnect();
+    vi.useRealTimers();
+  });
+
+  it('emits branch_created on the base stream after branch creation', async () => {
+    vi.useFakeTimers();
+
+    const service = createMockSimulationServiceClient();
+    const client = createMockSimulationStreamClient();
+    const branchEvents: string[] = [];
+
+    client.subscribe((event) => {
+      if (event.type === 'branch_created') {
+        branchEvents.push(String(event.branchId));
+      }
+    });
+
+    client.connect('base');
+    vi.advanceTimersByTime(250);
+    await service.createBranchSimulation('base', {
+      sourceEvent: {
+        id: 'timeline-evt-17',
+        type: 'landing_assignment',
+        tick: 41,
+      },
+    });
+
+    expect(branchEvents).toHaveLength(1);
+    expect(branchEvents[0]).toMatch(/^branch-/);
 
     client.disconnect();
     vi.useRealTimers();
