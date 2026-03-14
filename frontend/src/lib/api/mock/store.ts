@@ -1,7 +1,10 @@
 import type {
+  AssignmentSource,
   CreateBaseSimulationRequest,
   CreateBranchSimulationRequest,
+  OverrideAssignmentResponse,
   SimulationEvent,
+  SimulationAircraft,
   SimulationInfo,
 } from '@/lib/api/types';
 import {
@@ -14,7 +17,7 @@ import {
 } from '@/lib/api/mock/scenarios';
 
 const simulationStore = new Map<string, MockSimulationScenario>();
-const baseBranchEventSubscribers = new Set<(event: SimulationEvent) => void>();
+const simulationEventSubscribers = new Map<string, Set<(event: SimulationEvent) => void>>();
 let branchCounter = 0;
 
 function initializeStore() {
@@ -40,6 +43,32 @@ function cloneStoredScenario(scenario: MockSimulationScenario): MockSimulationSc
 export function resetMockScenarioStore() {
   branchCounter = 0;
   initializeStore();
+  simulationEventSubscribers.clear();
+}
+
+function createMockHttpError(status: number, message: string) {
+  return {
+    status,
+    body: JSON.stringify({ message }),
+  };
+}
+
+function cloneAircraft(aircraft: SimulationAircraft): SimulationAircraft {
+  return {
+    ...aircraft,
+    needs: aircraft.needs.map((need) => ({ ...need })),
+  };
+}
+
+function emitMockSimulationEvent(simulationId: string, event: SimulationEvent) {
+  const subscribers = simulationEventSubscribers.get(simulationId);
+  if (!subscribers) {
+    return;
+  }
+
+  subscribers.forEach((handler) => {
+    handler(event);
+  });
 }
 
 export function listStoredMockSimulationScenarios(): MockSimulationScenario[] {
@@ -122,11 +151,69 @@ export function createStoredMockBranchSimulation(
     splitTimestamp,
     sourceEvent: request?.sourceEvent ? { ...request.sourceEvent } : undefined,
   };
-  baseBranchEventSubscribers.forEach((handler) => {
-    handler(branchCreatedEvent);
-  });
+  emitMockSimulationEvent('base', branchCreatedEvent);
 
   return storedScenario;
+}
+
+export function overrideStoredMockAssignment(
+  simulationId: string,
+  tailNumber: string,
+  baseId: string,
+): OverrideAssignmentResponse {
+  const scenario = simulationStore.get(simulationId);
+  if (!scenario) {
+    throw createMockHttpError(404, 'simulation or aircraft not found');
+  }
+
+  const baseExists = scenario.airbases.some((airbase) => airbase.id === baseId);
+  if (!baseExists) {
+    throw createMockHttpError(400, 'airbase not found');
+  }
+
+  const nextAircrafts = scenario.aircrafts.map((aircraft) => {
+    if (aircraft.tailNumber !== tailNumber) {
+      return cloneAircraft(aircraft);
+    }
+
+    if (aircraft.state === 'Committed') {
+      throw createMockHttpError(409, 'assignment override too late');
+    }
+
+    return {
+      ...cloneAircraft(aircraft),
+      assignedTo: baseId,
+      assignmentSource: 'human' as AssignmentSource,
+    };
+  });
+
+  const updatedAircraft = nextAircrafts.find((aircraft) => aircraft.tailNumber === tailNumber);
+  if (!updatedAircraft) {
+    throw createMockHttpError(404, 'simulation or aircraft not found');
+  }
+
+  simulationStore.set(simulationId, {
+    ...cloneStoredScenario(scenario),
+    aircrafts: nextAircrafts,
+  });
+
+  emitMockSimulationEvent(simulationId, {
+    type: 'landing_assignment',
+    simulationId,
+    tailNumber,
+    baseId,
+    source: 'human',
+    tick: scenario.info.tick,
+    timestamp: createMockEventTimestamp(scenario.info.tick, scenario.info.tick),
+  });
+
+  return {
+    aircraft: cloneAircraft(updatedAircraft),
+    assignment: {
+      base: baseId,
+      source: 'human',
+    },
+  };
 }
 
 export function createStoredMockSimulationInfoUpdate(
@@ -140,12 +227,24 @@ export function createStoredMockSimulationInfoUpdate(
   };
 }
 
-export function subscribeToMockBaseBranchEvents(
+export function subscribeToMockSimulationEvents(
+  simulationId: string,
   handler: (event: SimulationEvent) => void,
 ): () => void {
-  baseBranchEventSubscribers.add(handler);
+  const currentSubscribers = simulationEventSubscribers.get(simulationId) ?? new Set();
+  currentSubscribers.add(handler);
+  simulationEventSubscribers.set(simulationId, currentSubscribers);
+
   return () => {
-    baseBranchEventSubscribers.delete(handler);
+    const subscribers = simulationEventSubscribers.get(simulationId);
+    if (!subscribers) {
+      return;
+    }
+
+    subscribers.delete(handler);
+    if (subscribers.size === 0) {
+      simulationEventSubscribers.delete(simulationId);
+    }
   };
 }
 

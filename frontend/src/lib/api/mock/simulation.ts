@@ -1,6 +1,7 @@
 import type {
   CreateBaseSimulationRequest,
   CreateBranchSimulationRequest,
+  OverrideAssignmentRequest,
   SimulationServiceClient,
 } from '@/lib/api/types';
 import {
@@ -9,6 +10,7 @@ import {
   createStoredMockSimulationInfoUpdate,
   getStoredMockSimulationScenario,
   listStoredMockSimulationScenarios,
+  overrideStoredMockAssignment,
   resetMockScenarioStore,
   resetStoredMockSimulation,
   updateStoredMockSimulationInfo,
@@ -38,6 +40,11 @@ export function createMockSimulationServiceClient(): SimulationServiceClient {
       console.log('Mock: Branching simulation', simulationId, request);
       const scenario = createStoredMockBranchSimulation(simulationId, request);
       return { ...scenario.info };
+    },
+
+    async overrideAssignment(simulationId: string, tailNumber: string, request: OverrideAssignmentRequest) {
+      console.log('Mock: Overriding assignment', simulationId, tailNumber, request);
+      return overrideStoredMockAssignment(simulationId, tailNumber, request.baseId);
     },
 
     async startSimulation(simulationId: string) {
