@@ -205,7 +205,7 @@ func deterministicNeedRate(tail TailNumber, needType NeedType, phase NeedPhase, 
 	hash := int64(binary.BigEndian.Uint64(tail[:])) + int64(idx*97) + int64(phase*193)
 	spread := model.VariancePermille*2 + 1
 	offset := (hash % spread) - model.VariancePermille
-	adjusted := base * (1000 + offset) / 100
+	adjusted := base * (1200 + offset) / 100
 	if adjusted < 1 {
 		return 1
 	}
